@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(**/*.unity)",
+      "Write(**/*.unity)",
+      "Edit(**/*.prefab)",
+      "Write(**/*.prefab)",
+      "Edit(**/*.asset)",
+      "Write(**/*.asset)"
+    ]
+  }
+}
