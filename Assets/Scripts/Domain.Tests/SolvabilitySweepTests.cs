@@ -75,7 +75,7 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void InflatingOneEnemyStrandsTheLevelThePanelJustCleared()
+        public void ThePanelIsNotVacuousWhenAnEnemyIsInflated()
         {
             var caught = 0;
             var mutated = 0;

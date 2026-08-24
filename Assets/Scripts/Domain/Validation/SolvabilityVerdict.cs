@@ -5,7 +5,7 @@ namespace Game.Domain
 {
     public sealed class SolvabilityVerdict
     {
-        SolvabilityVerdict(
+        internal SolvabilityVerdict(
             SolvabilityReason reason,
             int offendingNodeId,
             int bossNodeId,
@@ -28,20 +28,6 @@ namespace Game.Domain
         internal static SolvabilityVerdict Malformed(SolvabilityReason reason, int offendingNodeId)
         {
             return new SolvabilityVerdict(reason, offendingNodeId, -1, 0, 0, 0, false, null);
-        }
-
-        internal static SolvabilityVerdict Judged(
-            SolvabilityReason reason,
-            int offendingNodeId,
-            int bossNodeId,
-            int bossPower,
-            long bound,
-            int beelinePower,
-            bool beelineBlocked,
-            StallReport stall)
-        {
-            return new SolvabilityVerdict(
-                reason, offendingNodeId, bossNodeId, bossPower, bound, beelinePower, beelineBlocked, stall);
         }
 
         public bool IsSafe

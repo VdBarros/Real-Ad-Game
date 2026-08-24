@@ -29,6 +29,19 @@ namespace Game.Domain
             NodeType.Enemy, NodeType.Multiplier, NodeType.Additive
         };
 
+        readonly struct Appetite
+        {
+            public Appetite(NodeType[] order, bool biggestWins)
+            {
+                Order = order;
+                BiggestWins = biggestWins;
+            }
+
+            public NodeType[] Order { get; }
+
+            public bool BiggestWins { get; }
+        }
+
         public static IReadOnlyList<AdversaryPolicy> Policies
         {
             get { return All; }
@@ -36,12 +49,14 @@ namespace Game.Domain
 
         public static StallReport FirstStall(LevelGraph level, PowerTuning tuning)
         {
-            return FirstStall(BoardOf(level, tuning), tuning);
+            RequireTuning(tuning);
+            return FirstStall(ContentBoard.Of(level), tuning);
         }
 
         public static StallReport Walk(LevelGraph level, PowerTuning tuning, AdversaryPolicy policy)
         {
-            return Walk(BoardOf(level, tuning), tuning, policy);
+            RequireTuning(tuning);
+            return Walk(ContentBoard.Of(level), tuning, policy);
         }
 
         internal static StallReport FirstStall(ContentBoard board, PowerTuning tuning)
@@ -63,21 +78,18 @@ namespace Game.Domain
             var consumed = new bool[board.Count];
             var power = tuning.StartingPower;
 
-            for (var step = 0; step <= board.Count; step++)
+            while (true)
             {
                 var reachable = board.ReachableFlags(consumed);
                 var take = NextUnder(policy, board, reachable, consumed, power);
                 if (take < 0)
                 {
-                    return Reported(policy, board, reachable, consumed, power);
+                    return StallIfStranded(policy, board, reachable, consumed, power);
                 }
 
                 power = board.PowerAfter(power, take);
                 consumed[take] = true;
             }
-
-            throw new InvalidOperationException(
-                "An adversary walk consumes a node a step, so it cannot outrun the board.");
         }
 
         static int NextUnder(
@@ -87,10 +99,9 @@ namespace Game.Domain
             bool[] consumed,
             int power)
         {
-            var biggestWins = policy == AdversaryPolicy.BiggestAdditiveFirst
-                || policy == AdversaryPolicy.BiggestMultiplierFirst;
+            var appetite = AppetiteOf(policy);
 
-            foreach (var wanted in PriorityOf(policy))
+            foreach (var wanted in appetite.Order)
             {
                 var take = -1;
                 for (var nodeId = 0; nodeId < board.Count; nodeId++)
@@ -109,7 +120,9 @@ namespace Game.Domain
                         }
                     }
                     else if (take < 0
-                        || (biggestWins ? value > board.ValueOf(take) : value < board.ValueOf(take)))
+                        || (appetite.BiggestWins
+                            ? value > board.ValueOf(take)
+                            : value < board.ValueOf(take)))
                     {
                         take = nodeId;
                     }
@@ -124,23 +137,28 @@ namespace Game.Domain
             return -1;
         }
 
-        static NodeType[] PriorityOf(AdversaryPolicy policy)
+        static Appetite AppetiteOf(AdversaryPolicy policy)
         {
             switch (policy)
             {
                 case AdversaryPolicy.AdditiveFirst:
-                case AdversaryPolicy.BiggestAdditiveFirst:
-                    return AdditiveLed;
+                    return new Appetite(AdditiveLed, biggestWins: false);
 
                 case AdversaryPolicy.EnemyFirst:
-                    return EnemyLed;
+                    return new Appetite(EnemyLed, biggestWins: false);
+
+                case AdversaryPolicy.BiggestAdditiveFirst:
+                    return new Appetite(AdditiveLed, biggestWins: true);
+
+                case AdversaryPolicy.BiggestMultiplierFirst:
+                    return new Appetite(MultiplierLed, biggestWins: true);
 
                 default:
-                    return MultiplierLed;
+                    return new Appetite(MultiplierLed, biggestWins: false);
             }
         }
 
-        static StallReport Reported(
+        static StallReport StallIfStranded(
             AdversaryPolicy policy,
             ContentBoard board,
             bool[] reachable,
@@ -175,19 +193,12 @@ namespace Game.Domain
                 : new StallReport(policy, power, consumedIds, reachableIds, stranded);
         }
 
-        static ContentBoard BoardOf(LevelGraph level, PowerTuning tuning)
+        static void RequireTuning(PowerTuning tuning)
         {
-            if (level == null)
-            {
-                throw new ArgumentNullException(nameof(level));
-            }
-
             if (tuning == null)
             {
                 throw new ArgumentNullException(nameof(tuning));
             }
-
-            return ContentBoard.Of(level);
         }
     }
 }

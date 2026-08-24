@@ -129,6 +129,28 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void InvariantAIsWalkedEvenWhenInvariantBHasAlreadyFailed()
+        {
+            var verdict = SolvabilityValidator.Validate(
+                LevelSketch.Branching(gateEnemy: 500, boss: 600).Build(), LevelSketch.Tuning);
+
+            Assert.That(verdict.Reason, Is.EqualTo(SolvabilityReason.BossBeyondBound));
+            Assert.That(
+                verdict.Stall,
+                Is.Not.Null,
+                "The panel was skipped because another invariant had already failed.");
+            Assert.That(verdict.Stall.Power, Is.EqualTo(22));
+        }
+
+        [Test]
+        public void InvariantBReadsAGraphNoBoardCouldBeBuiltFrom()
+        {
+            var headless = LevelSketch.Solvable().Retyped(0, 0, NodeType.Empty).Build();
+
+            Assert.That(PowerBound.Of(headless, LevelSketch.Tuning), Is.EqualTo(49));
+        }
+
+        [Test]
         public void InvariantBIsAPureLinearComputation()
         {
             var level = LevelSketch.Solvable().Build();

@@ -36,10 +36,10 @@ namespace Game.Domain
             bool beelineBlocked;
             var beelinePower = EnvelopeWalks.ShortestPathPower(board, tuning, bossNodeId, out beelineBlocked);
 
-            var reason = SolvabilityReason.None;
             var offendingNodeId = FirstGatedBehindTheBoss(board, bossNodeId);
-            StallReport stall = null;
+            var stall = AdversaryPanel.FirstStall(board, tuning);
 
+            var reason = SolvabilityReason.None;
             if (offendingNodeId >= 0)
             {
                 reason = SolvabilityReason.GatedBehindBoss;
@@ -52,16 +52,12 @@ namespace Game.Domain
             {
                 reason = SolvabilityReason.BossWithinReach;
             }
-            else
+            else if (stall != null)
             {
-                stall = AdversaryPanel.FirstStall(board, tuning);
-                if (stall != null)
-                {
-                    reason = SolvabilityReason.AdversaryStalled;
-                }
+                reason = SolvabilityReason.AdversaryStalled;
             }
 
-            return SolvabilityVerdict.Judged(
+            return new SolvabilityVerdict(
                 reason, offendingNodeId, bossNodeId, bossPower, bound, beelinePower, beelineBlocked, stall);
         }
 

@@ -4,7 +4,7 @@ namespace Game.Domain
 {
     public static class LevelGenerator
     {
-        public const int MaximumAttempts = MazeLayoutGenerator.MaximumAttempts;
+        public const int MaximumAttempts = 50;
 
         const int LayoutReasonCount = (int)LayoutRejection.TooFewOffPathSlots + 1;
 
