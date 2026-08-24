@@ -11,6 +11,8 @@ namespace Game.Presentation.Pure
 
         public const string NodesGroup = "Nodes";
 
+        public const string BadgesGroup = "Badges";
+
         public static string Floor(int floor)
         {
             return "Floor_" + floor.ToString(CultureInfo.InvariantCulture);
@@ -34,6 +36,11 @@ namespace Game.Presentation.Pure
         public static string Node(int nodeId)
         {
             return "Node_" + nodeId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static string Badge(int nodeId)
+        {
+            return "Badge_" + nodeId.ToString(CultureInfo.InvariantCulture);
         }
 
         static string Key(TilePosition position)
