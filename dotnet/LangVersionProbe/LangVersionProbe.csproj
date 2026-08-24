@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- This project is expected to FAIL to build. It inherits the same
+       Directory.Build.props ceiling as Game.Domain, so if it ever compiles the
+       fast loop has drifted past Unity's C# 9 compiler and can go green where
+       the Editor would be red. Nothing references it; CI builds it and asserts
+       the failure. See .github/workflows/domain-tests.yml. -->
+
+  <PropertyGroup>
+    <TargetFramework>$(UnityTargetFramework)</TargetFramework>
+    <AssemblyName>LangVersionProbe</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="NewerThanUnity.cs" />
+  </ItemGroup>
+
+</Project>

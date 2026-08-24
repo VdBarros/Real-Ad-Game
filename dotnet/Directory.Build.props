@@ -1,0 +1,23 @@
+<Project>
+
+  <!-- Compile the way Unity compiles. Unity 6000.5.9f1 builds player assemblies
+       against netstandard2.1 with the C# 9 language version; anything newer here
+       would let domain code pass the fast loop and fail in the Editor. Every
+       project under dotnet/ inherits this, including LangVersionProbe, which
+       exists to prove the ceiling is actually enforced. -->
+
+  <PropertyGroup>
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <UnityTargetFramework>netstandard2.1</UnityTargetFramework>
+    <ScriptsRoot>$(MSBuildThisFileDirectory)..\Assets\Scripts\</ScriptsRoot>
+  </PropertyGroup>
+
+</Project>
