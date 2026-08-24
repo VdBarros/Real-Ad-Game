@@ -6,17 +6,18 @@ namespace Game.Domain.Tests
     public class AdversaryPanelTests
     {
         [Test]
-        public void ThePanelIsFiveDistinctPolicies()
+        public void ThePanelIsSixDistinctPolicies()
         {
             var seen = new List<AdversaryPolicy>(AdversaryPanel.Policies);
 
-            Assert.That(seen.Count, Is.EqualTo(5));
+            Assert.That(seen.Count, Is.EqualTo(6));
             Assert.That(seen, Is.Unique);
             Assert.That(seen, Contains.Item(AdversaryPolicy.MultiplierFirst));
             Assert.That(seen, Contains.Item(AdversaryPolicy.AdditiveFirst));
             Assert.That(seen, Contains.Item(AdversaryPolicy.EnemyFirst));
             Assert.That(seen, Contains.Item(AdversaryPolicy.BiggestAdditiveFirst));
             Assert.That(seen, Contains.Item(AdversaryPolicy.BiggestMultiplierFirst));
+            Assert.That(seen, Contains.Item(AdversaryPolicy.AdditiveLast));
         }
 
         [Test]

@@ -11,7 +11,8 @@ namespace Game.Domain
             AdversaryPolicy.AdditiveFirst,
             AdversaryPolicy.EnemyFirst,
             AdversaryPolicy.BiggestAdditiveFirst,
-            AdversaryPolicy.BiggestMultiplierFirst
+            AdversaryPolicy.BiggestMultiplierFirst,
+            AdversaryPolicy.AdditiveLast
         };
 
         static readonly NodeType[] MultiplierLed =
@@ -22,6 +23,11 @@ namespace Game.Domain
         static readonly NodeType[] AdditiveLed =
         {
             NodeType.Additive, NodeType.Multiplier, NodeType.Enemy
+        };
+
+        static readonly NodeType[] MultiplierLedEnemySecond =
+        {
+            NodeType.Multiplier, NodeType.Enemy, NodeType.Additive
         };
 
         static readonly NodeType[] EnemyLed =
@@ -152,6 +158,9 @@ namespace Game.Domain
 
                 case AdversaryPolicy.BiggestMultiplierFirst:
                     return new Appetite(MultiplierLed, biggestWins: true);
+
+                case AdversaryPolicy.AdditiveLast:
+                    return new Appetite(MultiplierLedEnemySecond, biggestWins: false);
 
                 default:
                     return new Appetite(MultiplierLed, biggestWins: false);

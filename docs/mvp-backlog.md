@@ -212,18 +212,25 @@ before content exists, it is approximated by **tile distance from `Start`**
 From any reachable state, at least one unconsumed node must be both reachable
 and affordable. A state where none is, is a **stall**.
 
-Checked by an **adversary panel of five policies**, not one ([#9]). The
+Checked by an **adversary panel of six policies**, not one ([#9], T-07). The
 original single greedy-worst walk — multiplier, then addition, then cheapest
 affordable enemy — is **unsound in the dangerous direction**: measured against
 the exhaustive oracle it missed 14 real stalls in 2292 mutated levels. It never
 false-alarmed, so every failure it reports is real, but silence from it did not
 mean safe.
 
-The panel is that policy plus four siblings — additive-first, enemy-first,
-biggest-additive-first, biggest-multiplier-first. **A level fails if any policy
-strands.** Five walks cost microseconds each, and together they miss 4 of 2292.
-The original priority order stops being the *definition* of worst and becomes
-one member of the panel.
+The panel is that policy plus five siblings — additive-first, enemy-first,
+biggest-additive-first, biggest-multiplier-first, and additive-last (multiplier,
+then cheapest affordable enemy, then addition). **A level fails if any policy
+strands.** Six walks cost microseconds each. The original priority order stops
+being the *definition* of worst and becomes one member of the panel.
+
+Additive-last is T-07's addition, and it is the ordering that keeps final power
+lowest: an addition taken before a multiplier gets multiplied, so the adversary
+that never takes one early is the one that arrives poorest. On the fuzz suite's
+6000 `tiny` mutants the five-policy panel missed 31 real stalls; the six-policy
+panel misses 7. The other two type orders — enemy-then-addition and
+addition-then-enemy — were measured and caught nothing the six already had.
 
 Generation retries a rejected level, **capped at 50 attempts**, then throws
 with a per-reason histogram rather than looping.
@@ -232,14 +239,24 @@ with a per-reason histogram rather than looping.
 levels greedy and exhaustive agree vacuously — 0 stalls in 118 `tiny` levels —
 because #8 mints values during the adversary's own walk, so affordability is
 true by construction. T-07 must therefore *break* levels first (inflate one
-enemy ×3 / ×10 / ×50, one at a time) and assert the panel's verdict matches the
+enemy ×3 / ×10 / ×50, one at a time) and compare the panel's verdict with the
 oracle's on every mutant. **"Agree" means identical verdict, never identical
-consumed set** — the oracle explores all orderings, the panel walks five, so
+consumed set** — the oracle explores all orderings, the panel walks six, so
 their consumed sets differ legitimately on levels both call safe.
 
-The oracle runs on **`tiny` only**; `ship` blows a 200k state budget five times
-in six. Peak `(consumed-set, power)` state count on `tiny` is a median of 93,
-so it runs inside the fast loop rather than as a separate job.
+**Exact agreement is not a property any fixed set of greedy walks can have**,
+and T-07 measured the gap rather than pretending otherwise. Over 6000 mutants
+(400 `tiny` levels × 5 enemies × 3 factors): the oracle finds a stall in 3875,
+the panel in 3868, it **false-alarms 0 times** and **misses 7** — 0.12%. The
+suite therefore fails the build on a single false alarm, because every stall the
+panel reports must be real, and on a miss rate above 0.25%, which is the
+measured residual with headroom. Both residual and bar are `tiny`-mutant
+numbers: no unmutated level in the ten-thousand-seed sweep stalls at all.
+
+The oracle runs on **`tiny` only**; `ship` blows a 200k state budget six times
+in six, ~610 ms each. Peak `(consumed-set, power)` state count on `tiny` mutants
+is a median of 181, p90 1746, max 16177, so it runs inside the fast loop rather
+than as a separate job.
 
 ### Region scaling
 

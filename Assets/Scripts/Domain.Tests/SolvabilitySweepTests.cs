@@ -90,7 +90,7 @@ namespace Game.Domain.Tests
                     }
 
                     mutated++;
-                    var broken = Inflated(level.Graph, node.Id, 50);
+                    var broken = LevelMutation.WithNodeInflated(level.Graph, node.Id, 50);
                     if (AdversaryPanel.FirstStall(broken, level.Tuning) != null)
                     {
                         caught++;
@@ -105,37 +105,6 @@ namespace Game.Domain.Tests
                 caught,
                 Is.GreaterThan((int)(mutated * 0.5)),
                 "The panel let " + (mutated - caught) + " of " + mutated + " broken levels through.");
-        }
-
-        static LevelGraph Inflated(LevelGraph level, int nodeId, int factor)
-        {
-            var builder = new LevelGraphBuilder(level.Seed, level.Preset);
-
-            foreach (var tile in level.Tiles.Tiles)
-            {
-                builder.AddTile(tile.Position, tile.RegionId);
-            }
-
-            foreach (var stair in level.Tiles.Stairs)
-            {
-                builder.AddStair(stair.Lower, stair.Upper);
-            }
-
-            foreach (var node in level.Decisions.Nodes)
-            {
-                builder.AddNode(
-                    node.Position, node.Type, node.Id == nodeId ? node.Value * factor : node.Value);
-            }
-
-            foreach (var corridor in level.Decisions.Corridors)
-            {
-                builder.Connect(
-                    level.Decisions.Node(corridor.LowNodeId).Position,
-                    level.Decisions.Node(corridor.HighNodeId).Position,
-                    corridor.TilePath);
-            }
-
-            return builder.Build();
         }
     }
 }

@@ -51,9 +51,11 @@
   `Game.Domain.Tests` source (`Assets/Scripts/Domain/`,
   `Assets/Scripts/Presentation.Pure/`, `Assets/Scripts/Domain.Tests/`) is also
   globbed by standalone projects under `dotnet/` — same files, no duplication.
-  Run `dotnet test dotnet/Game.Domain.Tests` (~3s) instead of entering the Unity
-  Editor for domain work. 6 of 18 tasks are Phase 1 and that's where the
-  invariant-correctness risk sits — see mvp-backlog §2.
+  Run `dotnet test dotnet/Game.Domain.Tests` (~30s, of which T-07's ten-thousand
+  seed fuzz sweep is ~25s) instead of entering the Unity Editor for domain work;
+  add `--filter "FullyQualifiedName!~GeneratorFuzz"` for a ~5s loop while
+  iterating, and run the whole thing before you commit. 6 of 18 tasks are Phase 1
+  and that's where the invariant-correctness risk sits — see mvp-backlog §2.
   **Those projects compile the way Unity compiles**, or domain code passes the
   fast loop and fails in the Editor: `dotnet/Directory.Build.props` pins C# 9
   for everything under `dotnet/`, `Game.Domain` and `Game.Presentation.Pure`
