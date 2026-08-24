@@ -389,6 +389,25 @@ namespace Game.Domain.Tests
                 }
             }
 
+            var largest = 0;
+            var largestBoss = 0;
+            foreach (var level in sweep)
+            {
+                if (level.BossPower > largestBoss)
+                {
+                    largestBoss = level.BossPower;
+                }
+
+                foreach (var node in level.Graph.Decisions.Nodes)
+                {
+                    if (node.Type != NodeType.Boss && node.Value > largest)
+                    {
+                        largest = node.Value;
+                    }
+                }
+            }
+
+            Console.WriteLine("  largest badge, content " + largest + " boss " + largestBoss);
             Console.WriteLine("  regions whose dearest enemy tops P_max  " + ceilingBreaches);
             Console.WriteLine("  levels whose beeline is blocked  " + blocked);
             Console.WriteLine("  regions holding only the boss  " + enemylessRegions);
@@ -407,6 +426,10 @@ namespace Game.Domain.Tests
                 Quantile(passes, 0.9),
                 Is.LessThan(PowerTuning.FloorRepairPasses),
                 "Floor repair is running to its cap rather than converging.");
+            Assert.That(
+                Math.Max(largest, largestBoss),
+                Is.LessThan(1000),
+                "A badge needs a fourth digit: content " + largest + ", boss " + largestBoss + ".");
         }
 
         static bool[] ReachableWithoutTheBoss(PlacedLevel level)
