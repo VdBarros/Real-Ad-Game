@@ -34,7 +34,11 @@ namespace Game.Domain
                 throw new ArgumentNullException(nameof(level));
             }
 
-            RequireTuning(tuning);
+            if (tuning == null)
+            {
+                throw new ArgumentNullException(nameof(tuning));
+            }
+
             return Sweep(ContentBoard.Of(level), tuning, stateBudget);
         }
 
@@ -86,7 +90,7 @@ namespace Game.Domain
                         continue;
                     }
 
-                    if (board.TypeOf(nodeId) == NodeType.Enemy && state.Power <= board.ValueOf(nodeId))
+                    if (!board.CanAfford(state.Power, nodeId))
                     {
                         continue;
                     }
@@ -145,7 +149,6 @@ namespace Game.Domain
         static OracleStall StallAt(ContentBoard board, bool[] consumed, bool[] reachable, int power)
         {
             var consumedIds = new List<int>();
-            var stranded = new List<StrandedNode>();
 
             for (var nodeId = 0; nodeId < board.Count; nodeId++)
             {
@@ -153,27 +156,14 @@ namespace Game.Domain
                 {
                     consumedIds.Add(nodeId);
                 }
-                else if (board.IsContent(nodeId))
-                {
-                    stranded.Add(new StrandedNode(
-                        nodeId, board.TypeOf(nodeId), board.ValueOf(nodeId), reachable[nodeId]));
-                }
             }
 
-            return new OracleStall(power, consumedIds, stranded);
+            return new OracleStall(power, consumedIds, board.StrandedUnder(consumed, reachable));
         }
 
         static long KeyOf(int mask, int power)
         {
             return (long)mask << 32 | (uint)power;
-        }
-
-        static void RequireTuning(PowerTuning tuning)
-        {
-            if (tuning == null)
-            {
-                throw new ArgumentNullException(nameof(tuning));
-            }
         }
     }
 }

@@ -247,10 +247,11 @@ their consumed sets differ legitimately on levels both call safe.
 **Exact agreement is not a property any fixed set of greedy walks can have**,
 and T-07 measured the gap rather than pretending otherwise. Over 6000 mutants
 (400 `tiny` levels × 5 enemies × 3 factors): the oracle finds a stall in 3875,
-the panel in 3868, it **false-alarms 0 times** and **misses 7** — 0.12%. The
-suite therefore fails the build on a single false alarm, because every stall the
-panel reports must be real, and on a miss rate above 0.25%, which is the
-measured residual with headroom. Both residual and bar are `tiny`-mutant
+the panel in 3868, it **false-alarms 0 times** and **misses 7 of the 3875
+stalls there were to catch** — 0.18%. The suite therefore fails the build on a
+single false alarm, because every stall the panel reports must be real, and on
+a miss rate above 0.4% of the oracle's stalls, which is the measured residual
+with headroom. Both residual and bar are `tiny`-mutant
 numbers: no unmutated level in the ten-thousand-seed sweep stalls at all.
 
 The oracle runs on **`tiny` only**; `ship` blows a 200k state budget six times

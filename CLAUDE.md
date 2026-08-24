@@ -54,7 +54,10 @@
   Run `dotnet test dotnet/Game.Domain.Tests` (~30s, of which T-07's ten-thousand
   seed fuzz sweep is ~25s) instead of entering the Unity Editor for domain work;
   add `--filter "FullyQualifiedName!~GeneratorFuzz"` for a ~5s loop while
-  iterating, and run the whole thing before you commit. 6 of 18 tasks are Phase 1
+  iterating, and run the whole thing before you commit. The sweep's measurements
+  — rejection rate by reason, mean generation time, peak oracle state counts, the
+  `P_max/P_min` spread — print from a passing test, so they are only visible with
+  `-v n`. 6 of 18 tasks are Phase 1
   and that's where the invariant-correctness risk sits — see mvp-backlog §2.
   **Those projects compile the way Unity compiles**, or domain code passes the
   fast loop and fails in the Editor: `dotnet/Directory.Build.props` pins C# 9

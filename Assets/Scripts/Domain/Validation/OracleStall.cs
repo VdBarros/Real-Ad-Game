@@ -45,26 +45,9 @@ namespace Game.Domain
             description.Append("stalled at power ");
             description.Append(Power.ToString(CultureInfo.InvariantCulture));
             description.Append(" having consumed ");
-
-            if (consumed.Count == 0)
-            {
-                description.Append("nothing");
-            }
-            else
-            {
-                for (var index = 0; index < consumed.Count; index++)
-                {
-                    description.Append(index == 0 ? "#" : ", #");
-                    description.Append(consumed[index].ToString(CultureInfo.InvariantCulture));
-                }
-            }
-
+            StallText.Ids(description, consumed);
             description.Append(", stranding ");
-            for (var index = 0; index < stranded.Count; index++)
-            {
-                description.Append(index == 0 ? string.Empty : ", ");
-                description.Append(stranded[index]);
-            }
+            StallText.Nodes(description, stranded);
 
             return description.ToString();
         }
