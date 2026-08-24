@@ -143,6 +143,25 @@ namespace Game.Domain
             return flags;
         }
 
+        public bool CanAfford(int power, int nodeId)
+        {
+            return types[nodeId] != NodeType.Enemy || power > values[nodeId];
+        }
+
+        public List<StrandedNode> StrandedUnder(bool[] consumed, bool[] reachable)
+        {
+            var stranded = new List<StrandedNode>();
+            for (var nodeId = 0; nodeId < types.Length; nodeId++)
+            {
+                if (!consumed[nodeId] && IsContent(nodeId))
+                {
+                    stranded.Add(new StrandedNode(nodeId, types[nodeId], values[nodeId], reachable[nodeId]));
+                }
+            }
+
+            return stranded;
+        }
+
         public int PowerAfter(int power, int nodeId)
         {
             return types[nodeId] == NodeType.Multiplier ? power * values[nodeId] : power + values[nodeId];

@@ -6,6 +6,7 @@ namespace Game.Domain
         AdditiveFirst,
         EnemyFirst,
         BiggestAdditiveFirst,
-        BiggestMultiplierFirst
+        BiggestMultiplierFirst,
+        AdditiveLast
     }
 }

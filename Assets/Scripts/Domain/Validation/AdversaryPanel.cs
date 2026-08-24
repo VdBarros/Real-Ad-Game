@@ -11,7 +11,8 @@ namespace Game.Domain
             AdversaryPolicy.AdditiveFirst,
             AdversaryPolicy.EnemyFirst,
             AdversaryPolicy.BiggestAdditiveFirst,
-            AdversaryPolicy.BiggestMultiplierFirst
+            AdversaryPolicy.BiggestMultiplierFirst,
+            AdversaryPolicy.AdditiveLast
         };
 
         static readonly NodeType[] MultiplierLed =
@@ -22,6 +23,11 @@ namespace Game.Domain
         static readonly NodeType[] AdditiveLed =
         {
             NodeType.Additive, NodeType.Multiplier, NodeType.Enemy
+        };
+
+        static readonly NodeType[] MultiplierLedAdditiveLast =
+        {
+            NodeType.Multiplier, NodeType.Enemy, NodeType.Additive
         };
 
         static readonly NodeType[] EnemyLed =
@@ -114,7 +120,7 @@ namespace Game.Domain
                     var value = board.ValueOf(nodeId);
                     if (wanted == NodeType.Enemy)
                     {
-                        if (power > value && (take < 0 || value < board.ValueOf(take)))
+                        if (board.CanAfford(power, nodeId) && (take < 0 || value < board.ValueOf(take)))
                         {
                             take = nodeId;
                         }
@@ -153,6 +159,9 @@ namespace Game.Domain
                 case AdversaryPolicy.BiggestMultiplierFirst:
                     return new Appetite(MultiplierLed, biggestWins: true);
 
+                case AdversaryPolicy.AdditiveLast:
+                    return new Appetite(MultiplierLedAdditiveLast, biggestWins: false);
+
                 default:
                     return new Appetite(MultiplierLed, biggestWins: false);
             }
@@ -167,7 +176,7 @@ namespace Game.Domain
         {
             var consumedIds = new List<int>();
             var reachableIds = new List<int>();
-            var stranded = new List<StrandedNode>();
+            var stranded = board.StrandedUnder(consumed, reachable);
 
             for (var nodeId = 0; nodeId < board.Count; nodeId++)
             {
@@ -179,12 +188,6 @@ namespace Game.Domain
                 if (reachable[nodeId])
                 {
                     reachableIds.Add(nodeId);
-                }
-
-                if (!consumed[nodeId] && board.IsContent(nodeId))
-                {
-                    stranded.Add(new StrandedNode(
-                        nodeId, board.TypeOf(nodeId), board.ValueOf(nodeId), reachable[nodeId]));
                 }
             }
 
