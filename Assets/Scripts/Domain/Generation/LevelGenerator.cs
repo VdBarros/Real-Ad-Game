@@ -4,11 +4,11 @@ namespace Game.Domain
 {
     public static class LevelGenerator
     {
-        public const int MaximumAttempts = MazeLayoutGenerator.MaximumAttempts;
+        public const int MaximumAttempts = 50;
 
         const int LayoutReasonCount = (int)LayoutRejection.TooFewOffPathSlots + 1;
 
-        const int ContentReasonCount = (int)ContentRejection.BossWithinReach + 1;
+        const int ContentReasonCount = (int)ContentRejection.PanelStalled + 1;
 
         public static PlacedLevel Generate(long seed, MazePreset preset)
         {

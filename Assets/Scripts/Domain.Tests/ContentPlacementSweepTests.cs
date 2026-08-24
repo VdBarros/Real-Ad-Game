@@ -263,7 +263,7 @@ namespace Game.Domain.Tests
         {
             var accepted = 0;
             var contentRejections = 0;
-            var countByReason = new int[(int)ContentRejection.BossWithinReach + 1];
+            var countByReason = new int[(int)ContentRejection.PanelStalled + 1];
 
             for (var seed = 1; seed <= ShipSeeds; seed++)
             {
@@ -291,6 +291,14 @@ namespace Game.Domain.Tests
             Console.WriteLine(
                 "ship first-attempt acceptance " + accepted + "/" + ShipSeeds
                 + ", of the rejections " + contentRejections + " came from content placement");
+
+            for (var reason = 1; reason < countByReason.Length; reason++)
+            {
+                if (countByReason[reason] > 0)
+                {
+                    Console.WriteLine("  " + (ContentRejection)reason + " " + countByReason[reason]);
+                }
+            }
 
             Assert.That(
                 accepted,

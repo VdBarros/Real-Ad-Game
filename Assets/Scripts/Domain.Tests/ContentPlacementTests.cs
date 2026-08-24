@@ -146,6 +146,23 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void ASolvabilityReasonFillsTheHistogramTheCapThrowsWith()
+        {
+            var greedy = new PowerTuning(2, 600, 0.6, 0.2, 0.9999, 0.8, 0.7);
+
+            var thrown = Assert.Throws<LevelGenerationException>(
+                () => LevelGenerator.Generate(Seed, MazePreset.Ship, ContentRecipe.Ship, greedy, out _));
+
+            Assert.That(thrown.Attempts, Is.EqualTo(LevelGenerator.MaximumAttempts));
+            Assert.That(thrown.Report.Rejections, Is.EqualTo(LevelGenerator.MaximumAttempts));
+            Assert.That(
+                thrown.CountOf(ContentRejection.BossBeyondBound),
+                Is.GreaterThan(0),
+                "The histogram lost the reason the validator gave: " + thrown.Report);
+            Assert.That(thrown.Message, Does.Contain("BossBeyondBound"));
+        }
+
+        [Test]
         public void APresetWithNoFiledRecipeIsAnArgumentErrorRatherThanAGuess()
         {
             var unknown = new MazePreset("unknown", 5, 3, 1, 2, 0.25, 0, 11, 1, 0);

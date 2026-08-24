@@ -12,6 +12,7 @@ namespace Game.Domain
         EnvelopeInverted,
         GatedBehindBoss,
         BossBeyondBound,
-        BossWithinReach
+        BossWithinReach,
+        PanelStalled
     }
 }
