@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="NewerThanUnity.cs" />
+    <Compile Include="FileScopedNamespaceIsCSharp10.cs" />
   </ItemGroup>
 
 </Project>

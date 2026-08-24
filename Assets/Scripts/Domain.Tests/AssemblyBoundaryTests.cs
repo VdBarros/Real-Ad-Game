@@ -99,7 +99,14 @@ namespace Game.Domain.Tests
 
         static string ScriptsRoot([CallerFilePath] string sourceFile = "")
         {
-            return Directory.GetParent(Path.GetDirectoryName(sourceFile)).FullName;
+            var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile));
+            while (directory != null && directory.Name != "Scripts")
+            {
+                directory = directory.Parent;
+            }
+
+            Assert.That(directory, Is.Not.Null, $"No Scripts folder above {sourceFile}.");
+            return directory.FullName;
         }
     }
 }

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Compiles the test sources a second time, at Unity's netstandard2.1, and runs
+       nothing. Game.Domain.Tests must carry a runnable TFM to host the test
+       adapter, which leaves its sources able to bind BCL APIs Unity does not have
+       — the framework half of the gap Directory.Build.props closes for language.
+       Game.Domain.Tests takes a ReferenceOutputAssembly="false" reference to this
+       project so `dotnet test dotnet/Game.Domain.Tests` builds it without linking
+       it, and the fast loop fails on an API Unity lacks instead of the Editor. -->
+
+  <PropertyGroup>
+    <TargetFramework>$(UnityTargetFramework)</TargetFramework>
+    <AssemblyName>Game.Domain.Tests.Conformance</AssemblyName>
+    <RootNamespace>Game.Domain.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(ScriptsRoot)Domain.Tests\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Game.Domain\Game.Domain.csproj" />
+    <ProjectReference Include="..\Game.Presentation.Pure\Game.Presentation.Pure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="3.14.0" />
+  </ItemGroup>
+
+</Project>

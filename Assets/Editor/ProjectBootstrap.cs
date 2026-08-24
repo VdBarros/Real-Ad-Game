@@ -1,6 +1,6 @@
+using System;
 using UnityEditor;
 using UnityEditor.Build;
-using UnityEngine;
 
 namespace Game.EditorTooling
 {
@@ -39,20 +39,18 @@ namespace Game.EditorTooling
             var playerSettings = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset");
             if (playerSettings.Length == 0)
             {
-                Debug.LogError("Could not load ProjectSettings.asset, so active input handling went unverified.");
-                return;
+                throw new InvalidOperationException("Could not load ProjectSettings.asset to verify active input handling.");
             }
 
             var activeInputHandler = new SerializedObject(playerSettings[0]).FindProperty("activeInputHandler");
             if (activeInputHandler == null)
             {
-                Debug.LogError("ProjectSettings.asset has no activeInputHandler property, so active input handling went unverified.");
-                return;
+                throw new InvalidOperationException("ProjectSettings.asset has no activeInputHandler property.");
             }
 
             if (activeInputHandler.intValue != NewInputSystemOnly)
             {
-                Debug.LogError(
+                throw new InvalidOperationException(
                     "Active input handling is not 'Input System Package (New)'. " +
                     "Change it in Project Settings > Player and restart the Editor.");
             }

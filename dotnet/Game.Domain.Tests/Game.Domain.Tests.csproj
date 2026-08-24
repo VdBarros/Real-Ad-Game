@@ -1,12 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- The only runnable project in the fast loop: `dotnet test dotnet/Game.Domain.Tests`.
-       A test host cannot target netstandard2.1, so this project carries a modern
-       runtime TFM while the code under test lives in Game.Domain and
-       Game.Presentation.Pure, both pinned to Unity's netstandard2.1. The C# 9
-       ceiling from Directory.Build.props still applies to the test sources.
-       NUnit is held at 3.x because Unity 6000.5.9f1 ships nunit.framework 3.5;
-       NUnit 4 would let tests compile here and fail in the Editor. -->
+       A test host cannot target netstandard2.1, so this project carries a runnable
+       TFM while the code under test lives in Game.Domain and Game.Presentation.Pure,
+       both pinned to Unity's netstandard2.1. Two guards cover what that TFM would
+       otherwise let through: Directory.Build.props pins the language to C# 9, and
+       Game.Domain.Tests.Conformance recompiles these same sources at netstandard2.1
+       so a BCL API Unity lacks fails here rather than in the Editor.
+       NUnit is held at 3.x because Unity 6000.5.9f1 ships nunit.framework 3.5.0.0;
+       NUnit 4 would let tests compile here and fail in the Editor. 3.14 is the
+       closest runnable match, not an exact one — it is still possible to use an
+       API added between 3.5 and 3.14. -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -22,6 +26,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Game.Domain\Game.Domain.csproj" />
     <ProjectReference Include="..\Game.Presentation.Pure\Game.Presentation.Pure.csproj" />
+    <ProjectReference Include="..\Game.Domain.Tests.Conformance\Game.Domain.Tests.Conformance.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
