@@ -81,6 +81,15 @@ A tile is reachable when a path of tiles connects it to the player's position
 without passing through an unconsumed enemy or the boss. Reachability grows as
 nodes are consumed and never shrinks.
 
+## Route
+
+The run of decision nodes a tap commits the player to, from where they stand to
+the node they tapped. It is the shortest such run, and everything on it resolves
+in order — a route is a plan, not a suggestion. Only its last node may be an
+unconsumed enemy, since every other node on it was walked through; a tie or a
+loss there leaves the player standing on the node before it, holding whatever
+the walk already earned.
+
 ## Cleared
 
 A tile is cleared when it can be reached from the start once every consumed
