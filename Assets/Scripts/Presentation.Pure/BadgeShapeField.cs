@@ -12,7 +12,7 @@ namespace Game.Presentation.Pure
 
         public const int TextureHeight = CellPixels;
 
-        public const int PixelsPerUnit = CellPixels;
+        public const float PixelsPerUnit = CellPixels / BadgeMetrics.Height;
 
         public const float RoundedRectRadius = 18f;
 

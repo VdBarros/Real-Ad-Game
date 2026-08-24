@@ -13,18 +13,15 @@ namespace Game.Presentation
 
         TextMeshPro label;
 
-        string prefix;
-
         string monospace;
 
         public BadgeStyle Style { get; private set; }
 
-        public long Value { get; private set; }
+        public int Value { get; private set; }
 
         internal void Compose(BadgePart part, BadgePlan plan, BadgeAssets assets)
         {
             Style = part.Style;
-            prefix = BadgeStyles.Prefix(part.Style);
             monospace = "<mspace=" + BadgeMetrics.MonospaceEm.ToString("0.###", CultureInfo.InvariantCulture) + "em>";
 
             background = gameObject.AddComponent<SpriteRenderer>();
@@ -52,10 +49,10 @@ namespace Game.Presentation
             Show(part.Value);
         }
 
-        public void Show(long value)
+        public void Show(int value)
         {
             Value = value;
-            label.text = monospace + prefix + value.ToString(CultureInfo.InvariantCulture);
+            label.text = monospace + BadgeText.Of(Style, value);
         }
     }
 }

@@ -13,7 +13,8 @@ namespace Game.Presentation.Pure
                 throw new ArgumentNullException(nameof(graph));
             }
 
-            var plan = BadgePlan.For(graph, startingPower);
+            var ceiling = PowerCeiling.Of(graph, startingPower);
+            var plan = new BadgePlan(CapacityFor(graph, ceiling), ceiling);
             var badges = new List<BadgePart>();
 
             foreach (var node in graph.Decisions.Nodes)
@@ -25,9 +26,9 @@ namespace Game.Presentation.Pure
                     continue;
                 }
 
-                var tile = IsoProjection.Of(node.Position);
                 var isPlayer = style == BadgeStyle.Player;
                 var value = isPlayer ? startingPower : node.Value;
+                var tile = IsoProjection.Of(node.Position);
 
                 badges.Add(new BadgePart(
                     PartNames.Badge(node.Id),
@@ -41,6 +42,28 @@ namespace Game.Presentation.Pure
             }
 
             return new BadgeBlueprint(plan, badges);
+        }
+
+        static int CapacityFor(LevelGraph graph, long ceiling)
+        {
+            var capacity = BadgeText.Digits(ceiling);
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                BadgeStyle style;
+                if (!BadgeStyles.TryOf(node.Type, out style) || style == BadgeStyle.Player)
+                {
+                    continue;
+                }
+
+                var cells = BadgeText.Cells(style, node.Value);
+                if (cells > capacity)
+                {
+                    capacity = cells;
+                }
+            }
+
+            return capacity;
         }
     }
 }

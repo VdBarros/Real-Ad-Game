@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Diagnostics;
 using Game.Domain;
 using Game.Presentation.Pure;
 using UnityEngine;
@@ -14,26 +14,22 @@ namespace Game.Presentation
 
         readonly BadgeAssets badgeAssets = new BadgeAssets();
 
-        readonly List<int> badgeFloors = new List<int>();
-
-        readonly List<Transform> badgeGroups = new List<Transform>();
-
         public PowerBadge PlayerBadge { get; private set; }
 
-        public GameObject Build(LevelGraph graph, int startingPower)
+        public GameObject Build(LevelGraph graph)
         {
             if (graph == null)
             {
                 throw new ArgumentNullException(nameof(graph));
             }
 
+            var startingPower = PowerTuning.For(MazePreset.Named(graph.Preset)).StartingPower;
             var blueprint = LevelBlueprintBuilder.Build(graph);
             var badges = BadgeBlueprintBuilder.Build(graph, startingPower);
             var root = new GameObject(blueprint.RootName);
 
-            badgeFloors.Clear();
-            badgeGroups.Clear();
             PlayerBadge = null;
+            WarnIfTheCameraHasTurned();
 
             foreach (var floor in blueprint.Floors)
             {
@@ -51,27 +47,35 @@ namespace Game.Presentation
                     Raise(part, nodes);
                 }
 
-                badgeFloors.Add(floor.Floor);
-                badgeGroups.Add(Group(floorRoot, PartNames.BadgesGroup));
-            }
+                var group = Group(floorRoot, PartNames.BadgesGroup);
 
-            WarnIfTheCameraHasTurned();
-
-            foreach (var part in badges.Badges)
-            {
-                var badge = BadgeFactory.Raise(part, badges.Plan, badgeAssets, GroupFor(part.Floor));
-                if (part.Style != BadgeStyle.Player)
+                foreach (var part in badges.Badges)
                 {
-                    continue;
-                }
+                    if (part.Floor != floor.Floor)
+                    {
+                        continue;
+                    }
 
-                PlayerBadge = badge.gameObject.AddComponent<PowerBadge>();
-                PlayerBadge.Begin(badge, startingPower);
+                    Hang(part, badges.Plan, group, startingPower);
+                }
             }
 
             return root;
         }
 
+        void Hang(BadgePart part, BadgePlan plan, Transform parent, int startingPower)
+        {
+            var badge = BadgeFactory.Raise(part, plan, badgeAssets, parent);
+            if (part.Style != BadgeStyle.Player)
+            {
+                return;
+            }
+
+            PlayerBadge = badge.gameObject.AddComponent<PowerBadge>();
+            PlayerBadge.Begin(badge, startingPower);
+        }
+
+        [Conditional("UNITY_EDITOR")]
         static void WarnIfTheCameraHasTurned()
         {
             var camera = Camera.main;
@@ -88,23 +92,10 @@ namespace Game.Presentation
                 return;
             }
 
-            Debug.LogWarning(
+            UnityEngine.Debug.LogWarning(
                 "The main camera sits at " + camera.transform.rotation.eulerAngles
                 + " rather than the constant framing every badge copies its rotation from at construction. "
                 + "Badges do not billboard, so they will face the wrong way until the rig stops rotating.");
-        }
-
-        Transform GroupFor(int floor)
-        {
-            for (var slot = 0; slot < badgeFloors.Count; slot++)
-            {
-                if (badgeFloors[slot] == floor)
-                {
-                    return badgeGroups[slot];
-                }
-            }
-
-            throw new InvalidOperationException("A badge stands on floor " + floor + ", which the level has not built.");
         }
 
         void Raise(WorldPart part, Transform parent)

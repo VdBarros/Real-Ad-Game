@@ -9,7 +9,7 @@ namespace Game.Presentation.Pure
             int nodeId,
             int floor,
             BadgeStyle style,
-            long value,
+            int value,
             int cells,
             WorldPoint position,
             WorldPoint rotation)
@@ -37,7 +37,7 @@ namespace Game.Presentation.Pure
 
         public BadgeStyle Style { get; }
 
-        public long Value { get; }
+        public int Value { get; }
 
         public int Cells { get; }
 

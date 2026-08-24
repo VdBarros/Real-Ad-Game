@@ -14,7 +14,7 @@ namespace Game.Domain.Tests
         [Test]
         public void TheCeilingIsEveryGainTakenBeforeEveryMultiplier()
         {
-            var ceiling = PlayerPowerCeiling.Of(LevelGraphFixture.TwoFloors(), StartingPower);
+            var ceiling = PowerCeiling.Of(LevelGraphFixture.TwoFloors(), StartingPower);
 
             Assert.That(ceiling, Is.EqualTo((2 + 12 + 4 + 30) * 3));
         }
@@ -23,7 +23,7 @@ namespace Game.Domain.Tests
         public void NoRunCanOutgrowTheCeiling()
         {
             var graph = LevelGraphFixture.TwoFloors();
-            var ceiling = PlayerPowerCeiling.Of(graph, StartingPower);
+            var ceiling = PowerCeiling.Of(graph, StartingPower);
             var random = new Random(20250824);
 
             for (var attempt = 0; attempt < 200; attempt++)
@@ -71,7 +71,7 @@ namespace Game.Domain.Tests
             var level = LevelGenerator.Generate(20250824L, MazePreset.Ship);
             var plan = BadgePlan.For(level.Graph, PowerTuning.Ship.StartingPower);
 
-            Assert.That(plan.Capacity, Is.LessThanOrEqualTo(6));
+            Assert.That(plan.Capacity, Is.LessThanOrEqualTo(5));
             Assert.That(plan.PlayerWidth, Is.LessThanOrEqualTo(2f));
             Assert.That(plan.FontSize, Is.GreaterThan(0f));
         }
@@ -82,7 +82,7 @@ namespace Game.Domain.Tests
             for (var capacity = 1; capacity <= 8; capacity++)
             {
                 var width = BadgeMetrics.WidthFor(capacity);
-                var fontSize = BadgeMetrics.FontSizeFor(capacity);
+                var fontSize = BadgeMetrics.FontSize;
                 var textWidth = capacity * BadgeMetrics.MonospaceEm * fontSize * BadgeMetrics.UnitsPerFontPoint;
                 var textHeight = BadgeMetrics.CapHeightEm * fontSize * BadgeMetrics.UnitsPerFontPoint;
 
@@ -139,7 +139,7 @@ namespace Game.Domain.Tests
 
             Console.WriteLine("  dearest power ceiling " + dearest);
 
-            Assert.That(widest, Is.LessThanOrEqualTo(6));
+            Assert.That(widest, Is.LessThanOrEqualTo(5));
         }
 
         [Test]
@@ -148,7 +148,20 @@ namespace Game.Domain.Tests
             var widths = Enumerable.Range(1, 8).Select(BadgeMetrics.WidthFor).ToList();
 
             Assert.That(widths, Is.Ordered.Ascending);
-            Assert.That(Enumerable.Range(1, 8).Select(BadgeMetrics.FontSizeFor).Distinct().Count(), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TheNineSliceBordersFitInsideTheNarrowestBadgeTheyAreDrawnOn()
+        {
+            var narrowest = BadgeMetrics.WidthFor(1);
+
+            foreach (var shape in new[] { BadgeShape.RoundedRect, BadgeShape.Pill })
+            {
+                var border = BadgeShapeField.BorderOf(shape) / BadgeShapeField.PixelsPerUnit;
+
+                Assert.That(2f * border, Is.LessThan(BadgeMetrics.Height), shape.ToString());
+                Assert.That(2f * border, Is.LessThan(narrowest), shape.ToString());
+            }
         }
     }
 }

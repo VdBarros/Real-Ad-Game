@@ -28,14 +28,11 @@ namespace Game.Presentation.Pure
             return capacity * CellWidth + 2f * SidePadding;
         }
 
-        public static float FontSizeFor(int capacity)
-        {
-            RequireCapacity(capacity);
+        public const float FontSizeByWidth = CellWidth / (MonospaceEm * UnitsPerFontPoint);
 
-            var byWidth = CellWidth / (MonospaceEm * UnitsPerFontPoint);
-            var byHeight = (Height - 2f * VerticalPadding) / (CapHeightEm * UnitsPerFontPoint);
-            return byWidth < byHeight ? byWidth : byHeight;
-        }
+        public const float FontSizeByHeight = (Height - 2f * VerticalPadding) / (CapHeightEm * UnitsPerFontPoint);
+
+        public const float FontSize = FontSizeByWidth < FontSizeByHeight ? FontSizeByWidth : FontSizeByHeight;
 
         public static float AnchorHeight(WorldPart prop)
         {

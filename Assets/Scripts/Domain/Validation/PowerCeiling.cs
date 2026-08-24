@@ -1,17 +1,16 @@
 using System;
-using Game.Domain;
 
-namespace Game.Presentation.Pure
+namespace Game.Domain
 {
-    public static class PlayerPowerCeiling
+    public static class PowerCeiling
     {
         public const long Cap = 99999999L;
 
-        public static long Of(LevelGraph graph, int startingPower)
+        public static long Of(LevelGraph level, int startingPower)
         {
-            if (graph == null)
+            if (level == null)
             {
-                throw new ArgumentNullException(nameof(graph));
+                throw new ArgumentNullException(nameof(level));
             }
 
             if (startingPower < 1)
@@ -23,7 +22,7 @@ namespace Game.Presentation.Pure
             long gains = startingPower;
             long product = 1;
 
-            foreach (var node in graph.Decisions.Nodes)
+            foreach (var node in level.Decisions.Nodes)
             {
                 switch (node.Type)
                 {

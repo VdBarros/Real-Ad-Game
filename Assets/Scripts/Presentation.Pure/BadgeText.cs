@@ -5,12 +5,12 @@ namespace Game.Presentation.Pure
 {
     public static class BadgeText
     {
-        public static string Of(BadgeStyle style, long value)
+        public static string Of(BadgeStyle style, int value)
         {
             return BadgeStyles.Prefix(style) + value.ToString(CultureInfo.InvariantCulture);
         }
 
-        public static int Cells(BadgeStyle style, long value)
+        public static int Cells(BadgeStyle style, int value)
         {
             return BadgeStyles.Prefix(style).Length + Digits(value);
         }
