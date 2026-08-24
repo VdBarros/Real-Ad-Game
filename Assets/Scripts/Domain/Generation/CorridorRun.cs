@@ -4,52 +4,52 @@ namespace Game.Domain
 {
     sealed class CorridorRun
     {
-        CorridorRun(int first, int second, IReadOnlyList<int> path)
+        CorridorRun(int lowTile, int highTile, IReadOnlyList<int> path)
         {
-            First = first;
-            Second = second;
+            LowTile = lowTile;
+            HighTile = highTile;
             Path = path;
         }
 
-        public int First { get; }
+        public int LowTile { get; }
 
-        public int Second { get; }
+        public int HighTile { get; }
 
         public IReadOnlyList<int> Path { get; }
 
-        public bool IsLoop
+        public bool IsSelfLoop
         {
-            get { return First == Second; }
+            get { return LowTile == HighTile; }
         }
 
-        public static CorridorRun Canonical(int first, int second, IReadOnlyList<int> path)
+        public static CorridorRun Canonical(int oneEnd, int otherEnd, IReadOnlyList<int> path)
         {
             var reversed = new List<int>(path);
             reversed.Reverse();
 
-            if (first > second)
+            if (oneEnd > otherEnd)
             {
-                return new CorridorRun(second, first, reversed);
+                return new CorridorRun(otherEnd, oneEnd, reversed);
             }
 
-            if (first == second && ComparePaths(reversed, path) < 0)
+            if (oneEnd == otherEnd && ComparePaths(reversed, path) < 0)
             {
-                return new CorridorRun(first, second, reversed);
+                return new CorridorRun(oneEnd, otherEnd, reversed);
             }
 
-            return new CorridorRun(first, second, new List<int>(path));
+            return new CorridorRun(oneEnd, otherEnd, new List<int>(path));
         }
 
         public static int Compare(CorridorRun left, CorridorRun right)
         {
-            if (left.First != right.First)
+            if (left.LowTile != right.LowTile)
             {
-                return left.First < right.First ? -1 : 1;
+                return left.LowTile < right.LowTile ? -1 : 1;
             }
 
-            if (left.Second != right.Second)
+            if (left.HighTile != right.HighTile)
             {
-                return left.Second < right.Second ? -1 : 1;
+                return left.HighTile < right.HighTile ? -1 : 1;
             }
 
             return ComparePaths(left.Path, right.Path);
@@ -57,7 +57,7 @@ namespace Game.Domain
 
         public static bool JoinTheSamePair(CorridorRun left, CorridorRun right)
         {
-            return left.First == right.First && left.Second == right.Second;
+            return left.LowTile == right.LowTile && left.HighTile == right.HighTile;
         }
 
         static int ComparePaths(IReadOnlyList<int> left, IReadOnlyList<int> right)

@@ -6,7 +6,7 @@ namespace Game.Domain
     public sealed class MazeLayout
     {
         public MazeLayout(
-            long seed,
+            long attemptSeed,
             MazePreset preset,
             LevelGraph graph,
             TileDistanceMap distanceFromStart,
@@ -32,7 +32,7 @@ namespace Game.Domain
                 throw new ArgumentNullException(nameof(metrics));
             }
 
-            Seed = seed;
+            AttemptSeed = attemptSeed;
             Preset = preset;
             Graph = graph;
             DistanceFromStart = distanceFromStart;
@@ -66,7 +66,7 @@ namespace Game.Domain
             SlotNodeIds = slots;
         }
 
-        public long Seed { get; }
+        public long AttemptSeed { get; }
 
         public MazePreset Preset { get; }
 

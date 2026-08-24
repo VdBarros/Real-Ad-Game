@@ -5,33 +5,46 @@ namespace Game.Domain.Tests
 {
     public class MazeLayoutSweepTests
     {
-        const int Seeds = 1000;
+        const int ShipSeeds = 1000;
 
-        static readonly List<MazeLayout> Sweep = new List<MazeLayout>(Seeds);
+        static readonly Dictionary<string, List<MazeLayout>> SweepByPreset =
+            new Dictionary<string, List<MazeLayout>>();
 
-        [OneTimeSetUp]
-        public void GenerateTheSweep()
+        static IEnumerable<MazePreset> EveryPreset()
         {
-            if (Sweep.Count > 0)
-            {
-                return;
-            }
-
-            for (var seed = 1; seed <= Seeds; seed++)
-            {
-                Sweep.Add(MazeLayoutGenerator.Generate(seed, MazePreset.Ship));
-            }
+            yield return MazePreset.Tiny;
+            yield return MazePreset.Ship;
+            yield return MazePreset.Stress;
         }
 
-        [Test]
-        public void EverySeedProducesAGraphConnectedAcrossBothFloors()
+        static List<MazeLayout> Sweep(MazePreset preset)
         {
-            foreach (var layout in Sweep)
+            List<MazeLayout> sweep;
+            if (SweepByPreset.TryGetValue(preset.Name, out sweep))
+            {
+                return sweep;
+            }
+
+            var seeds = preset == MazePreset.Ship ? ShipSeeds : preset == MazePreset.Tiny ? 300 : 100;
+            sweep = new List<MazeLayout>(seeds);
+            for (var seed = 1; seed <= seeds; seed++)
+            {
+                sweep.Add(MazeLayoutGenerator.Generate(seed, preset));
+            }
+
+            SweepByPreset.Add(preset.Name, sweep);
+            return sweep;
+        }
+
+        [TestCaseSource(nameof(EveryPreset))]
+        public void EverySeedProducesAGraphConnectedAcrossEveryFloor(MazePreset preset)
+        {
+            foreach (var layout in Sweep(preset))
             {
                 Assert.That(
                     layout.DistanceFromStart.ReachedCount,
                     Is.EqualTo(layout.Graph.Tiles.Tiles.Count),
-                    "Seed " + layout.Seed + " left tiles the start cannot walk to.");
+                    "Seed " + layout.AttemptSeed + " left tiles the start cannot walk to.");
 
                 var floors = new HashSet<int>();
                 foreach (var tile in layout.Graph.Tiles.Tiles)
@@ -39,24 +52,31 @@ namespace Game.Domain.Tests
                     floors.Add(tile.Position.Floor);
                 }
 
-                Assert.That(floors.Count, Is.EqualTo(2), "Seed " + layout.Seed + " lost a floor.");
+                Assert.That(
+                    floors.Count,
+                    Is.EqualTo(preset.Floors),
+                    "Seed " + layout.AttemptSeed + " lost a floor.");
             }
         }
 
-        [Test]
-        public void EverySeedIsByteIdenticalWhenGeneratedAgain()
+        [TestCaseSource(nameof(EveryPreset))]
+        public void EverySeedIsByteIdenticalWhenGeneratedAgain(MazePreset preset)
         {
-            foreach (var layout in Sweep)
+            foreach (var layout in Sweep(preset))
             {
-                var again = MazeLayoutGenerator.Generate(layout.Seed, MazePreset.Ship);
+                MazeLayout again;
+                LayoutRejection rejection;
+                Assert.That(
+                    MazeLayoutGenerator.TryGenerate(layout.AttemptSeed, preset, out again, out rejection),
+                    Is.True);
                 Assert.That(LevelGraphWriter.Write(again.Graph), Is.EqualTo(LevelGraphWriter.Write(layout.Graph)));
             }
         }
 
-        [Test]
-        public void RegionsAreContiguousTotalAndNeverSpanAFloor()
+        [TestCaseSource(nameof(EveryPreset))]
+        public void RegionsAreContiguousTotalAndNeverSpanAFloor(MazePreset preset)
         {
-            foreach (var layout in Sweep)
+            foreach (var layout in Sweep(preset))
             {
                 var grid = layout.Graph.Tiles;
                 var floorOfRegion = new Dictionary<int, int>();
@@ -70,7 +90,7 @@ namespace Game.Domain.Tests
                         Assert.That(
                             floor,
                             Is.EqualTo(tile.Position.Floor),
-                            "Seed " + layout.Seed + " region " + tile.RegionId + " spans two floors.");
+                            "Seed " + layout.AttemptSeed + " region " + tile.RegionId + " spans two floors.");
                     }
                     else
                     {
@@ -83,23 +103,53 @@ namespace Game.Domain.Tests
 
                 Assert.That(
                     membersOfRegion.Count,
-                    Is.EqualTo(MazePreset.Ship.Regions),
-                    "Seed " + layout.Seed + " did not paint every region.");
+                    Is.EqualTo(preset.RegionsPerFloor * preset.Floors),
+                    "Seed " + layout.AttemptSeed + " did not paint every region.");
 
                 foreach (var region in membersOfRegion)
                 {
                     Assert.That(
                         IsFourConnected(grid, region.Value),
                         Is.True,
-                        "Seed " + layout.Seed + " region " + region.Key + " is not contiguous.");
+                        "Seed " + layout.AttemptSeed + " region " + region.Key + " is not contiguous.");
                 }
             }
         }
 
-        [Test]
-        public void AnEmptyCorridorJoinsTwoStairTilesAndNothingElse()
+        [TestCaseSource(nameof(EveryPreset))]
+        public void EveryRegionHoldsAtLeastOneSlot(MazePreset preset)
         {
-            foreach (var layout in Sweep)
+            foreach (var layout in Sweep(preset))
+            {
+                var regionsHoldingASlot = new HashSet<int>();
+                foreach (var slotId in layout.SlotNodeIds)
+                {
+                    regionsHoldingASlot.Add(layout.Graph.RegionOf(slotId));
+                }
+
+                Assert.That(
+                    regionsHoldingASlot.Count,
+                    Is.EqualTo(preset.RegionsPerFloor * preset.Floors),
+                    "Seed " + layout.AttemptSeed + " left a region with nothing in it to scale.");
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPreset))]
+        public void EveryAcceptedSeedClearsTheGeometricProxyForInvariantC(MazePreset preset)
+        {
+            foreach (var layout in Sweep(preset))
+            {
+                Assert.That(layout.Metrics.BossDepth, Is.GreaterThanOrEqualTo(preset.MinimumBossDepth));
+                Assert.That(layout.Metrics.OffPathSlotCount, Is.GreaterThanOrEqualTo(preset.MinimumOffPathSlots));
+            }
+        }
+
+        [Test]
+        public void TheOnlyZeroLengthCorridorBetweenTwoEmptyNodesIsAStairAndSomeSeedHasOne()
+        {
+            var exercised = 0;
+
+            foreach (var layout in Sweep(MazePreset.Ship))
             {
                 foreach (var corridor in layout.Graph.Decisions.Corridors)
                 {
@@ -116,53 +166,97 @@ namespace Game.Domain.Tests
                     }
 
                     Assert.That(
-                        CarriesStair(layout.Graph.Tiles, low.Position) && CarriesStair(layout.Graph.Tiles, high.Position),
+                        layout.Graph.Tiles.CarriesStair(low.Position)
+                            && layout.Graph.Tiles.CarriesStair(high.Position),
                         Is.True,
-                        "Seed " + layout.Seed + " joined two Empty nodes with a zero-length corridor that is not a stair.");
+                        "Seed " + layout.AttemptSeed + " joined two Empty nodes with a zero-length corridor "
+                        + "that is not a stair.");
+                    exercised++;
                 }
             }
+
+            Assert.That(
+                exercised,
+                Is.GreaterThan(0),
+                "The stair carve-out never fired, so it proves nothing.");
         }
 
         [Test]
-        public void TheMeasuredGateRatioAndPocketCountMatchBraidingAtAQuarter()
+        public void TwoRoutesBetweenTheSameNodesAreSplitByAnEmptyNodeMidCorridor()
         {
+            var split = 0;
+
+            foreach (var layout in Sweep(MazePreset.Ship))
+            {
+                foreach (var node in layout.Graph.Decisions.Nodes)
+                {
+                    if (node.Type != NodeType.Empty
+                        || layout.Graph.Tiles.CarriesStair(node.Position)
+                        || layout.Graph.Tiles.Neighbours(node.Position).Count != 2)
+                    {
+                        continue;
+                    }
+
+                    split++;
+                }
+            }
+
+            Assert.That(
+                split,
+                Is.GreaterThan(0),
+                "No corridor was ever split, so nothing proves the graph model's refusal of "
+                + "parallel corridors is being honoured by construction rather than by luck.");
+        }
+
+        [Test]
+        public void TheShipLevelKeepsTheShapeTheBraidWasMeasuredAt()
+        {
+            var sweep = Sweep(MazePreset.Ship);
+            var nodes = 0.0;
+            var corridors = 0.0;
+            var empties = 0.0;
             var gateRatio = 0.0;
             var pockets = 0.0;
 
-            foreach (var layout in Sweep)
+            foreach (var layout in sweep)
             {
+                Assert.That(layout.Metrics.TileCount, Is.EqualTo(60));
+                Assert.That(layout.Metrics.SlotCount, Is.EqualTo(MazePreset.Ship.ContentSlots));
+                Assert.That(
+                    layout.Metrics.NodeCount,
+                    Is.EqualTo(layout.Metrics.SlotCount + layout.Metrics.EmptyCount + 1));
+
+                nodes += layout.Metrics.NodeCount;
+                corridors += layout.Metrics.CorridorCount;
+                empties += layout.Metrics.EmptyCount;
                 gateRatio += layout.Metrics.GateRatio;
-                pockets += layout.Metrics.PocketCount;
+                pockets += layout.Metrics.PocketSlotCount;
             }
 
-            gateRatio /= Sweep.Count;
-            pockets /= Sweep.Count;
+            nodes /= sweep.Count;
+            corridors /= sweep.Count;
+            empties /= sweep.Count;
+            gateRatio /= sweep.Count;
+            pockets /= sweep.Count;
 
+            Assert.That(nodes, Is.EqualTo(28.0).Within(1.0), "Mean node count was " + nodes + ".");
+            Assert.That(corridors, Is.EqualTo(30.0).Within(1.5), "Mean corridor count was " + corridors + ".");
+            Assert.That(empties, Is.EqualTo(3.0).Within(1.0), "Mean Empty count was " + empties + ".");
             Assert.That(gateRatio, Is.EqualTo(0.30).Within(0.06), "Mean gate ratio was " + gateRatio + ".");
             Assert.That(pockets, Is.EqualTo(2.3).Within(0.6), "Mean pocket count was " + pockets + ".");
         }
 
         [Test]
-        public void EveryAcceptedSeedClearsTheGeometricProxyForInvariantC()
-        {
-            foreach (var layout in Sweep)
-            {
-                Assert.That(layout.Metrics.BossDepth, Is.GreaterThanOrEqualTo(MazePreset.Ship.MinimumBossDepth));
-                Assert.That(layout.Metrics.OffPathSlotCount, Is.GreaterThanOrEqualTo(MazePreset.Ship.MinimumOffPathSlots));
-            }
-        }
-
-        [Test]
         public void RejectionRatesStayInsideTheBandTheBraidWasTunedAgainst()
         {
-            Assert.That(AcceptedOf(MazePreset.Ship), Is.GreaterThanOrEqualTo(850));
-            Assert.That(AcceptedOf(MazePreset.Tiny), Is.GreaterThanOrEqualTo(600));
+            Assert.That(AcceptedOf(MazePreset.Ship, ShipSeeds), Is.GreaterThanOrEqualTo(850));
+            Assert.That(AcceptedOf(MazePreset.Tiny, ShipSeeds), Is.GreaterThanOrEqualTo(600));
         }
 
-        static int AcceptedOf(MazePreset preset)
+        static int AcceptedOf(MazePreset preset, int seeds)
         {
             var accepted = 0;
-            for (var seed = 1; seed <= Seeds; seed++)
+            for (var seed = 1; seed <= seeds; seed++)
             {
                 MazeLayout layout;
                 LayoutRejection rejection;
@@ -173,19 +267,6 @@ namespace Game.Domain.Tests
             }
 
             return accepted;
-        }
-
-        static bool CarriesStair(TileGrid grid, TilePosition position)
-        {
-            foreach (var stair in grid.Stairs)
-            {
-                if (stair.Lower.Equals(position) || stair.Upper.Equals(position))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         static bool IsFourConnected(TileGrid grid, IReadOnlyList<TilePosition> members)

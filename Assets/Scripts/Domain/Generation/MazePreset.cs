@@ -99,26 +99,6 @@ namespace Game.Domain
             get { return Math.Max(1, (int)Math.Floor((double)Regions / Floors + 0.5)); }
         }
 
-        public static MazePreset Named(string name)
-        {
-            if (name == Tiny.Name)
-            {
-                return Tiny;
-            }
-
-            if (name == Ship.Name)
-            {
-                return Ship;
-            }
-
-            if (name == Stress.Name)
-            {
-                return Stress;
-            }
-
-            throw new ArgumentException("\"" + name + "\" is not a preset.", nameof(name));
-        }
-
         public override string ToString()
         {
             return Name;

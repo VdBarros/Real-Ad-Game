@@ -25,9 +25,29 @@ namespace Game.Domain.Tests
             MazeLayout direct;
             LayoutRejection rejection;
             Assert.That(
-                MazeLayoutGenerator.TryGenerate(retried.Seed, MazePreset.Ship, out direct, out rejection),
+                MazeLayoutGenerator.TryGenerate(retried.AttemptSeed, MazePreset.Ship, out direct, out rejection),
                 Is.True);
             Assert.That(LevelGraphWriter.Write(direct.Graph), Is.EqualTo(LevelGraphWriter.Write(retried.Graph)));
+        }
+
+        [Test]
+        public void TheGraphIsStampedWithTheSeedThatReproducesIt()
+        {
+            var layout = MazeLayoutGenerator.Generate(Seed, MazePreset.Ship);
+
+            Assert.That(layout.Graph.Seed, Is.EqualTo(layout.AttemptSeed));
+            Assert.That(layout.Graph.Preset, Is.EqualTo(MazePreset.Ship.Name));
+        }
+
+        [Test]
+        public void GenerationReportsHowManyAttemptsItSpentAndOnWhat()
+        {
+            MazeGenerationReport report;
+            MazeLayoutGenerator.Generate(Seed, MazePreset.Ship, out report);
+
+            Assert.That(report.Preset, Is.SameAs(MazePreset.Ship));
+            Assert.That(report.Attempts, Is.GreaterThanOrEqualTo(1));
+            Assert.That(report.Rejections, Is.EqualTo(report.Attempts - 1));
         }
 
         [Test]
@@ -155,6 +175,20 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void AskingForMoreSlotsThanTheCarveOffersIsAShortfallNotAThinnerLevel()
+        {
+            var greedy = new MazePreset(
+                "greedy", 5, 3, 2, 4, 0.25, 2, contentSlots: 200, minimumBossDepth: 1, minimumOffPathSlots: 0);
+
+            MazeLayout layout;
+            LayoutRejection rejection;
+            var generated = MazeLayoutGenerator.TryGenerate(Seed, greedy, out layout, out rejection);
+
+            Assert.That(generated, Is.False);
+            Assert.That(rejection, Is.EqualTo(LayoutRejection.SlotShortfall));
+        }
+
+        [Test]
         public void GenerationGivesUpAfterFiftyAttemptsAndReportsWhy()
         {
             var impossible = new MazePreset(
@@ -173,6 +207,13 @@ namespace Game.Domain.Tests
         {
             Assert.Throws<ArgumentOutOfRangeException>(
                 () => new MazePreset("bad", 0, 3, 1, 2, 0.25, 0, 12, 8, 3));
+        }
+
+        [Test]
+        public void APresetAboveTheGroundFloorMustCarryAStair()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => new MazePreset("stairless", 5, 3, 2, 4, 0.25, 0, 24, 16, 8));
         }
     }
 }

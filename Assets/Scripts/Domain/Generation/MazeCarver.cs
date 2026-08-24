@@ -5,12 +5,12 @@ namespace Game.Domain
 {
     static class MazeCarver
     {
-        static readonly IReadOnlyList<LatticeStep> Steps = new[]
+        static readonly IReadOnlyList<LatticeCell> Steps = new[]
         {
-            new LatticeStep(1, 0),
-            new LatticeStep(-1, 0),
-            new LatticeStep(0, 1),
-            new LatticeStep(0, -1)
+            new LatticeCell(1, 0),
+            new LatticeCell(-1, 0),
+            new LatticeCell(0, 1),
+            new LatticeCell(0, -1)
         };
 
         public static CarvedMaze Carve(long seed, MazePreset preset)
@@ -53,7 +53,7 @@ namespace Game.Domain
 
                 foreach (var step in random.Shuffled(Steps))
                 {
-                    var next = new LatticeCell(cell.X + step.X, cell.Y + step.Y);
+                    var next = cell.Shifted(step);
                     if (!InsideLattice(preset, next) || visited[IndexOfCell(preset, next)])
                     {
                         continue;
@@ -98,7 +98,7 @@ namespace Game.Domain
                 var blocked = new List<TilePosition>();
                 foreach (var step in Steps)
                 {
-                    var beyond = new LatticeCell(cell.X + step.X, cell.Y + step.Y);
+                    var beyond = cell.Shifted(step);
                     if (!InsideLattice(preset, beyond))
                     {
                         continue;
@@ -179,7 +179,7 @@ namespace Game.Domain
             var open = 0;
             foreach (var step in Steps)
             {
-                var beyond = new LatticeCell(cell.X + step.X, cell.Y + step.Y);
+                var beyond = cell.Shifted(step);
                 if (InsideLattice(preset, beyond) && walkable.Contains(TileBetweenCells(floor, cell, beyond)))
                 {
                     open++;
@@ -225,19 +225,11 @@ namespace Game.Domain
             public int X { get; }
 
             public int Y { get; }
-        }
 
-        readonly struct LatticeStep
-        {
-            public LatticeStep(int x, int y)
+            public LatticeCell Shifted(LatticeCell step)
             {
-                X = x;
-                Y = y;
+                return new LatticeCell(X + step.X, Y + step.Y);
             }
-
-            public int X { get; }
-
-            public int Y { get; }
         }
     }
 }

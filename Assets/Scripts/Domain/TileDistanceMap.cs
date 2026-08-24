@@ -54,11 +54,6 @@ namespace Game.Domain
             get { return distanceByPosition.Count; }
         }
 
-        public bool Reaches(TilePosition position)
-        {
-            return distanceByPosition.ContainsKey(position);
-        }
-
         public int DistanceTo(TilePosition position)
         {
             int distance;

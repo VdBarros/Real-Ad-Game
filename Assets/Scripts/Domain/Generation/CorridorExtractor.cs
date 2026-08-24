@@ -44,15 +44,31 @@ namespace Game.Domain
             }
 
             runs.Sort(CorridorRun.Compare);
-            DropTheSecondSightingOfEachRun(runs);
+            RemoveTheSecondSightingOfEachRun(runs);
             return runs;
         }
 
-        public static CorridorRun FirstThatBreaksTheGraphModel(IReadOnlyList<CorridorRun> runs)
+        public static List<CorridorRun> ExtractWithoutSelfLoopsOrParallelRuns(
+            IReadOnlyList<int[]> adjacency, bool[] isNode)
+        {
+            while (true)
+            {
+                var runs = Extract(adjacency, isNode);
+                var offender = FirstSelfLoopOrParallelRun(runs);
+                if (offender == null)
+                {
+                    return runs;
+                }
+
+                isNode[offender.Path[offender.Path.Count / 2]] = true;
+            }
+        }
+
+        static CorridorRun FirstSelfLoopOrParallelRun(IReadOnlyList<CorridorRun> runs)
         {
             foreach (var run in runs)
             {
-                if (run.IsLoop)
+                if (run.IsSelfLoop)
                 {
                     return run;
                 }
@@ -71,7 +87,7 @@ namespace Game.Domain
             return null;
         }
 
-        static void DropTheSecondSightingOfEachRun(List<CorridorRun> runs)
+        static void RemoveTheSecondSightingOfEachRun(List<CorridorRun> runs)
         {
             var kept = 0;
             for (var index = 0; index < runs.Count; index++)
