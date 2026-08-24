@@ -37,15 +37,36 @@
   module management, builds, running tests, scene/hierarchy inspection, and
   live-Editor operations. Fall back to hand-editing only for things unity-cli
   genuinely can't do.
-- **Fast Phase 1 loop:** `Game.Domain`/`Game.Domain.Tests` source
-  (`Assets/Scripts/Domain(.Tests)/`) is also globbed by a standalone project
-  at `dotnet/Game.Domain.Tests/` — same files, no duplication. Run
-  `dotnet test dotnet/Game.Domain.Tests` (~2s) instead of entering the Unity
+  **Neither binary is on `PATH` — call them by full path, don't conclude the
+  tooling is missing:**
+  - `C:\Users\vinib\AppData\Local\Unity\bin\unity.exe` — the unity CLI
+  - `C:\Program Files\Unity\Hub\Editor\6000.5.9f1\Editor\Unity.exe` — the
+    Editor, for `-batchmode -quit -executeMethod …`
+
+  Batch mode fails while the Editor is open on this project (Unity lock), so
+  close it first. Driving a *live* Editor with `unity command` additionally
+  needs `com.unity.pipeline` in `Packages/manifest.json`, which is not there
+  yet — add it with `unity pipeline install` if a task needs live control.
+- **Fast Phase 1 loop:** `Game.Domain`, `Game.Presentation.Pure` and
+  `Game.Domain.Tests` source (`Assets/Scripts/Domain/`,
+  `Assets/Scripts/Presentation.Pure/`, `Assets/Scripts/Domain.Tests/`) is also
+  globbed by standalone projects under `dotnet/` — same files, no duplication.
+  Run `dotnet test dotnet/Game.Domain.Tests` (~3s) instead of entering the Unity
   Editor for domain work. 6 of 18 tasks are Phase 1 and that's where the
   invariant-correctness risk sits — see mvp-backlog §2.
-  **That project must compile the way Unity compiles** (netstandard2.1 / C# 9,
-  not net8.0 / C# 12) or domain code passes the fast loop and fails in the
-  Editor. T-01 splits it.
+  **Those projects compile the way Unity compiles**, or domain code passes the
+  fast loop and fails in the Editor: `dotnet/Directory.Build.props` pins C# 9
+  for everything under `dotnet/`, `Game.Domain` and `Game.Presentation.Pure`
+  target netstandard2.1, and NUnit is held at 3.x because Unity 6000.5.9f1
+  ships `nunit.framework` 3.5. `dotnet/LangVersionProbe/` is a project that
+  must **fail** to build — CI asserts it fails with CS8773, so the ceiling
+  cannot silently drift.
+- **Unity-side settings are applied from code, not by hand.**
+  `Assets/Editor/ProjectBootstrap.cs` owns portrait lock, bundle id, scripting
+  backend and API level; `Assets/Editor/AndroidBuildCommand.cs` produces the
+  APK. Both run from the `Tools/Real Ad Game` menu or via
+  `-executeMethod Game.EditorTooling.ProjectBootstrap.Apply` /
+  `Game.EditorTooling.AndroidBuildCommand.Build` in batch mode.
 
 ## Where things live
 

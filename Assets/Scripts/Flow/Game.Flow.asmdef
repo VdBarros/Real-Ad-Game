@@ -1,0 +1,19 @@
+{
+    "name": "Game.Flow",
+    "rootNamespace": "Game.Flow",
+    "references": [
+        "Game.Domain",
+        "Game.Presentation",
+        "Game.Presentation.Pure",
+        "Game.Interaction"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

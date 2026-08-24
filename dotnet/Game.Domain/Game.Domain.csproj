@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(UnityTargetFramework)</TargetFramework>
+    <AssemblyName>Game.Domain</AssemblyName>
+    <RootNamespace>Game.Domain</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Same source files Unity compiles into the Game.Domain asmdef.
+         Nothing is duplicated — this project just globs Assets/. -->
+    <Compile Include="$(ScriptsRoot)Domain\**\*.cs" />
+  </ItemGroup>
+
+</Project>

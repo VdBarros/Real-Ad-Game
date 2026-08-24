@@ -1,0 +1,19 @@
+{
+    "name": "Game.Interaction",
+    "rootNamespace": "Game.Interaction",
+    "references": [
+        "Game.Domain",
+        "Game.Presentation",
+        "Game.Presentation.Pure",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

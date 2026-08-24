@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>$(UnityTargetFramework)</TargetFramework>
+    <AssemblyName>Game.Presentation.Pure</AssemblyName>
+    <RootNamespace>Game.Presentation.Pure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Same source files Unity compiles into the Game.Presentation.Pure asmdef. -->
+    <Compile Include="$(ScriptsRoot)Presentation.Pure\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Game.Domain\Game.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

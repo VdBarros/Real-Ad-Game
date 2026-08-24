@@ -1,0 +1,42 @@
+name: Domain tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  domain-tests:
+    name: Fast loop (Game.Domain + Game.Presentation.Pure)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run domain tests
+        run: dotnet test dotnet/Game.Domain.Tests --nologo
+
+      - name: Language ceiling (expects a CS8773 build failure)
+        shell: bash
+        run: |
+          # This build is SUPPOSED to fail. GITHUB_ACTIONS is unset for it only,
+          # so the SDK does not turn the expected CS8773 into a red ::error::
+          # annotation on a passing pull request.
+          set +e
+          output=$(env -u GITHUB_ACTIONS dotnet build dotnet/LangVersionProbe --nologo 2>&1)
+          status=$?
+          set -e
+          echo "$output" | sed 's/^/    probe| /'
+          if [ "$status" -eq 0 ]; then
+            echo "::error::LangVersionProbe compiled. The fast loop now accepts C# newer than Unity 6000.5.9f1 does, so domain code can pass here and fail in the Editor."
+            exit 1
+          fi
+          if ! grep -q "CS8773" <<<"$output"; then
+            echo "::error::LangVersionProbe failed for the wrong reason — expected CS8773 (post-C#9 language feature), got the output above."
+            exit 1
+          fi
+          echo "OK — LangVersionProbe failed to compile with CS8773, which is the expected result."
+          echo "Language ceiling holds: C# 9.0, matching Unity 6000.5.9f1."

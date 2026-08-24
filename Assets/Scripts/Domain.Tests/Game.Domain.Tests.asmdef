@@ -2,7 +2,8 @@
     "name": "Game.Domain.Tests",
     "rootNamespace": "Game.Domain.Tests",
     "references": [
-        "Game.Domain"
+        "Game.Domain",
+        "Game.Presentation.Pure"
     ],
     "includePlatforms": [
         "Editor"
