@@ -52,9 +52,9 @@ namespace Game.Domain
             ReadArray(scanner, "stairs", () =>
             {
                 scanner.Expect('{');
-                var lower = ReadPosition(scanner);
+                var stair = new StairLink(ReadPosition(scanner));
                 scanner.Expect('}');
-                builder.AddStair(lower, new TilePosition(lower.Floor + 1, lower.X, lower.Y));
+                builder.AddStair(stair.Lower, stair.Upper);
             });
             scanner.Expect(',');
 
@@ -76,7 +76,7 @@ namespace Game.Domain
                 var position = ReadPosition(scanner);
                 scanner.Expect(',');
                 scanner.ExpectMember("type");
-                var type = TypeNamed(scanner.ReadText());
+                var type = NodeTypeNames.TypeNamed(scanner.ReadText());
                 scanner.Expect(',');
                 scanner.ExpectMember("value");
                 var value = scanner.ReadInt();
@@ -137,29 +137,6 @@ namespace Game.Domain
             }
 
             return Read(new UTF8Encoding(false).GetString(document));
-        }
-
-        public static NodeType TypeNamed(string name)
-        {
-            switch (name)
-            {
-                case "Unassigned":
-                    return NodeType.Unassigned;
-                case "Start":
-                    return NodeType.Start;
-                case "Empty":
-                    return NodeType.Empty;
-                case "Enemy":
-                    return NodeType.Enemy;
-                case "Boss":
-                    return NodeType.Boss;
-                case "Additive":
-                    return NodeType.Additive;
-                case "Multiplier":
-                    return NodeType.Multiplier;
-                default:
-                    throw new FormatException("\"" + name + "\" is not a node type.");
-            }
         }
 
         static TilePosition PositionOf(List<TilePosition> positionById, int id)

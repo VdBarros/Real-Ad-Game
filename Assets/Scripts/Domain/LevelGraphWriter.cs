@@ -34,29 +34,6 @@ namespace Game.Domain
             return new UTF8Encoding(false).GetBytes(Write(graph));
         }
 
-        public static string NameOf(NodeType type)
-        {
-            switch (type)
-            {
-                case NodeType.Unassigned:
-                    return "Unassigned";
-                case NodeType.Start:
-                    return "Start";
-                case NodeType.Empty:
-                    return "Empty";
-                case NodeType.Enemy:
-                    return "Enemy";
-                case NodeType.Boss:
-                    return "Boss";
-                case NodeType.Additive:
-                    return "Additive";
-                case NodeType.Multiplier:
-                    return "Multiplier";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(type), type, "No written name for that node type.");
-            }
-        }
-
         static void WriteTiles(StringBuilder document, IReadOnlyList<Tile> tiles)
         {
             OpenSection(document, "tiles", tiles.Count);
@@ -94,7 +71,7 @@ namespace Game.Domain
                 var node = nodes[index];
                 document.Append("    { \"id\": ").Append(Number(node.Id)).Append(", ");
                 AppendPosition(document, node.Position);
-                document.Append(", \"type\": ").Append(Quoted(NameOf(node.Type)));
+                document.Append(", \"type\": ").Append(Quoted(NodeTypeNames.NameOf(node.Type)));
                 document.Append(", \"value\": ").Append(Number(node.Value));
                 document.Append(" }");
                 CloseElement(document, index, nodes.Count);

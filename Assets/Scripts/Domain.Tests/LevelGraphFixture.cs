@@ -1,8 +1,10 @@
-using System;
 using System.Collections.Generic;
 
 namespace Game.Domain.Tests
 {
+    using PlacedCorridor = System.ValueTuple<TilePosition, TilePosition, IReadOnlyList<TilePosition>>;
+    using PlacedNode = System.ValueTuple<TilePosition, NodeType, int>;
+
     static class LevelGraphFixture
     {
         public const long Seed = 20250824L;
@@ -35,20 +37,20 @@ namespace Game.Domain.Tests
 
             foreach (var node in Order(Nodes(), backwards))
             {
-                builder.AddNode(node.Position, node.Type, node.Value);
+                builder.AddNode(node.Item1, node.Item2, node.Item3);
             }
 
             foreach (var corridor in Order(Corridors(), backwards))
             {
                 if (backwards)
                 {
-                    var reversedPath = new List<TilePosition>(corridor.Path);
+                    var reversedPath = new List<TilePosition>(corridor.Item3);
                     reversedPath.Reverse();
-                    builder.Connect(corridor.Second, corridor.First, reversedPath);
+                    builder.Connect(corridor.Item2, corridor.Item1, reversedPath);
                 }
                 else
                 {
-                    builder.Connect(corridor.First, corridor.Second, corridor.Path);
+                    builder.Connect(corridor.Item1, corridor.Item2, corridor.Item3);
                 }
             }
 
@@ -89,13 +91,13 @@ namespace Game.Domain.Tests
         {
             return new[]
             {
-                new PlacedNode(At(0, 1, 0), NodeType.Start, 1),
-                new PlacedNode(At(0, 5, 0), NodeType.Empty, 0),
-                new PlacedNode(At(0, 1, 2), NodeType.Enemy, 4),
-                new PlacedNode(At(0, 5, 2), NodeType.Additive, 12),
-                new PlacedNode(At(1, 5, 0), NodeType.Empty, 0),
-                new PlacedNode(At(1, 6, 0), NodeType.Multiplier, 3),
-                new PlacedNode(At(1, 6, 1), NodeType.Boss, 30)
+                Node(At(0, 1, 0), NodeType.Start, 0),
+                Node(At(0, 5, 0), NodeType.Empty, 0),
+                Node(At(0, 1, 2), NodeType.Enemy, 4),
+                Node(At(0, 5, 2), NodeType.Additive, 12),
+                Node(At(1, 5, 0), NodeType.Empty, 0),
+                Node(At(1, 6, 0), NodeType.Multiplier, 3),
+                Node(At(1, 6, 1), NodeType.Boss, 30)
             };
         }
 
@@ -103,14 +105,24 @@ namespace Game.Domain.Tests
         {
             return new[]
             {
-                new PlacedCorridor(At(0, 1, 0), At(0, 5, 0), At(0, 2, 0), At(0, 3, 0), At(0, 4, 0)),
-                new PlacedCorridor(At(0, 1, 0), At(0, 1, 2), At(0, 1, 1)),
-                new PlacedCorridor(At(0, 5, 0), At(0, 5, 2), At(0, 5, 1)),
-                new PlacedCorridor(At(0, 1, 2), At(0, 5, 2), At(0, 2, 2), At(0, 3, 2), At(0, 4, 2)),
-                new PlacedCorridor(At(0, 5, 0), At(1, 5, 0)),
-                new PlacedCorridor(At(1, 5, 0), At(1, 6, 0)),
-                new PlacedCorridor(At(1, 6, 0), At(1, 6, 1))
+                Joined(At(0, 1, 0), At(0, 5, 0), At(0, 2, 0), At(0, 3, 0), At(0, 4, 0)),
+                Joined(At(0, 1, 0), At(0, 1, 2), At(0, 1, 1)),
+                Joined(At(0, 5, 0), At(0, 5, 2), At(0, 5, 1)),
+                Joined(At(0, 1, 2), At(0, 5, 2), At(0, 2, 2), At(0, 3, 2), At(0, 4, 2)),
+                Joined(At(0, 5, 0), At(1, 5, 0)),
+                Joined(At(1, 5, 0), At(1, 6, 0)),
+                Joined(At(1, 6, 0), At(1, 6, 1))
             };
+        }
+
+        static PlacedNode Node(TilePosition position, NodeType type, int value)
+        {
+            return (position, type, value);
+        }
+
+        static PlacedCorridor Joined(TilePosition first, TilePosition second, params TilePosition[] path)
+        {
+            return (first, second, path);
         }
 
         static TilePosition At(int floor, int x, int y)
@@ -118,36 +130,5 @@ namespace Game.Domain.Tests
             return new TilePosition(floor, x, y);
         }
 
-        sealed class PlacedNode
-        {
-            public PlacedNode(TilePosition position, NodeType type, int value)
-            {
-                Position = position;
-                Type = type;
-                Value = value;
-            }
-
-            public TilePosition Position { get; }
-
-            public NodeType Type { get; }
-
-            public int Value { get; }
-        }
-
-        sealed class PlacedCorridor
-        {
-            public PlacedCorridor(TilePosition first, TilePosition second, params TilePosition[] path)
-            {
-                First = first;
-                Second = second;
-                Path = path ?? Array.Empty<TilePosition>();
-            }
-
-            public TilePosition First { get; }
-
-            public TilePosition Second { get; }
-
-            public IReadOnlyList<TilePosition> Path { get; }
-        }
     }
 }

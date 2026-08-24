@@ -35,6 +35,15 @@ namespace Game.Domain
                         + index + " carries id " + this.nodes[index].Id + ".",
                         nameof(nodes));
                 }
+
+                if (index > 0 && this.nodes[index - 1].Position.CompareTo(this.nodes[index].Position) >= 0)
+                {
+                    throw new ArgumentException(
+                        "Ids are assigned by a (floor, y, x) sweep, so node " + index + " at "
+                        + this.nodes[index].Position + " cannot follow "
+                        + this.nodes[index - 1].Position + ".",
+                        nameof(nodes));
+                }
             }
 
             this.corridors.Sort(CompareCorridors);
@@ -99,11 +108,7 @@ namespace Game.Domain
 
         public DecisionNode Node(int nodeId)
         {
-            if (nodeId < 0 || nodeId >= nodes.Count)
-            {
-                throw new ArgumentOutOfRangeException(nameof(nodeId), nodeId, "No node carries that id.");
-            }
-
+            RequireNode(nodeId);
             return nodes[nodeId];
         }
 

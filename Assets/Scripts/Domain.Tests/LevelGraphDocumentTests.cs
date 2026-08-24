@@ -32,7 +32,7 @@ namespace Game.Domain.Tests
             "    { \"floor\": 0, \"x\": 5, \"y\": 0 }",
             "  ],",
             "  \"nodes\": [",
-            "    { \"id\": 0, \"floor\": 0, \"x\": 1, \"y\": 0, \"type\": \"Start\", \"value\": 1 },",
+            "    { \"id\": 0, \"floor\": 0, \"x\": 1, \"y\": 0, \"type\": \"Start\", \"value\": 0 },",
             "    { \"id\": 1, \"floor\": 0, \"x\": 5, \"y\": 0, \"type\": \"Empty\", \"value\": 0 },",
             "    { \"id\": 2, \"floor\": 0, \"x\": 1, \"y\": 2, \"type\": \"Enemy\", \"value\": 4 },",
             "    { \"id\": 3, \"floor\": 0, \"x\": 5, \"y\": 2, \"type\": \"Additive\", \"value\": 12 },",

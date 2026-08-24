@@ -10,9 +10,14 @@ namespace Game.Domain
 
         public Corridor(int lowNodeId, int highNodeId, IEnumerable<TilePosition> tilePath)
         {
-            if (lowNodeId < 0 || highNodeId < 0)
+            if (lowNodeId < 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(lowNodeId), "Corridors join dense node ids.");
+                throw new ArgumentOutOfRangeException(nameof(lowNodeId), lowNodeId, "Corridors join dense node ids.");
+            }
+
+            if (highNodeId < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(highNodeId), highNodeId, "Corridors join dense node ids.");
             }
 
             if (lowNodeId >= highNodeId)
@@ -35,23 +40,6 @@ namespace Game.Domain
         public IReadOnlyList<TilePosition> TilePath
         {
             get { return tilePath; }
-        }
-
-        public int OtherEnd(int nodeId)
-        {
-            if (nodeId == LowNodeId)
-            {
-                return HighNodeId;
-            }
-
-            if (nodeId == HighNodeId)
-            {
-                return LowNodeId;
-            }
-
-            throw new ArgumentException(
-                "Node " + nodeId + " is not an end of the corridor " + this + ".",
-                nameof(nodeId));
         }
 
         public bool Equals(Corridor other)

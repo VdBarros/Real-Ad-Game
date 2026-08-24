@@ -76,7 +76,7 @@ namespace Game.Domain.Tests
                 new TilePosition(floor: 0, x: 4, y: 0),
                 new[] { new TilePosition(floor: 0, x: 2, y: 0) });
 
-            Assert.That(() => builder.Build(), Throws.InvalidOperationException);
+            Assert.That(() => builder.Build(), Throws.ArgumentException);
         }
 
         [Test]
@@ -95,7 +95,7 @@ namespace Game.Domain.Tests
                     new TilePosition(floor: 0, x: 3, y: 0)
                 });
 
-            Assert.That(() => builder.Build(), Throws.InvalidOperationException);
+            Assert.That(() => builder.Build(), Throws.ArgumentException);
         }
 
         [Test]
@@ -115,7 +115,7 @@ namespace Game.Domain.Tests
                 new TilePosition(floor: 0, x: 2, y: 1),
                 new[] { new TilePosition(floor: 0, x: 2, y: 0) });
 
-            Assert.That(() => builder.Build(), Throws.InvalidOperationException);
+            Assert.That(() => builder.Build(), Throws.ArgumentException);
         }
 
         static LevelGraphBuilder FourTilesInARow()

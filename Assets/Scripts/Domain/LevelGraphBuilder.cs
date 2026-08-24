@@ -57,20 +57,7 @@ namespace Game.Domain
             var nodes = new List<DecisionNode>(sweep.Count);
             for (var id = 0; id < sweep.Count; id++)
             {
-                var pending = sweep[id];
-                if (!grid.Contains(pending.Position))
-                {
-                    throw new InvalidOperationException(
-                        "Node at " + pending.Position + " sits where there is no tile.");
-                }
-
-                if (id > 0 && sweep[id - 1].Position.Equals(pending.Position))
-                {
-                    throw new InvalidOperationException(
-                        "Two nodes were added at " + pending.Position + ".");
-                }
-
-                nodes.Add(new DecisionNode(id, pending.Position, pending.Type, pending.Value));
+                nodes.Add(new DecisionNode(id, sweep[id].Position, sweep[id].Type, sweep[id].Value));
             }
 
             var idByPosition = new Dictionary<TilePosition, int>(nodes.Count);
@@ -86,7 +73,7 @@ namespace Game.Domain
                 var secondId = NodeIdAt(idByPosition, pending.Second);
                 if (firstId == secondId)
                 {
-                    throw new InvalidOperationException(
+                    throw new ArgumentException(
                         "A corridor joins two nodes, but both ends sit at " + pending.First + ".");
                 }
 
@@ -102,66 +89,7 @@ namespace Game.Domain
                     path));
             }
 
-            corridors.Sort(CompareCorridors);
-            VerifyCorridorPaths(grid, nodes, idByPosition, corridors);
-
             return new LevelGraph(seed, preset, grid, new DecisionGraph(nodes, corridors));
-        }
-
-        static void VerifyCorridorPaths(
-            TileGrid grid,
-            List<DecisionNode> nodes,
-            Dictionary<TilePosition, int> idByPosition,
-            List<Corridor> corridors)
-        {
-            var interiorOwner = new Dictionary<TilePosition, Corridor>();
-            foreach (var corridor in corridors)
-            {
-                var previous = nodes[corridor.LowNodeId].Position;
-                foreach (var tile in corridor.TilePath)
-                {
-                    if (!grid.Contains(tile))
-                    {
-                        throw new InvalidOperationException(
-                            "Corridor " + corridor + " runs over " + tile + ", where there is no tile.");
-                    }
-
-                    if (idByPosition.ContainsKey(tile))
-                    {
-                        throw new InvalidOperationException(
-                            "Corridor " + corridor + " runs through the node at " + tile
-                            + ". A corridor never branches and never passes a decision node.");
-                    }
-
-                    if (interiorOwner.ContainsKey(tile))
-                    {
-                        throw new InvalidOperationException(
-                            "Tile " + tile + " lies in the interior of both " + interiorOwner[tile]
-                            + " and " + corridor + ".");
-                    }
-
-                    RequireAdjacent(grid, corridor, previous, tile);
-                    interiorOwner.Add(tile, corridor);
-                    previous = tile;
-                }
-
-                RequireAdjacent(grid, corridor, previous, nodes[corridor.HighNodeId].Position);
-            }
-        }
-
-        static void RequireAdjacent(TileGrid grid, Corridor corridor, TilePosition previous, TilePosition next)
-        {
-            if (!grid.AreAdjacent(previous, next))
-            {
-                throw new InvalidOperationException(
-                    "Corridor " + corridor + " is broken between " + previous + " and " + next + ".");
-            }
-        }
-
-        static int CompareCorridors(Corridor left, Corridor right)
-        {
-            var byLow = left.LowNodeId.CompareTo(right.LowNodeId);
-            return byLow != 0 ? byLow : left.HighNodeId.CompareTo(right.HighNodeId);
         }
 
         static int NodeIdAt(Dictionary<TilePosition, int> idByPosition, TilePosition position)
