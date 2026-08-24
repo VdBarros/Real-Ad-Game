@@ -4,7 +4,7 @@ namespace Game.Domain
 {
     public sealed class MazePreset
     {
-        public static readonly MazePreset Tiny = new MazePreset("tiny", 4, 3, 1, 2, 0.25, 0, 12, 8, 3);
+        public static readonly MazePreset Tiny = new MazePreset("tiny", 4, 3, 1, 2, 0.25, 0, 11, 8, 3);
 
         public static readonly MazePreset Ship = new MazePreset("ship", 5, 3, 2, 4, 0.25, 2, 24, 16, 8);
 
