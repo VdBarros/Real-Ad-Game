@@ -272,16 +272,32 @@ region pull the cheapest enemy below that region's `P_min`, iterating to a cap
 of 6 passes. Lowering a value only ever lowers power, so `P_min` can move down
 underneath the repair. Floor-rule failures go from 16/51 to **0/445**.
 
+Both walls are searches over the **same reachability the game runs on** — only
+an unconsumed enemy or boss is a door, a pickup is not ([#2]) — rather than the
+stricter "everything on the way must be consumed" rule #8's prototype used.
+That is a real change of number, not just of wording: a region no enemy gates
+becomes reachable earlier and therefore cheaper, so `P_min` falls and the
+spread widens. The alternative is a domain that disagrees with `RunState` about
+what the player can reach, which T-06's panel and T-07's oracle both walk.
+
 The `P_min`/`P_max` spread is the skill expression. Tune it, don't collapse it.
-Measured `P_max/P_min` p10/50/90 = **1.0 / 14.3 / 193.2**; the p10 of 1.0 is
-the start region, where both walls are `P₀` by definition.
+Measured `P_max/P_min` p10/50/90 = **1.0 / 46.1 / 492** over 500 `ship` seeds
+(#8's prototype measured 1.0 / 14.3 / 193.2 under its own stricter
+reachability); the p10 of 1.0 is the start region, where both walls are `P₀` by
+definition.
+
+A region whose **only** content slot is the boss carries no enemy and so has no
+floor rule to honour — 8 of 2000 regions across those seeds. Every other region
+does: after roles are drawn, a region left with treasure and no enemy swaps one
+of its pickups for an enemy from the region holding the most, which keeps the
+recipe's counts exact.
 
 ### Presets ([#4])
 
 | | `tiny` | `ship` | `stress` |
 |---|---|---|---|
 | purpose | exhaustive verification | what ships | generation-time regression |
-| content nodes | 10–12 | ~24 | 90 |
+| content nodes | **11** | 24 | 90 |
 | tiles | — | ~60 | — |
 | floors | 1 | 2 | 3 |
 | regions | 2 | 4 | 9 |
@@ -290,7 +306,15 @@ the start region, where both walls are `P₀` by definition.
 `ship`'s `D_min` was lowered from 20 to 16 on measured rejection rates ([#7]).
 The carve alone already spends ~11% of `ship` seeds and ~32% of `tiny` seeds;
 envelope rejections stack on top, so the **combined** rate is what has to stay
-sane. Content placement accepts 89% of the seeds that reach it.
+sane. Measured on `ship`: **443/500** seeds accepted on the first attempt, and
+of the 57 rejections **1** came from content placement — so the 89% is the
+*combined* rate, and placement alone passes 443 of the 444 seeds that reach it.
+
+`tiny` counts **11** content nodes, not 12. #8's recipe — 1 boss, 3
+multipliers, 5 enemies, 2 additives — totals 11, and `Start` is geometric
+rather than a slot, so it must not be counted into the preset's slot budget. A
+recipe that does not match its preset exactly is a rejection, so the two have
+to agree.
 
 ### Maze construction ([#7])
 

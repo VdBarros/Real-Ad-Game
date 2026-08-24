@@ -212,6 +212,29 @@ The richest entry into a region: take everything outside it first, in the best
 order, and only then enter. The upper wall of the envelope, and what good
 routing is worth.
 
+## Recipe
+
+How many of each kind of content a preset's level holds: one boss, and a fixed
+count of multipliers, enemies and additives. It is a count, never a set of
+numbers — the numbers are minted per level. A recipe that does not ask for
+exactly the slots the carve offers is a rejected level, not a squashed one.
+
+## Minting
+
+Choosing a content node's number, done **during** an adversary's own walk
+rather than before it: the walk reaches for a node, and the number is chosen
+then, against the power the walk actually holds. An enemy the walk could not
+afford is therefore never minted, so a level that cannot stall is produced
+directly instead of being produced and then filtered.
+
+## Floor Repair
+
+The pass that makes the floor rule true after minting has finished. `P_min` is
+a property of the completed level, so minting cannot see it; instead each
+region's cheapest enemy is pulled below that region's `P_min` afterwards.
+Lowering a number only ever lowers power, so the walls move down underneath the
+repair and it iterates to a fixed point.
+
 ## Adversary
 
 A policy that plays a level badly on purpose, to find out whether playing it

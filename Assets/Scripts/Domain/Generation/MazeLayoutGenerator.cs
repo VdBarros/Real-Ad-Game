@@ -98,7 +98,7 @@ namespace Game.Domain
             return true;
         }
 
-        static long SeedOfAttempt(long seed, int attempt)
+        public static long SeedOfAttempt(long seed, int attempt)
         {
             unchecked
             {
