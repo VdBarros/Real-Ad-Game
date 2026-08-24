@@ -96,7 +96,7 @@ namespace Game.Domain.Tests
 
             var stall = AdversaryPanel.Walk(level, LevelSketch.Tuning, AdversaryPolicy.EnemyFirst);
 
-            Assert.That(stall.Reachable, Does.Not.Contain(6));
+            Assert.That(stall.Reachable, Has.No.Member(6));
             Assert.That(stall.Stranded.Count, Is.EqualTo(2));
             Assert.That(stall.Stranded[0].NodeId, Is.EqualTo(LevelSketch.DeepEnemyNodeId));
             Assert.That(stall.Stranded[0].Reachable, Is.True);
