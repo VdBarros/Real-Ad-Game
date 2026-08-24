@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using NUnit.Framework;
 
 namespace Game.Domain.Tests
@@ -50,7 +51,7 @@ namespace Game.Domain.Tests
 
                     Assert.That(
                         region.CheapestEnemy,
-                        Is.LessThanOrEqualTo(region.Minimum),
+                        Is.LessThanOrEqualTo(region.CheapestEntry),
                         "Seed " + level.AttemptSeed + " left nothing edible in " + region + ".");
                 }
             }
@@ -88,8 +89,8 @@ namespace Game.Domain.Tests
                 foreach (var region in level.Envelope.Regions)
                 {
                     Assert.That(
-                        region.Minimum,
-                        Is.LessThanOrEqualTo(region.Maximum),
+                        region.CheapestEntry,
+                        Is.LessThanOrEqualTo(region.RichestEntry),
                         "Seed " + level.AttemptSeed + " inverted the envelope in " + region + ".");
                 }
             }
@@ -100,31 +101,9 @@ namespace Game.Domain.Tests
         {
             foreach (var level in Sweep(preset))
             {
-                var decisions = level.Graph.Decisions;
-                var seen = new bool[decisions.Nodes.Count];
-                var queue = new List<int> { StartOf(level) };
-                seen[queue[0]] = true;
+                var seen = ReachableWithoutTheBoss(level);
 
-                for (var head = 0; head < queue.Count; head++)
-                {
-                    if (queue[head] == level.BossNodeId)
-                    {
-                        continue;
-                    }
-
-                    foreach (var neighbour in decisions.NeighboursOf(queue[head]))
-                    {
-                        if (seen[neighbour])
-                        {
-                            continue;
-                        }
-
-                        seen[neighbour] = true;
-                        queue.Add(neighbour);
-                    }
-                }
-
-                foreach (var node in decisions.Nodes)
+                foreach (var node in level.Graph.Decisions.Nodes)
                 {
                     if (node.Type != NodeType.Enemy
                         && node.Type != NodeType.Additive
@@ -139,6 +118,38 @@ namespace Game.Domain.Tests
                         "Seed " + level.AttemptSeed + " walled " + node + " off behind the boss.");
                 }
             }
+        }
+
+        [TestCaseSource(nameof(EveryPreset))]
+        public void TreasureSitsInFrontOfTheBossRatherThanInsideItsRoom(MazePreset preset)
+        {
+            var exercised = 0;
+
+            foreach (var level in Sweep(preset))
+            {
+                var decisions = level.Graph.Decisions;
+                var seen = ReachableWithoutTheBoss(level);
+
+                foreach (var neighbour in decisions.NeighboursOf(level.BossNodeId))
+                {
+                    var node = decisions.Node(neighbour);
+                    if (node.Type != NodeType.Additive && node.Type != NodeType.Multiplier)
+                    {
+                        continue;
+                    }
+
+                    Assert.That(
+                        seen[neighbour],
+                        Is.True,
+                        "Seed " + level.AttemptSeed + " put " + node + " inside the boss room.");
+                    exercised++;
+                }
+            }
+
+            Assert.That(
+                exercised,
+                Is.GreaterThan(0),
+                "No seed ever laid treasure beside the boss, so this proves nothing.");
         }
 
         [TestCaseSource(nameof(EveryPreset))]
@@ -226,7 +237,7 @@ namespace Game.Domain.Tests
             {
                 foreach (var region in level.Envelope.Regions)
                 {
-                    if (region.Minimum > 0)
+                    if (region.CheapestEntry > 0)
                     {
                         spreads.Add(region.Spread);
                     }
@@ -234,17 +245,17 @@ namespace Game.Domain.Tests
             }
 
             Assert.That(
+                Quantile(spreads, 0.1),
+                Is.EqualTo(1.0).Within(0.01),
+                "p10 spread was " + Quantile(spreads, 0.1) + ", where the start region pins it at one.");
+            Assert.That(
                 Quantile(spreads, 0.5),
-                Is.GreaterThan(8.0),
+                Is.EqualTo(46.1).Within(12.0),
                 "Median spread was " + Quantile(spreads, 0.5) + ".");
             Assert.That(
                 Quantile(spreads, 0.9),
-                Is.GreaterThan(50.0),
+                Is.EqualTo(492.0).Within(150.0),
                 "p90 spread was " + Quantile(spreads, 0.9) + ".");
-            Assert.That(
-                Quantile(spreads, 0.1),
-                Is.GreaterThanOrEqualTo(1.0),
-                "p10 spread was " + Quantile(spreads, 0.1) + ".");
         }
 
         [Test]
@@ -252,6 +263,7 @@ namespace Game.Domain.Tests
         {
             var accepted = 0;
             var contentRejections = 0;
+            var countByReason = new int[(int)ContentRejection.BossWithinReach + 1];
 
             for (var seed = 1; seed <= ShipSeeds; seed++)
             {
@@ -272,6 +284,7 @@ namespace Game.Domain.Tests
                 else if (layoutRejection == LayoutRejection.None)
                 {
                     contentRejections++;
+                    countByReason[(int)contentRejection]++;
                 }
             }
 
@@ -287,6 +300,15 @@ namespace Game.Domain.Tests
                 contentRejections,
                 Is.LessThanOrEqualTo((int)(ShipSeeds * 0.05)),
                 "Content placement alone rejected " + contentRejections + " seeds.");
+
+            foreach (var reason in ConstructedRatherThanFiltered())
+            {
+                Assert.That(
+                    countByReason[(int)reason],
+                    Is.EqualTo(0),
+                    reason + " fired " + countByReason[(int)reason] + " times, so it is filtering seeds "
+                    + "rather than guarding a construction.");
+            }
         }
 
         [Test]
@@ -309,7 +331,7 @@ namespace Game.Domain.Tests
 
                 foreach (var region in level.Envelope.Regions)
                 {
-                    if (region.Minimum > 0)
+                    if (region.CheapestEntry > 0)
                     {
                         spreads.Add(region.Spread);
                     }
@@ -349,11 +371,83 @@ namespace Game.Domain.Tests
                 }
             }
 
+            var ceilingBreaches = 0;
+            var blocked = 0;
+            foreach (var level in sweep)
+            {
+                if (level.ShortestPathBlocked)
+                {
+                    blocked++;
+                }
+
+                foreach (var region in level.Envelope.Regions)
+                {
+                    if (region.HoldsAnEnemy && region.DearestEnemy > region.RichestEntry)
+                    {
+                        ceilingBreaches++;
+                    }
+                }
+            }
+
+            Console.WriteLine("  regions whose dearest enemy tops P_max  " + ceilingBreaches);
+            Console.WriteLine("  levels whose beeline is blocked  " + blocked);
             Console.WriteLine("  regions holding only the boss  " + enemylessRegions);
             Console.WriteLine("  share of values that are 1  "
-                + (100.0 * ones / contentNodes).ToString("F1") + "%");
+                + Fixed(100.0 * ones / contentNodes) + "%");
 
-            Assert.That(sweep.Count, Is.EqualTo(ShipSeeds));
+            Assert.That(
+                Quantile(boss, 0.5),
+                Is.EqualTo(406.0).Within(60.0),
+                "Median boss power was " + Fixed(Quantile(boss, 0.5)) + ".");
+            Assert.That(
+                100.0 * ones / contentNodes,
+                Is.LessThan(50.0),
+                "Half the board collapsed to 1: " + Fixed(100.0 * ones / contentNodes) + "%.");
+            Assert.That(
+                Quantile(passes, 0.9),
+                Is.LessThan(PowerTuning.FloorRepairPasses),
+                "Floor repair is running to its cap rather than converging.");
+        }
+
+        static bool[] ReachableWithoutTheBoss(PlacedLevel level)
+        {
+            var decisions = level.Graph.Decisions;
+            var seen = new bool[decisions.Nodes.Count];
+            var queue = new List<int> { StartOf(level) };
+            seen[queue[0]] = true;
+
+            for (var head = 0; head < queue.Count; head++)
+            {
+                if (queue[head] == level.BossNodeId)
+                {
+                    continue;
+                }
+
+                foreach (var neighbour in decisions.NeighboursOf(queue[head]))
+                {
+                    if (seen[neighbour])
+                    {
+                        continue;
+                    }
+
+                    seen[neighbour] = true;
+                    queue.Add(neighbour);
+                }
+            }
+
+            return seen;
+        }
+
+        static IEnumerable<ContentRejection> ConstructedRatherThanFiltered()
+        {
+            yield return ContentRejection.RecipeSlotMismatch;
+            yield return ContentRejection.RolesUnfilled;
+            yield return ContentRejection.AdversaryStalled;
+            yield return ContentRejection.UnaffordableEnemy;
+            yield return ContentRejection.ValueNeverMinted;
+            yield return ContentRejection.RegionFloorUnmet;
+            yield return ContentRejection.EnvelopeInverted;
+            yield return ContentRejection.BossBeyondBound;
         }
 
         static int ContentNodesIn(PlacedLevel level, int regionId)
@@ -389,9 +483,14 @@ namespace Game.Domain.Tests
 
         static string Band(List<double> samples)
         {
-            return Quantile(samples, 0.1).ToString("F2")
-                + " / " + Quantile(samples, 0.5).ToString("F2")
-                + " / " + Quantile(samples, 0.9).ToString("F2");
+            return Fixed(Quantile(samples, 0.1))
+                + " / " + Fixed(Quantile(samples, 0.5))
+                + " / " + Fixed(Quantile(samples, 0.9));
+        }
+
+        static string Fixed(double value)
+        {
+            return value.ToString("F2", CultureInfo.InvariantCulture);
         }
 
         static double Quantile(List<double> samples, double share)

@@ -306,9 +306,9 @@ recipe's counts exact.
 `ship`'s `D_min` was lowered from 20 to 16 on measured rejection rates ([#7]).
 The carve alone already spends ~11% of `ship` seeds and ~32% of `tiny` seeds;
 envelope rejections stack on top, so the **combined** rate is what has to stay
-sane. Content placement accepts 89% of the seeds that reach it — measured
-443/500 `ship` seeds accepted on the first attempt, with **1** of the 57
-rejections coming from placement rather than the carve.
+sane. Measured on `ship`: **443/500** seeds accepted on the first attempt, and
+of the 57 rejections **1** came from content placement — so the 89% is the
+*combined* rate, and placement alone passes 443 of the 444 seeds that reach it.
 
 `tiny` counts **11** content nodes, not 12. #8's recipe — 1 boss, 3
 multipliers, 5 enemies, 2 additives — totals 11, and `Start` is geometric

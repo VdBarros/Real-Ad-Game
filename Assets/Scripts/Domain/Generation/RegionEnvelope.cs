@@ -4,20 +4,20 @@ namespace Game.Domain
 {
     public sealed class RegionEnvelope
     {
-        public RegionEnvelope(int regionId, int minimum, int maximum, int cheapestEnemy, int dearestEnemy)
+        public RegionEnvelope(int regionId, int cheapestEntry, int richestEntry, int cheapestEnemy, int dearestEnemy)
         {
             RegionId = regionId;
-            Minimum = minimum;
-            Maximum = maximum;
+            CheapestEntry = cheapestEntry;
+            RichestEntry = richestEntry;
             CheapestEnemy = cheapestEnemy;
             DearestEnemy = dearestEnemy;
         }
 
         public int RegionId { get; }
 
-        public int Minimum { get; }
+        public int CheapestEntry { get; }
 
-        public int Maximum { get; }
+        public int RichestEntry { get; }
 
         public int CheapestEnemy { get; }
 
@@ -30,17 +30,17 @@ namespace Game.Domain
 
         public bool FloorHolds
         {
-            get { return !HoldsAnEnemy || CheapestEnemy <= Minimum; }
+            get { return !HoldsAnEnemy || CheapestEnemy <= CheapestEntry; }
         }
 
         public bool WallsAreOrdered
         {
-            get { return Minimum <= Maximum; }
+            get { return CheapestEntry <= RichestEntry; }
         }
 
         public double Spread
         {
-            get { return Minimum <= 0 ? 0.0 : (double)Maximum / Minimum; }
+            get { return CheapestEntry <= 0 ? 0.0 : (double)RichestEntry / CheapestEntry; }
         }
 
         public override string ToString()
@@ -49,9 +49,9 @@ namespace Game.Domain
                 "region ",
                 RegionId.ToString(CultureInfo.InvariantCulture),
                 ": P_min ",
-                Minimum.ToString(CultureInfo.InvariantCulture),
+                CheapestEntry.ToString(CultureInfo.InvariantCulture),
                 ", P_max ",
-                Maximum.ToString(CultureInfo.InvariantCulture),
+                RichestEntry.ToString(CultureInfo.InvariantCulture),
                 ", enemies ",
                 CheapestEnemy.ToString(CultureInfo.InvariantCulture),
                 "..",

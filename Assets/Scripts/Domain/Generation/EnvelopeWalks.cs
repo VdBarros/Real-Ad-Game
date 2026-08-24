@@ -58,7 +58,7 @@ namespace Game.Domain
                     return power;
                 }
 
-                power = PowerAfter(board, power, take);
+                power = board.PowerAfter(power, take);
                 consumed[take] = true;
             }
 
@@ -122,7 +122,7 @@ namespace Game.Domain
                     return power;
                 }
 
-                power = PowerAfter(board, power, take);
+                power = board.PowerAfter(power, take);
                 consumed[take] = true;
             }
 
@@ -153,17 +153,10 @@ namespace Game.Domain
                     return power;
                 }
 
-                power = PowerAfter(board, power, nodeId);
+                power = board.PowerAfter(power, nodeId);
             }
 
             return power;
-        }
-
-        static int PowerAfter(ContentBoard board, int power, int nodeId)
-        {
-            return board.TypeOf(nodeId) == NodeType.Multiplier
-                ? power * board.ValueOf(nodeId)
-                : power + board.ValueOf(nodeId);
         }
     }
 }

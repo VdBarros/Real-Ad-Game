@@ -29,16 +29,6 @@ namespace Game.Domain
             get { return Total(countByLayoutRejection) + Total(countByContentRejection); }
         }
 
-        public int LayoutRejections
-        {
-            get { return Total(countByLayoutRejection); }
-        }
-
-        public int ContentRejections
-        {
-            get { return Total(countByContentRejection); }
-        }
-
         public int CountOf(LayoutRejection rejection)
         {
             return At(countByLayoutRejection, (int)rejection);

@@ -118,6 +118,38 @@ namespace Game.Domain
 
         public List<int> ReachableFrom(bool[] consumed)
         {
+            return Flood(nodeId => IsPassable(nodeId, consumed));
+        }
+
+        public bool[] ReachableFlags(bool[] consumed)
+        {
+            var flags = new bool[types.Length];
+            foreach (var nodeId in ReachableFrom(consumed))
+            {
+                flags[nodeId] = true;
+            }
+
+            return flags;
+        }
+
+        public bool[] ReachableAround(int impassableNodeId)
+        {
+            var flags = new bool[types.Length];
+            foreach (var nodeId in Flood(nodeId => nodeId != impassableNodeId))
+            {
+                flags[nodeId] = true;
+            }
+
+            return flags;
+        }
+
+        public int PowerAfter(int power, int nodeId)
+        {
+            return types[nodeId] == NodeType.Multiplier ? power * values[nodeId] : power + values[nodeId];
+        }
+
+        List<int> Flood(Func<int, bool> passable)
+        {
             var seen = new bool[types.Length];
             var order = new List<int> { StartNodeId };
             seen[StartNodeId] = true;
@@ -125,7 +157,7 @@ namespace Game.Domain
             for (var head = 0; head < order.Count; head++)
             {
                 var nodeId = order[head];
-                if (nodeId != StartNodeId && !IsPassable(nodeId, consumed))
+                if (nodeId != StartNodeId && !passable(nodeId))
                 {
                     continue;
                 }
@@ -143,46 +175,6 @@ namespace Game.Domain
             }
 
             return order;
-        }
-
-        public bool[] ReachableFlags(bool[] consumed)
-        {
-            var flags = new bool[types.Length];
-            foreach (var nodeId in ReachableFrom(consumed))
-            {
-                flags[nodeId] = true;
-            }
-
-            return flags;
-        }
-
-        public bool[] ReachableAround(int impassableNodeId)
-        {
-            var seen = new bool[types.Length];
-            var order = new List<int> { StartNodeId };
-            seen[StartNodeId] = true;
-
-            for (var head = 0; head < order.Count; head++)
-            {
-                var nodeId = order[head];
-                if (nodeId == impassableNodeId)
-                {
-                    continue;
-                }
-
-                foreach (var neighbour in source.Decisions.NeighboursOf(nodeId))
-                {
-                    if (seen[neighbour])
-                    {
-                        continue;
-                    }
-
-                    seen[neighbour] = true;
-                    order.Add(neighbour);
-                }
-            }
-
-            return seen;
         }
 
         public List<int> ShortestRouteTo(int targetNodeId)

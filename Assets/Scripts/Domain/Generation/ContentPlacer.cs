@@ -5,19 +5,6 @@ namespace Game.Domain
 {
     public static class ContentPlacer
     {
-        public static PlacedLevel Place(MazeLayout layout, ContentRecipe recipe, PowerTuning tuning)
-        {
-            PlacedLevel placed;
-            ContentRejection rejection;
-            if (TryPlace(layout, recipe, tuning, out placed, out rejection))
-            {
-                return placed;
-            }
-
-            throw new InvalidOperationException(
-                "Seed " + layout.AttemptSeed + " could not be filled: " + rejection + ".");
-        }
-
         public static bool TryPlace(
             MazeLayout layout,
             ContentRecipe recipe,
@@ -412,7 +399,7 @@ namespace Game.Domain
                     }
                 }
 
-                var take = ChooseWorst(board, reachable, consumed, power);
+                var take = NextOnTheWorstWalk(board, reachable, consumed, power);
                 if (take < 0)
                 {
                     return ContentRejection.AdversaryStalled;
@@ -451,7 +438,7 @@ namespace Game.Domain
                     return ContentRejection.UnaffordableEnemy;
                 }
 
-                power = type == NodeType.Multiplier ? power * value : power + value;
+                power = board.PowerAfter(power, take);
                 consumed[take] = true;
             }
 
@@ -466,7 +453,7 @@ namespace Game.Domain
             return ContentRejection.None;
         }
 
-        static int ChooseWorst(ContentBoard board, List<int> reachable, bool[] consumed, int power)
+        static int NextOnTheWorstWalk(ContentBoard board, List<int> reachable, bool[] consumed, int power)
         {
             var multiplier = -1;
             var additive = -1;

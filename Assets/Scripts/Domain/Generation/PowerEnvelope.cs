@@ -100,28 +100,5 @@ namespace Game.Domain
                 return true;
             }
         }
-
-        public double MedianSpread
-        {
-            get
-            {
-                var spreads = new List<double>(regions.Count);
-                foreach (var region in regions)
-                {
-                    if (region.Minimum > 0)
-                    {
-                        spreads.Add(region.Spread);
-                    }
-                }
-
-                if (spreads.Count == 0)
-                {
-                    return 0.0;
-                }
-
-                spreads.Sort();
-                return spreads[spreads.Count / 2];
-            }
-        }
     }
 }
