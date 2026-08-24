@@ -49,6 +49,7 @@ namespace Game.Domain
             }
 
             var startNodeId = Unvisited;
+            var starts = 0;
             foreach (var node in level.Decisions.Nodes)
             {
                 if (node.Type != NodeType.Start)
@@ -56,15 +57,11 @@ namespace Game.Domain
                     continue;
                 }
 
-                if (startNodeId != Unvisited)
-                {
-                    throw new ArgumentException("A run needs exactly one Start to begin on.", nameof(level));
-                }
-
+                starts++;
                 startNodeId = node.Id;
             }
 
-            if (startNodeId == Unvisited)
+            if (starts != 1)
             {
                 throw new ArgumentException("A run needs exactly one Start to begin on.", nameof(level));
             }

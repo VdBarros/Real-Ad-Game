@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 
 namespace Game.Domain.Tests
@@ -39,7 +40,7 @@ namespace Game.Domain.Tests
         {
             Assert.That(
                 () => RunState.Begin(RunFixture.Level(), startingPower: 0),
-                Throws.InstanceOf<System.ArgumentOutOfRangeException>());
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
         }
 
         [Test]
@@ -57,7 +58,8 @@ namespace Game.Domain.Tests
                     RunFixture.GateEnemy,
                     RunFixture.Multiplier,
                     RunFixture.Start,
-                    RunFixture.DoorstepEnemy
+                    RunFixture.DoorstepEnemy,
+                    RunFixture.AdditiveBeyondTheMultiplier
                 }));
         }
 
@@ -123,7 +125,7 @@ namespace Game.Domain.Tests
 
             Assert.That(
                 () => state.IsReachable(99),
-                Throws.InstanceOf<System.ArgumentOutOfRangeException>());
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
         }
     }
 }

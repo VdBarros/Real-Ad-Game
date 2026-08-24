@@ -90,6 +90,18 @@ unconsumed enemy, since every other node on it was walked through; a tie or a
 loss there leaves the player standing on the node before it, holding whatever
 the walk already earned.
 
+A tap names a destination, not a path, and the game picks the route. A player
+who wants a different path expresses it by tapping its nodes in turn, so route
+choice is a sequence of taps rather than a property of one.
+
+## Outcome
+
+What a tap turned out to be. A **win**, a **tie** or a **loss** where the route
+ended on an enemy; a plain **walk** where it ended on anything else, pickups
+included. A tap the rules refuse — at a node that is not reachable, or after the
+boss has already fallen — is **rejected**, and a rejected tap has no route and
+changes nothing.
+
 ## Cleared
 
 A tile is cleared when it can be reached from the start once every consumed

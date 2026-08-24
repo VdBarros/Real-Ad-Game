@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 
@@ -92,6 +93,29 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void OneRouteAppliesAMultiplierBeforeAnAdditiveItLeadsTo()
+        {
+            var result = ActionResolver.Resolve(
+                RunFixture.Begin(startingPower: 2),
+                RunFixture.AdditiveBeyondTheMultiplier);
+
+            Assert.That(
+                result.Route,
+                Is.EqualTo(new[]
+                {
+                    RunFixture.Start,
+                    RunFixture.Multiplier,
+                    RunFixture.AdditiveBeyondTheMultiplier
+                }));
+            Assert.That(
+                result.State.Power,
+                Is.EqualTo(2 * RunFixture.MultiplierValue + RunFixture.AdditiveBeyondTheMultiplierValue));
+            Assert.That(
+                result.State.Power,
+                Is.Not.EqualTo((2 + RunFixture.AdditiveBeyondTheMultiplierValue) * RunFixture.MultiplierValue));
+        }
+
+        [Test]
         public void AnUnreachableTargetIsRejectedAndChangesNothing()
         {
             var before = RunFixture.Begin(startingPower: 2);
@@ -108,7 +132,7 @@ namespace Game.Domain.Tests
         {
             Assert.That(
                 () => ActionResolver.Resolve(RunFixture.Begin(startingPower: 2), 99),
-                Throws.InstanceOf<System.ArgumentOutOfRangeException>());
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
         }
 
         [Test]
@@ -122,7 +146,8 @@ namespace Game.Domain.Tests
 
             Assert.That(result.Outcome, Is.EqualTo(ActionOutcome.Win));
             Assert.That(result.State.IsLevelComplete, Is.True);
-            Assert.That(result.State.Power, Is.EqualTo(39 + RunFixture.BossValue));
+            var poweredUp = (2 + RunFixture.AdditiveValue + RunFixture.GateEnemyValue) * RunFixture.MultiplierValue;
+            Assert.That(result.State.Power, Is.EqualTo(poweredUp + RunFixture.BossValue));
         }
 
         [Test]

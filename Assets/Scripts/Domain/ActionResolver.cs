@@ -17,6 +17,7 @@ namespace Game.Domain
                 return ActionResult.Rejected(state);
             }
 
+            var decisions = state.Level.Decisions;
             var outcome = ActionOutcome.Walked;
             var position = state.PositionNodeId;
             var power = state.Power;
@@ -24,7 +25,7 @@ namespace Game.Domain
 
             for (var step = 1; step < route.Count; step++)
             {
-                var node = state.Level.Decisions.Node(route[step]);
+                var node = decisions.Node(route[step]);
                 if (consumed[node.Id])
                 {
                     position = node.Id;

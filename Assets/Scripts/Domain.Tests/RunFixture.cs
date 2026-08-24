@@ -30,6 +30,10 @@ namespace Game.Domain.Tests
 
         public const int DoorstepEnemyValue = 2;
 
+        public const int AdditiveBeyondTheMultiplier = 6;
+
+        public const int AdditiveBeyondTheMultiplierValue = 4;
+
         public static LevelGraph Level()
         {
             var builder = new LevelGraphBuilder(Seed, Preset);
@@ -46,13 +50,18 @@ namespace Game.Domain.Tests
                 builder.AddTile(At(x, 2), regionId: 0);
             }
 
+            builder.AddTile(At(1, 3), regionId: 0);
+            builder.AddTile(At(1, 4), regionId: 0);
+
             builder.AddNode(At(3, 0), NodeType.Additive, AdditiveValue);
             builder.AddNode(At(5, 0), NodeType.Enemy, GateEnemyValue);
             builder.AddNode(At(7, 0), NodeType.Boss, BossValue);
             builder.AddNode(At(1, 2), NodeType.Multiplier, MultiplierValue);
             builder.AddNode(At(3, 2), NodeType.Start);
             builder.AddNode(At(5, 2), NodeType.Enemy, DoorstepEnemyValue);
+            builder.AddNode(At(1, 4), NodeType.Additive, AdditiveBeyondTheMultiplierValue);
 
+            builder.Connect(At(1, 2), At(1, 4), Path(At(1, 3)));
             builder.Connect(At(3, 0), At(5, 0), Path(At(4, 0)));
             builder.Connect(At(5, 0), At(7, 0), Path(At(6, 0)));
             builder.Connect(At(3, 2), At(3, 0), Path(At(3, 1)));
