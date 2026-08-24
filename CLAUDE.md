@@ -15,8 +15,12 @@
   - `Game.Domain` — plain C#, **zero `UnityEngine` references**. Rules,
     graph, generator, validator. Must be unit-testable outside play mode.
   - `Game.Domain.Tests` — NUnit tests for `Game.Domain`.
+  - `Game.Presentation.Pure` — plain C#, **zero `UnityEngine` references**.
+    Presentation logic that is a pure function: visual tier from power,
+    fly-through waypoints, the grid-to-world projection, the zoom-beat
+    trigger. Lives here so the fast loop can test it.
   - `Game.Presentation` — Unity-side rendering of a `LevelGraph` (world
-    builder, badges, camera, floor state).
+    builder, badges, camera, floor state). References `Game.Presentation.Pure`.
   - `Game.Interaction` — input, pathfinding, encounter/pickup resolution.
   - `Game.Flow` — game state machine, cutscene.
   - Domain must never reference Presentation/Interaction/Flow, or `UnityEngine`
@@ -38,17 +42,35 @@
   at `dotnet/Game.Domain.Tests/` — same files, no duplication. Run
   `dotnet test dotnet/Game.Domain.Tests` (~2s) instead of entering the Unity
   Editor for domain work. 6 of 18 tasks are Phase 1 and that's where the
-  invariant-correctness risk sits — see mvp-backlog §2 and §5.
+  invariant-correctness risk sits — see mvp-backlog §2.
+  **That project must compile the way Unity compiles** (netstandard2.1 / C# 9,
+  not net8.0 / C# 12) or domain code passes the fast loop and fails in the
+  Editor. T-01 splits it.
 
-## Docs
+## Where things live
 
+Four artifacts, four jobs. Nothing restates another.
+
+- **[Spec: Number Maze MVP](https://github.com/VdBarros/Real-Ad-Game/issues/17)**
+  — source of truth for *what we are building*: problem, solution, user
+  stories, and every implementation and testing decision.
+- **T-01 … T-18** (GitHub issues, `ready-for-agent`, phase-labelled, wired with
+  native `blocked_by` edges) — source of truth for *what is left to do*. The
+  frontier is whatever has no open blocker. **Do not restate the task list
+  anywhere else.**
+- [`docs/mvp-backlog.md`](docs/mvp-backlog.md) — the premises (§1), the core
+  rules spec with its invariant proofs (§2), and the architecture (§3). §0 is
+  the same standing instructions as above. **§2 is what implementers must match
+  exactly**, and it holds reasoning no ticket does — Invariant B's proof, in
+  particular.
 - [`docs/ad-analysis.md`](docs/ad-analysis.md) — source of truth for *what the
-  reference ad showed*. Verified-vs-ambiguous breakdown of the game being
-  reproduced.
-- [`docs/mvp-backlog.md`](docs/mvp-backlog.md) — source of truth for *what we
-  are building*: locked design decisions, core rules spec, architecture, and
-  the full task backlog (T-01…T-18). §0 of that doc is the same standing
-  instructions as above; §2 is the exact rules spec implementers must match.
+  reference ad showed*, including what it faked. §7 records where each original
+  open question was answered.
+
+Reasoning, measurements and rejected alternatives for every decision live in
+the closed tickets of the wayfinding map,
+[issue #1](https://github.com/VdBarros/Real-Ad-Game/issues/1). **Where a doc and
+a closed ticket disagree, the ticket wins.**
 
 ## Agent skills
 

@@ -80,7 +80,7 @@ the ad showed*. This document is the source of truth for *what we are building*.
 | 19 | Workflow | Branch per task, PR to `main`, Actions runs `dotnet test` on Domain only. Unity work is human-reviewed ([#5]) |
 
 Decision 13 is about *numbers*. Enemy **appearance** is deliberately dynamic:
-#14 bands each enemy by `enemy.value / player.power`, because absolute bands
+[#14] bands each enemy by `enemy.value / player.power`, because absolute bands
 collapse 47% of enemies into one look. The badge never changes; the model does.
 
 [#2]: https://github.com/VdBarros/Real-Ad-Game/issues/2
@@ -368,236 +368,25 @@ owns them explicitly, caches them across levels, and destroys them on dispose.
 
 ---
 
-## 4. Task backlog
+## 4. The work itself
 
-Dependencies in brackets. Tasks with no shared dependency can run in parallel.
+The task backlog and its execution order used to live here. They are now
+**filed as issues** — T-01 through T-18, with native `blocked_by` edges, phase
+labels and `ready-for-agent` — so there is exactly one place that says what is
+left to do, and it is the same place that says who is doing it.
 
-### Phase 0 — Foundation
+- **Spec: Number Maze MVP** — <https://github.com/VdBarros/Real-Ad-Game/issues/17>
+  — the problem, the solution, the user stories, and every implementation and
+  testing decision in one document.
+- **T-01 … T-18** — the filed tickets. The frontier is whatever has no open
+  blocker; T-01 is the root and everything else waits on it.
+- **Issue #1** — the wayfinding map, whose closed tickets hold the reasoning,
+  the measurements and the rejected alternatives behind every decision above.
 
-**T-01 — Project bootstrap**
-Unity 6 LTS, URP, portrait-locked, new Input System. Assembly definitions:
-`Game.Domain` (no Unity refs), `Game.Domain.Tests`, `Game.Presentation`,
-`Game.Interaction`, `Game.Flow`. Folder structure, .gitignore, one empty scene.
-Also lands the workflow from [#5]: branch per task, PR to `main`, an Actions
-job running `dotnet test` on Domain only, and branch protection **after** T-01
-merges. The standalone `.csproj` must be **split so it compiles as Unity does**
-— netstandard2.1 / C# 9, not net8.0 / C# 12 ([#10]) — or domain code can pass
-the fast loop and fail in the Editor.
-*Accept:* builds to Android; `Game.Domain` compiles with zero UnityEngine
-references; an empty NUnit test runs outside play mode; the standalone project
-rejects a C# 10+ construct that Unity would reject.
+This document keeps only what those cannot hold: the premises (§1), the rules
+and their proofs (§2), and the architecture (§3).
 
-> `Game.Domain` and `Game.Domain.Tests` (with a smoke test) already exist at
-> `Assets/Scripts/Domain(.Tests)/`, plus the standalone `dotnet test` project —
-> bootstrapped early because Phase 1's feedback loop was worth having before
-> Phase 1 itself started. What's left for T-01: `Game.Presentation`,
-> `Game.Interaction`, `Game.Flow` asmdefs, Android build config, portrait
-> lock, Input System setup, and the bootstrap scene.
-
-### Phase 1 — Domain [T-01]
-
-**T-02 — Graph data model**
-The **tile grid** and the **decision graph**, which are two structures, not one
-([#3]). `Node` (id, type, value, regionId, tile), `Edge` (with its corridor
-tile path), `LevelGraph`. Node types: `Start`, `Empty`, `Enemy`, `Boss`,
-`Additive`, `Multiplier`. Adjacency queries, and serialization by a
-**hand-rolled writer inside Domain with zero dependencies** ([#10]) — no
-library gives deterministic ordering, so the model must.
-*Accept:* a hand-built 10-node graph round-trips; adjacency queries return
-correct neighbours; **serializing the same graph twice is byte-identical**, and
-so is serializing it after a rebuild.
-
-**T-03 — Run state and action resolution** [T-02]
-`RunState` (current power, current node, consumed set). `ActionResolver`
-implementing §2 Resolution exactly. Returns a result enum (`Win`/`Tie`/`Loss`/
-`Pickup`) plus the new state. Pure function, no side effects.
-Reachability is a flood fill over the consumed set, stopping at unconsumed
-enemies ([#2]) — **any reachable node is a legal target**, however many hops
-away.
-*Accept:* unit tests cover all five outcome branches including the tie case;
-power never decreases in any test; tapping an **unreachable** node is rejected
-while a reachable multi-hop target is accepted and resolves every node on the
-way; a tie is a no-op, since affordable is strictly `P > E`.
-
-**T-04 — Maze layout generator** [T-02]
-Seeded topology only, per §2 Maze construction: recursive backtracker per
-floor, braid 0.25, stairs, Voronoi regions, decision-graph extraction. No
-content values yet. **Topology is immutable after layout** ([#6]) — content
-placement may not move, add or remove a node.
-*Accept:* 1000 seeds all produce fully-connected graphs across floors;
-identical seed → byte-identical output; measured gate ratio ~30% and ~2.3
-pockets per level; Invariant C is approximated here by tile distance from
-`Start`, since no content exists yet.
-
-**T-05 — Content placement and power envelope** [T-04, T-03]
-Fill the slots T-04 fixed: enemies, additives, multipliers, and the boss.
-**Values are minted during the adversary's own walk** against the power it
-actually holds, so Invariant A holds by construction rather than by retry
-([#8]). The boss is `round(0.8 × (P₀·M + A))`, derived from the level's own
-Invariant B bound. Then a **floor-repair pass**, capped at 6 iterations, pulls
-each region's cheapest enemy below that region's `P_min`.
-*Accept:* every region has at least one enemy ≤ `P_min`; `P_min ≤ P_max` for
-all regions; nothing is gated behind the boss; the `P_max/P_min` spread does
-not collapse (measured median ~14×).
-
-**T-06 — Solvability validator** [T-05]
-Implement Invariants A, B, C as independent checks returning a **structured
-failure reason**. Invariant A is the **five-policy adversary panel** ([#9]), and
-a level fails if any single policy strands. Generator retries on failure,
-**capped at 50 attempts**, then throws with a per-reason histogram.
-*Accept:* deliberately malformed graphs are rejected with the correct reason;
-Invariant B is a pure O(n) computation; a stall report carries the consumed
-set, the power at stall, the reachable frontier and the stranded nodes.
-
-**T-07 — Generator fuzz suite** [T-06]
-Run 10,000 seeds. Assert every accepted level satisfies all three invariants.
-Cross-check the panel against the **brute-force oracle on `tiny` only** —
-`ship` is intractable — and **only on mutated levels**: inflate one enemy's
-power ×3 / ×10 / ×50, one enemy at a time. On unbroken levels the two agree
-vacuously, because #8 mints values so that stalls cannot occur naturally, which
-is why the old criterion tested nothing ([#9]).
-*Accept:* zero invariant violations across the run; **the panel's verdict
-matches the oracle's on every mutant** — verdict, never consumed set, since the
-oracle explores all orderings and the panel walks five; report of rejection
-rate, mean generation time and peak state counts.
-
-### Phase 2 — Presentation [T-02]
-
-Can start as soon as the data model exists — does not wait for the generator.
-
-**T-08 — Isometric world builder**
-Consume a `LevelGraph` **and nothing else** ([#12]). One floor quad per tile,
-plus a wall on each **absent neighbour** — walls are derived from the grid,
-never stored. Stairs are an ordinary quad plus a ramp prop; node props are
-primitives switched on `NodeType`, with `Empty` deliberately instantiating
-nothing. Projection is `(x·1, floor·2, y·1)`, camera `euler(30, 45, 0)`,
-orthographic size **9.50** — a per-preset constant, since the carve visits
-every lattice cell and the footprint never varies by seed.
-*Accept:* a fixture graph renders as a walkable-looking maze, both floors
-visible at once; rebuilding from the same graph is deterministic — names are a
-function of the tile key, sibling order is the `(floor, y, x)` sweep, and no
-`Dictionary`/`HashSet` iteration appears in the build path; everything hangs
-under one `LevelRoot`.
-
-**T-09 — Number badge system**
-World-space **TextMeshPro** above every node — MeshRenderer, not Canvas
-([#11]). Blue rounded-rect for player and pickups, red pill for enemies, both
-**generated procedurally in code** because the built-in UI sprites return null
-at runtime. Prefix rendering (`+N`, `xM`, bare N). Count-up animation for the
-player badge on power change, sized for three digits.
-*Accept:* badges are legible at mobile portrait resolution and never overlap
-their own node's geometry; **no billboard script exists** — the camera never
-rotates, so rotation is copied once at construction; the shared material and
-sprite are created once and destroyed explicitly, not minted per level.
-
-**T-10 — Player visual tiers and weapon drop** [T-08]
-**Five absolute tiers at power 2 / 8 / 30 / 100 / 300** ([#14]). `VisualTier`
-is a pure function of power, so a rebuild needs no restore step. Per tier:
-uniform scale +15%, a cool→warm colour ramp, and one accumulating primitive
-(max three). The weapon drop is a **transition effect that merges into the
-tier's primitive**, not one prop per kill. Enemy appearance is separate and
-**relative**: `enemy.value / player.power` in four bands, re-evaluated on every
-power change, instant and unanimated.
-*Accept:* crossing a threshold fires a ~0.25 s scale-and-colour beat with an
-overshoot; **the count-up finishes before the promotion fires**; rapid changes
-**collapse rather than queue**, so the badge never shows a stale number, even
-if that skips a tier; the player lives under `LevelRoot`.
-
-**T-11 — Camera rig** [T-08]
-**Two states, not three modes** ([#15], [#16]). The constant — `(levelCentre,
-ortho 9.50)`, which shows the whole level for every seed — and cuts away from
-it. **Follow mode does not exist.** The fly-through is a two-waypoint pull-out,
-`world(Start)` at ortho 4.2 to the constant, 2.0 s, ease in-out. The zoom beat
-is a **hard cut** to `(node, ortho 4.0)`, holding the enclosed animation
-(floor 0.35 s, cap 1.2 s), then a cut back; it fires on **multipliers and the
-boss only**, and a multi-hop walk pauses for it.
-*Accept:* every camera state is the constant or a cut to a known transform, and
-the flight is the only interpolation in the rig; the flight's last frame and
-every beat's exit equal the constant **exactly**, no snap; the flight's peak
-on-screen pan stays under 1000 px/s; **rotation is never written and the rig
-exposes no field for it**; a tap during the flight or a beat returns control
-immediately; camera sits at `target - forward × 20` (near 0.3, far 40), so no
-cut can clip geometry; the same seed produces the same flight.
-
-**T-12 — Floor state controller** [T-08]
-Two floor materials, cursed and cleared. **Corridor ownership does not exist**
-([#6]): cleared is a *reading* of the consumed set — every tile reachable from
-the start treating consumed nodes as walkable — so the defeated enemy's tile
-and the corridor behind it flip in the same evaluation.
-*Accept:* defeating an enemy changes exactly the tiles that reading newly
-covers, and nothing else; state survives camera cuts; the transition is under
-one second.
-
-### Phase 3 — Interaction [T-03, T-08]
-
-**T-13 — Tap input and target preview**
-Raycast taps onto nodes. Hovering/holding highlights the target and shows the
-predicted outcome (win / tie / loss) before commit. **Unreachable** nodes are
-visibly non-tappable — reachable ones are legal targets however many hops away
-([#2]), so this is a flood fill over the consumed set, not an adjacency test.
-Every node is on screen at all times ([#12]), so there is no off-screen
-targeting case.
-*Accept:* touch targets are at least 9mm on a reference device; prediction
-always matches what `ActionResolver` subsequently returns, including for a
-multi-hop target that consumes several nodes on the way.
-
-**T-14 — Pathfinding and walk** [T-13]
-Shortest path along graph edges to the tapped node, with a walk animation and
-the dotted-path trail from the ad. Cancellable by tapping elsewhere. The walk
-**pauses for a zoom beat** when it consumes a multiplier ([#16]).
-*Accept:* path never crosses walls; cancelling mid-walk leaves the run state
-untouched.
-
-**T-15 — Encounter resolution** [T-14]
-Drive `ActionResolver` on arrival and play the matching outcome: win (slash,
-enemy dissolves, power counts up, corridor clears, weapon drops), tie
-(clash-stalemate, walk back), loss (knockback, walk back).
-*Accept:* tie and loss are visually distinguishable; both leave `RunState`
-byte-identical to before the tap.
-
-**T-16 — Pickup resolution** [T-14]
-Additives and multipliers apply with the count-up animation. **Only multipliers
-get a zoom beat** ([#16]) — an additive is additive, and at 7 per level a beat
-on each interrupts the routing the game is made of. Consumed pickups leave an
-empty pedestal.
-*Accept:* `x2` on power 5 yields exactly 10; order of operations is observable
-— `x3` then `+50` and `+50` then `x3` give different results from the same
-start; consumed pickups are not re-tappable.
-
-### Phase 4 — Flow
-
-**T-17 — Game state machine** [T-06, T-11, T-15, T-16]
-`Boot → Cutscene → Generate → Preview → Play → BossDefeated → Result → Generate`.
-`Preview` is #15's fly-through; a tap during it sets the camera to the constant
-and enters `Play` — the skip target and the flight's natural end are the same
-state, so it is an assignment, not a special case. The boss beat cuts out into
-`BossDefeated`.
-Result panel shows final power and a Next button.
-*Accept:* full loop runs 20 times without leaking objects between levels — the
-leak to watch is the procedural badge `Texture2D` and `Material` ([#11]), which
-survive their GameObjects and must be cached across levels, not minted per
-level; generation failure retries silently, up to #9's cap of 50.
-
-**T-18 — Pillar cutscene** [T-09, T-17]
-Scripted, non-interactive, skippable. Player 5, girl 25, rival 99. Player
-throws hearts, drops to 2, becomes a skeleton, girl counts to 50, her pillar
-grows to the rival's height, she crosses, player falls through the portal into
-the generated level. Numbers are hardcoded, no simulation.
-*Accept:* plays start to finish under 20 seconds; skippable at any frame;
-hands off to `Generate` cleanly.
-
----
-
-## 5. Suggested execution order
-
-1. **T-01** alone, first. Everything blocks on it.
-2. Then two parallel tracks: **T-02 → T-03 → T-04 → T-05 → T-06 → T-07**
-   (domain) and **T-08 → T-09 → T-10 → T-11 → T-12** (presentation).
-3. **T-13 → T-14 → T-15 → T-16** once both tracks land.
-4. **T-17**, then **T-18** last — the cutscene is pure polish and should not
-   block anything.
-
-The riskiest task by a wide margin is **T-05/T-06**. If the envelope maths is
-wrong, the game is either unloseable and boring or stranding players despite
-the guarantee. Get T-07 running early and treat its output as the real measure
-of whether the design works.
+The riskiest work by a wide margin is **T-05 and T-06**. If the envelope maths
+is wrong the game is either unloseable and boring, or stranding players despite
+the guarantee. T-07 is what tells you which, so get it running early and treat
+its output as the real measure of whether the design works.
