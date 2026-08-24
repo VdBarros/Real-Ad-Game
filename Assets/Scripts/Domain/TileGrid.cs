@@ -93,6 +93,11 @@ namespace Game.Domain
                 && acrossTheStair.Equals(second);
         }
 
+        public bool CarriesStair(TilePosition position)
+        {
+            return stairPartnerByPosition.ContainsKey(position);
+        }
+
         public IReadOnlyList<TilePosition> Neighbours(TilePosition position)
         {
             if (!Contains(position))

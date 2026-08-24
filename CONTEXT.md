@@ -134,6 +134,16 @@ A content node whose content does not exist yet. Layout decides where the slots
 are and fixes them; content placement decides what fills each one and may not
 move, add or remove any. No slot survives generation unfilled.
 
+## Layout
+
+Everything about a level that is decided before any content exists: which tiles
+are walkable, where the stairs and regions are, which tiles are decision nodes,
+and which of those are slots. Layout is fixed once it is done — the topology a
+level ends up with is the topology layout chose, and nothing downstream moves,
+adds or removes a node. A layout that fails its own checks is discarded whole
+and a fresh seed tried, because there is no repair that would leave the
+topology honest.
+
 ## Preset
 
 A named level size the generator can be asked for. `tiny` exists so exhaustive
@@ -147,6 +157,21 @@ One complete generated level: its tile grid, its decision graph, and the
 content sitting on the content nodes. It is what the generator returns and the
 only thing presentation is given. A level graph is a pure function of its seed
 and preset — the same pair always yields the same level.
+
+## Lattice
+
+The coarse grid of rooms a floor is carved out of, before it becomes tiles.
+One lattice cell becomes one tile, and the wall between two joined cells
+becomes another, so a floor holds rather more tiles than the lattice holds
+cells. The lattice is a preset's way of saying how big a floor is; nothing
+outside carving knows it exists.
+
+## Carve
+
+Cutting a floor's corridors out of its lattice, by walking the cells in a
+random order and knocking through the wall behind each step. Carving alone
+produces a maze with exactly one route between any two tiles, which is why
+braiding follows it.
 
 ## Braid
 
