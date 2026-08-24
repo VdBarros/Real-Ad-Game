@@ -33,6 +33,15 @@ A decision node that holds nothing. It exists because three or more corridors
 terminate at that tile, or because the tile changes floor. Junction nodes are
 never consumed, so they carry no state and enter no reasoning about power.
 
+## Stair
+
+The only thing that joins two floors: a pair of tiles at the same `(x, y)` on
+adjacent floors, walkable in both directions. Tiles that merely sit one above
+the other are not connected — nothing but a stair crosses a floor, so a stair
+is data the level carries rather than a coincidence of coordinates. The
+corridor joining a stair's two tiles covers no tiles at all; it is the one
+corridor that is zero-length by construction.
+
 ## Corridor
 
 Exactly one decision-graph edge, together with the run of tiles it covers. A
