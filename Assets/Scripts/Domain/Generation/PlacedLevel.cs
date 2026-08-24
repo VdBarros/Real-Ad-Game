@@ -9,12 +9,9 @@ namespace Game.Domain
             LevelGraph graph,
             ContentRecipe recipe,
             PowerTuning tuning,
-            int bossNodeId,
-            long invariantBBound,
-            int shortestPathPower,
-            bool shortestPathBlocked,
             int floorRepairPasses,
-            PowerEnvelope envelope)
+            PowerEnvelope envelope,
+            SolvabilityVerdict verdict)
         {
             if (layout == null)
             {
@@ -41,16 +38,23 @@ namespace Game.Domain
                 throw new ArgumentNullException(nameof(envelope));
             }
 
+            if (verdict == null)
+            {
+                throw new ArgumentNullException(nameof(verdict));
+            }
+
+            if (!verdict.IsSafe)
+            {
+                throw new ArgumentException("A placed level is one the validator cleared: " + verdict, nameof(verdict));
+            }
+
             Layout = layout;
             Graph = graph;
             Recipe = recipe;
             Tuning = tuning;
-            BossNodeId = bossNodeId;
-            InvariantBBound = invariantBBound;
-            ShortestPathPower = shortestPathPower;
-            ShortestPathBlocked = shortestPathBlocked;
             FloorRepairPasses = floorRepairPasses;
             Envelope = envelope;
+            Verdict = verdict;
         }
 
         public MazeLayout Layout { get; }
@@ -61,17 +65,31 @@ namespace Game.Domain
 
         public PowerTuning Tuning { get; }
 
-        public int BossNodeId { get; }
-
-        public long InvariantBBound { get; }
-
-        public int ShortestPathPower { get; }
-
-        public bool ShortestPathBlocked { get; }
-
         public int FloorRepairPasses { get; }
 
         public PowerEnvelope Envelope { get; }
+
+        public SolvabilityVerdict Verdict { get; }
+
+        public int BossNodeId
+        {
+            get { return Verdict.BossNodeId; }
+        }
+
+        public long InvariantBBound
+        {
+            get { return Verdict.Bound; }
+        }
+
+        public int ShortestPathPower
+        {
+            get { return Verdict.BeelinePower; }
+        }
+
+        public bool ShortestPathBlocked
+        {
+            get { return Verdict.BeelineBlocked; }
+        }
 
         public long AttemptSeed
         {
@@ -105,7 +123,7 @@ namespace Game.Domain
 
         public int BossPower
         {
-            get { return Graph.Decisions.Node(BossNodeId).Value; }
+            get { return Verdict.BossPower; }
         }
     }
 }

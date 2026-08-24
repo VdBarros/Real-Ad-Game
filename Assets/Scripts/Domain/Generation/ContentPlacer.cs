@@ -53,41 +53,8 @@ namespace Game.Domain
 
             var passes = RepairRegionFloor(board, tuning);
 
-            long additiveTotal = 0;
-            long multiplierProduct = 1;
-            for (var nodeId = 0; nodeId < board.Count; nodeId++)
-            {
-                if (nodeId == bossNodeId)
-                {
-                    continue;
-                }
-
-                var type = board.TypeOf(nodeId);
-                if (type == NodeType.Multiplier)
-                {
-                    multiplierProduct *= board.ValueOf(nodeId);
-                }
-                else if (type == NodeType.Enemy || type == NodeType.Additive)
-                {
-                    additiveTotal += board.ValueOf(nodeId);
-                }
-            }
-
-            var bound = tuning.StartingPower * multiplierProduct + additiveTotal;
-            var bossPower = Math.Max(2, (int)Math.Floor(bound * tuning.BossFactor + 0.5));
-            board.SetValue(bossNodeId, bossPower);
-
-            if (bossPower >= bound)
-            {
-                rejection = ContentRejection.BossBeyondBound;
-                return false;
-            }
-
-            if (!NothingIsGatedBehindTheBoss(board, bossNodeId))
-            {
-                rejection = ContentRejection.GatedBehindBoss;
-                return false;
-            }
+            var bound = PowerBound.Of(board, tuning);
+            board.SetValue(bossNodeId, Math.Max(2, (int)Math.Floor(bound * tuning.BossFactor + 0.5)));
 
             var envelope = PowerEnvelope.Of(board, tuning);
             if (!envelope.FloorHolds)
@@ -102,26 +69,38 @@ namespace Game.Domain
                 return false;
             }
 
-            bool blocked;
-            var shortestPathPower = EnvelopeWalks.ShortestPathPower(board, tuning, bossNodeId, out blocked);
-            if (bossPower <= shortestPathPower)
+            var graph = board.Rebuild();
+            var verdict = SolvabilityValidator.Validate(graph, tuning);
+            if (!verdict.IsSafe)
             {
-                rejection = ContentRejection.BossWithinReach;
+                rejection = RejectionOf(verdict);
                 return false;
             }
 
-            placed = new PlacedLevel(
-                layout,
-                board.Rebuild(),
-                recipe,
-                tuning,
-                bossNodeId,
-                bound,
-                shortestPathPower,
-                blocked,
-                passes,
-                envelope);
+            placed = new PlacedLevel(layout, graph, recipe, tuning, passes, envelope, verdict);
             return true;
+        }
+
+        static ContentRejection RejectionOf(SolvabilityVerdict verdict)
+        {
+            switch (verdict.Reason)
+            {
+                case SolvabilityReason.GatedBehindBoss:
+                    return ContentRejection.GatedBehindBoss;
+
+                case SolvabilityReason.BossBeyondBound:
+                    return ContentRejection.BossBeyondBound;
+
+                case SolvabilityReason.BossWithinReach:
+                    return ContentRejection.BossWithinReach;
+
+                case SolvabilityReason.AdversaryStalled:
+                    return ContentRejection.PanelStalled;
+
+                default:
+                    throw new InvalidOperationException(
+                        "Placement built a level no seed can excuse: " + verdict + ".");
+            }
         }
 
         static int DeepestSlot(MazeLayout layout)
@@ -547,20 +526,6 @@ namespace Game.Domain
             }
 
             return PowerTuning.FloorRepairPasses;
-        }
-
-        static bool NothingIsGatedBehindTheBoss(ContentBoard board, int bossNodeId)
-        {
-            var reachable = board.ReachableAround(bossNodeId);
-            for (var nodeId = 0; nodeId < board.Count; nodeId++)
-            {
-                if (board.IsContent(nodeId) && !reachable[nodeId])
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
     }
 }
