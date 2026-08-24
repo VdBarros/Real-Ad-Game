@@ -212,19 +212,23 @@ Everything else (art, story, hero identity) is a skin over this.
 
 ## 7. Open decisions
 
-These block the task breakdown. Numbered for easy reply.
+**All resolved.** Kept for provenance — these are the questions that blocked
+the task breakdown, and where each was answered. `docs/mvp-backlog.md` §1 is
+the settled list; the wayfinding map (issue #1) holds the reasoning.
 
-1. **MVP scope** — dungeon only, pillar scene only, or both?
-2. **Control scheme** — tap-to-target (as depicted), virtual joystick, or drag-to-steer?
-3. **Combat resolution** — instant number comparison, real-time HP exchange, or timed auto-battle?
-4. **Attacking something stronger than you** — hard-blocked (can't select it),
-   allowed but you lose the run, or allowed and you lose the difference in power?
-5. **Enemy growth over time** — static enemies, enemies that grow on a timer,
-   or enemies that grow when you do? (See §4.7.1.)
-6. **Level authoring** — hand-authored levels loaded from data, or procedurally
-   generated with a solvability check?
-7. **How many levels** in the MVP, and is there a level-select/progression flow
-   or a single scene?
-8. **Is the AoE ability in scope** for the MVP, or is basic melee enough?
-9. **Pillar scene** — if in scope, is it interactive (you choose to give or keep
-   your power) or a non-interactive cutscene bookending the dungeon?
+| # | Question | Resolved as |
+|---|---|---|
+| 1 | **MVP scope** — dungeon, pillar scene, or both? | Both. Dungeon gameplay plus a non-interactive pillar cutscene (§1 decision 1) |
+| 2 | **Control scheme** | Tap-to-target, as depicted (§1 decision 3). Extended by [#2]: the tap targets **any reachable node**, not just an adjacent one, and the player walks multi-hop |
+| 3 | **Combat resolution** | Instant number comparison. No HP, no damage (§1 decisions 4–5) |
+| 4 | **Attacking something stronger** | Allowed, and it costs nothing: the fight plays, the player walks back, no penalty (§1 decision 7). A tie behaves the same way, and **affordable is strictly `P > E`** ([#9]) |
+| 5 | **Enemy growth over time** | Static. Numbers are fixed at generation and never change during play (§1 decision 13). Enemy *appearance* is dynamic and relative to player power ([#14]) — the model changes, the badge never does |
+| 6 | **Level authoring** | Procedural, seeded, with solvability validation (§1 decision 9). The maze is a recursive backtracker at braid 0.25 with Voronoi regions ([#7]); validation is a five-policy adversary panel cross-checked against a brute-force oracle on mutated levels ([#9]) |
+| 7 | **How many levels** | Endless. Beat the boss, a result panel offers "Next", a fresh seeded level generates. No level select, no persistence |
+| 8 | **AoE ability** | Out of scope (§1 decision 16) |
+| 9 | **Pillar scene** | Non-interactive cutscene bookending the dungeon (§1 decision 1) |
+
+[#2]: https://github.com/VdBarros/Real-Ad-Game/issues/2
+[#7]: https://github.com/VdBarros/Real-Ad-Game/issues/7
+[#9]: https://github.com/VdBarros/Real-Ad-Game/issues/9
+[#14]: https://github.com/VdBarros/Real-Ad-Game/issues/14

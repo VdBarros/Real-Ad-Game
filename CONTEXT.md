@@ -111,9 +111,70 @@ verification is tractable, `ship` is what the game ships, `stress` measures
 generation time. A preset counts content nodes; junction nodes are whatever the
 layout happens to need.
 
+## Level Graph
+
+One complete generated level: its tile grid, its decision graph, and the
+content sitting on the content nodes. It is what the generator returns and the
+only thing presentation is given. A level graph is a pure function of its seed
+and preset — the same pair always yields the same level.
+
+## Braid
+
+The proportion of the maze's dead ends that are reopened into loops after
+carving. It is the one knob that decides how much of the level is a gate and
+how much is an optional pocket: none of it braided gives a maze with a single
+forced order, all of it braided gives a maze with no gates and no puzzle.
+
+## Affordable
+
+An enemy is affordable when the player's power is **strictly greater** than the
+enemy's. Equal power is a tie, and a tie is a no-op — it changes nothing and
+opens nothing, so it is never progress and never a legal step in any reasoning
+about whether a level can be finished.
+
+## Stall
+
+A state from which no unconsumed node is both reachable and affordable. The
+run cannot continue and cannot fail; it is simply stuck. Invariant A is the
+promise that no reachable state of a shipped level is a stall.
+
+## Power Envelope
+
+The pair of walls a region carries: the least and the most power a player can
+arrive there holding. The distance between them is what routing skill is worth,
+which is why the envelope is tuned rather than collapsed — a region whose walls
+meet is a region where the route did not matter.
+
+## `P_min`
+
+The cheapest way into a region: consume as little as possible, always taking
+the smallest power gain available, and stop the instant the region is
+reachable. The lower wall of the envelope.
+
+## `P_max`
+
+The richest entry into a region: take everything outside it first, in the best
+order, and only then enter. The upper wall of the envelope, and what good
+routing is worth.
+
+## Adversary
+
+A policy that plays a level badly on purpose, to find out whether playing it
+badly can get stuck. Validation runs a **panel** of them rather than one, and a
+level is rejected if any single policy stalls — no adversary is *the* worst,
+so agreement across a panel is the claim being made.
+
+## Oracle
+
+Exhaustive search over every order a level could be played in, used to check
+what the adversary panel might have missed. It is only tractable on the
+smallest preset, and it only says anything useful about levels that have been
+deliberately broken first: on a level that is already correct it finds nothing,
+which proves nothing.
+
 ## Open terms
 
 Not yet defined; each is owned by an open ticket.
 
-- **Power envelope**, **`P_min`**, **`P_max`** — precise meaning under gating,
-  [#8](https://github.com/VdBarros/Real-Ad-Game/issues/8)
+None currently open. Camera vocabulary is deliberately absent: framing, cuts
+and beats are presentation, and this glossary is the domain's.
