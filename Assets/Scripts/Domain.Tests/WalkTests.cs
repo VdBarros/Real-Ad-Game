@@ -64,6 +64,29 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void AWalkFacesTheStepItIsTakingAndThenTheOneItJustTook()
+        {
+            var walk = Walk.Along(RunFixture.PastTheMultiplier());
+
+            Assert.That(walk.Facing, Is.EqualTo(new WorldPoint(-1f, 0f, 0f)));
+
+            var waiting = walk.Advanced(Step * 10f);
+
+            Assert.That(waiting.IsWaiting, Is.True);
+            Assert.That(waiting.Facing, Is.EqualTo(new WorldPoint(-1f, 0f, 0f)));
+            Assert.That(waiting.Resumed().Facing, Is.EqualTo(new WorldPoint(0f, 0f, 1f)));
+        }
+
+        [Test]
+        public void NobodyWalkingFacesNowhere()
+        {
+            Assert.That(Walk.Nowhere.Facing, Is.EqualTo(default(WorldPoint)));
+            Assert.That(
+                Walk.Along(TileRoute.Of(RunFixture.Level(), new[] { RunFixture.Start })).Facing,
+                Is.EqualTo(default(WorldPoint)));
+        }
+
+        [Test]
         public void AWaitingWalkGoesNoFurtherUntilItIsResumed()
         {
             var waiting = Walk.Along(RunFixture.PastTheMultiplier()).Advanced(Step * 10f);

@@ -20,6 +20,8 @@ namespace Game.Interaction
 
         TrailBoard trail;
 
+        FightBoard fights;
+
         Journey journey = Journey.Nowhere;
 
         bool landed;
@@ -96,6 +98,7 @@ namespace Game.Interaction
             power = world.PlayerBadge;
             floor = world.Floor;
             trail = world.Trail;
+            fights = world.Fights;
 
             journey = Journey.Nowhere;
             landed = false;
@@ -179,6 +182,11 @@ namespace Game.Interaction
                 Land();
             }
 
+            if (journey.HoldsForAFight)
+            {
+                return;
+            }
+
             if (holding)
             {
                 ReleaseTheBeat();
@@ -207,6 +215,11 @@ namespace Game.Interaction
 
             if (power != null)
             {
+                if (journey.Arrival.Outcome == ActionOutcome.Win && fights != null)
+                {
+                    power.DropWeaponFrom(fights.SiteOf(journey.Walk.ArrivedNodeId));
+                }
+
                 power.Show(Run.Power);
             }
 
@@ -242,6 +255,11 @@ namespace Game.Interaction
             if (figure != null)
             {
                 figure.StandOn(journey.Walk.Position);
+            }
+
+            if (fights != null)
+            {
+                fights.Show(journey);
             }
 
             if (journey.Walk.IsRetreating)

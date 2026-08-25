@@ -19,6 +19,16 @@ namespace Game.Domain.Tests
             return journey;
         }
 
+        static Journey Reached(Journey journey)
+        {
+            for (var frame = 0; frame < 2000 && !journey.IsWaiting && !journey.IsOver; frame++)
+            {
+                journey = journey.Advanced(Frame);
+            }
+
+            return journey;
+        }
+
         static Journey Ran(Journey journey, List<int> arrivals)
         {
             for (var frame = 0; frame < 2000 && !journey.IsOver; frame++)
@@ -255,6 +265,99 @@ namespace Game.Domain.Tests
             Assert.That(journey.IsWaiting, Is.True);
             Assert.That(journey.Arrival, Is.Not.Null);
             Assert.That(journey.Arrival.Outcome, Is.EqualTo(ActionOutcome.Win));
+        }
+
+        [Test]
+        public void ArrivingOnAnEnemyJoinsAFightTheWalkWaitsOut()
+        {
+            var journey = Reached(Journey.Toward(RunFixture.Begin(3), RunFixture.DoorstepEnemy));
+
+            Assert.That(journey.IsWaiting, Is.True);
+            Assert.That(journey.Fight.IsJoined, Is.True);
+            Assert.That(journey.Fight.Outcome, Is.EqualTo(ActionOutcome.Win));
+            Assert.That(journey.HoldsForAFight, Is.True);
+            Assert.That(journey.Resumed(), Is.SameAs(journey));
+        }
+
+        [Test]
+        public void TheWalkMovesOnOnlyOnceTheFightHasPlayedOut()
+        {
+            var journey = Reached(Journey.Toward(RunFixture.Begin(3), RunFixture.DoorstepEnemy));
+            var frames = (int)(journey.Fight.Seconds / Frame) + 1;
+
+            journey = Walked(journey, frames);
+
+            Assert.That(journey.Fight.IsSettled, Is.True);
+            Assert.That(journey.HoldsForAFight, Is.False);
+            Assert.That(journey.Resumed(), Is.Not.SameAs(journey));
+        }
+
+        [Test]
+        public void AnArrivalOnAnythingButAnEnemyJoinsNoFight()
+        {
+            var journey = Reached(
+                Journey.Toward(RunFixture.Begin(2), RunFixture.AdditiveBeyondTheMultiplier));
+
+            Assert.That(journey.Walk.ArrivedNodeId, Is.EqualTo(RunFixture.Multiplier));
+            Assert.That(journey.Fight.IsJoined, Is.False);
+            Assert.That(journey.HoldsForAFight, Is.False);
+        }
+
+        [Test]
+        public void WalkingBackOverAFallenEnemyJoinsNoSecondFight()
+        {
+            var journey = Ran(Journey.Toward(RunFixture.Begin(3), RunFixture.DoorstepEnemy), null);
+
+            Assert.That(journey.State.IsConsumed(RunFixture.DoorstepEnemy), Is.True);
+
+            journey = Reached(Journey.Toward(journey.State, RunFixture.Start));
+
+            Assert.That(journey.Walk.ArrivedNodeId, Is.EqualTo(RunFixture.Start));
+            Assert.That(journey.Fight.IsJoined, Is.False);
+        }
+
+        [Test]
+        public void LettingGoOfTheScreenDoesNotCallOffAFightAlreadyJoined()
+        {
+            var opening = RunFixture.Begin(RunFixture.DoorstepEnemyValue - 1);
+            var journey = Reached(Journey.Toward(opening, RunFixture.DoorstepEnemy));
+
+            Assert.That(journey.Fight.Outcome, Is.EqualTo(ActionOutcome.Loss));
+
+            var cancelled = journey.Cancelled();
+
+            Assert.That(cancelled.HoldsForAFight, Is.True);
+            Assert.That(cancelled.Walk.IsRetreating, Is.False);
+
+            var settled = Ran(cancelled, null);
+
+            Assert.That(settled.State, Is.EqualTo(opening));
+            Assert.That(settled.State.PositionNodeId, Is.EqualTo(RunFixture.Start));
+        }
+
+        [Test]
+        public void ATieAndALossRunTheirFightsAndStillLeaveTheRunByteIdentical()
+        {
+            foreach (var power in new[] { RunFixture.DoorstepEnemyValue, RunFixture.DoorstepEnemyValue - 1 })
+            {
+                var opening = RunFixture.Begin(power);
+                var fought = Ran(Journey.Toward(opening, RunFixture.DoorstepEnemy), null);
+
+                Assert.That(fought.State, Is.EqualTo(opening));
+                Assert.That(fought.State.Power, Is.EqualTo(power));
+                Assert.That(fought.State.ConsumedNodes.Count, Is.EqualTo(0));
+                Assert.That(fought.State.PositionNodeId, Is.EqualTo(RunFixture.Start));
+            }
+        }
+
+        [Test]
+        public void AWonFightAddsTheEnemysValueAndNothingElseTouchesPower()
+        {
+            var opening = RunFixture.Begin(3);
+            var journey = Ran(Journey.Toward(opening, RunFixture.DoorstepEnemy), null);
+
+            Assert.That(journey.State.Power - opening.Power, Is.EqualTo(RunFixture.DoorstepEnemyValue));
+            Assert.That(journey.State.ConsumedNodes, Is.EqualTo(new[] { RunFixture.DoorstepEnemy }));
         }
 
         [Test]

@@ -25,6 +25,8 @@ namespace Game.Presentation
 
         public TrailBoard Trail { get; private set; }
 
+        public FightBoard Fights { get; private set; }
+
         public GameObject Build(LevelGraph graph)
         {
             if (graph == null)
@@ -43,6 +45,8 @@ namespace Game.Presentation
             Floor.Dress(materials.Of(PartStyle.Floor), materials.Of(PartStyle.Cleared));
             Targets = root.AddComponent<TargetBoard>();
             Targets.Begin(graph.Decisions.Nodes.Count);
+            Fights = root.AddComponent<FightBoard>();
+            Fights.Dress(materials.Of(PartStyle.Spark));
             Trail = Group(root.transform, PartNames.TrailGroup).gameObject.AddComponent<TrailBoard>();
             Trail.Dress(materials.Of(PartStyle.Trail));
             NumberBadge playerNumber = null;
@@ -102,13 +106,14 @@ namespace Game.Presentation
                     else if (part.Style == BadgeStyle.Enemy || part.Style == BadgeStyle.Boss)
                     {
                         var enemy = prop.gameObject.AddComponent<EnemyFigure>();
-                        enemy.Begin(badge.transform, part.Value);
+                        enemy.Begin(badge.transform, part.NodeId, part.Value);
                         enemies.Add(enemy);
                     }
                 }
             }
 
             var opening = RunState.Begin(graph, startingPower);
+            Fights.Begin(graph.Decisions.Nodes.Count, playerFigure, enemies);
             Floor.Begin(opening);
             Targets.Show(opening, TargetPreview.None);
 

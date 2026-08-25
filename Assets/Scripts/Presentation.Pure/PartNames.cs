@@ -19,6 +19,8 @@ namespace Game.Presentation.Pure
 
         public const string TrailGroup = "Trail";
 
+        public const string Spark = "Spark";
+
         public static string Floor(int floor)
         {
             return "Floor_" + floor.ToString(CultureInfo.InvariantCulture);

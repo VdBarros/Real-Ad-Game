@@ -30,6 +30,8 @@ namespace Game.Presentation
                     return new Color(0.30f, 0.82f, 0.93f);
                 case PartStyle.Trail:
                     return new Color(0.97f, 0.93f, 0.55f);
+                case PartStyle.Spark:
+                    return new Color(1f, 0.97f, 0.86f);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(style), style, "No colour for that style.");
             }

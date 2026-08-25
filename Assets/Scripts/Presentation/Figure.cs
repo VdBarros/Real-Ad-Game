@@ -42,6 +42,16 @@ namespace Game.Presentation
             Replant();
         }
 
+        protected void Hide()
+        {
+            if (badge != null)
+            {
+                badge.gameObject.SetActive(false);
+            }
+
+            gameObject.SetActive(false);
+        }
+
         protected void Wear(float scale, Tint tint)
         {
             transform.localScale = new Vector3(scale, scale, scale);

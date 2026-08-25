@@ -5,16 +5,19 @@ namespace Game.Presentation.Pure
 {
     public sealed class Journey : IEquatable<Journey>
     {
-        public static readonly Journey Nowhere = new Journey(null, Walk.Nowhere, null, false);
+        public static readonly Journey Nowhere =
+            new Journey(null, Walk.Nowhere, null, false, Fight.None);
 
         readonly bool owesABeat;
+        readonly Fight fight;
 
-        Journey(RunState state, Walk walk, ActionResult arrival, bool owesABeat)
+        Journey(RunState state, Walk walk, ActionResult arrival, bool owesABeat, Fight fight)
         {
             State = state;
             Walk = walk;
             Arrival = arrival;
             this.owesABeat = owesABeat;
+            this.fight = fight;
         }
 
         public static Journey Toward(RunState state, int nodeId)
@@ -30,7 +33,8 @@ namespace Game.Presentation.Pure
                 return Nowhere;
             }
 
-            return new Journey(state, Walk.Along(TileRoute.Of(state.Level, resolved.Route)), null, false);
+            return new Journey(
+                state, Walk.Along(TileRoute.Of(state.Level, resolved.Route)), null, false, Fight.None);
         }
 
         public RunState State { get; }
@@ -54,17 +58,35 @@ namespace Game.Presentation.Pure
             get { return IsWaiting && owesABeat; }
         }
 
+        public Fight Fight
+        {
+            get { return fight; }
+        }
+
+        public bool HoldsForAFight
+        {
+            get { return IsWaiting && !fight.IsSettled; }
+        }
+
         public Journey Advanced(float deltaSeconds)
         {
-            if (IsOver || IsWaiting)
+            if (IsOver)
             {
                 return this;
+            }
+
+            if (IsWaiting)
+            {
+                var fought = fight.Advanced(deltaSeconds);
+                return fought.Equals(fight)
+                    ? this
+                    : new Journey(State, Walk, Arrival, owesABeat, fought);
             }
 
             var walked = Walk.Advanced(deltaSeconds);
             if (!walked.IsWaiting)
             {
-                return new Journey(State, walked, null, false);
+                return new Journey(State, walked, null, false, Fight.None);
             }
 
             var reached = walked.ArrivedNodeId;
@@ -72,18 +94,23 @@ namespace Game.Presentation.Pure
                 && State.Level.Decisions.Node(reached).Type == NodeType.Multiplier;
             var resolved = ActionResolver.Resolve(State, reached);
 
-            return new Journey(resolved.State, walked, resolved, spendsAMultiplier);
+            return new Journey(
+                resolved.State, walked, resolved, spendsAMultiplier, Fight.Of(resolved.Outcome));
         }
 
         public Journey Resumed()
         {
-            if (!IsWaiting)
+            if (!IsWaiting || !fight.IsSettled)
             {
                 return this;
             }
 
             return new Journey(
-                State, StandsWhereItArrived ? Walk.Resumed() : Walk.Backtracked(), null, false);
+                State,
+                StandsWhereItArrived ? Walk.Resumed() : Walk.Backtracked(),
+                null,
+                false,
+                Fight.None);
         }
 
         public Journey Cancelled()
@@ -93,12 +120,12 @@ namespace Game.Presentation.Pure
                 return this;
             }
 
-            if (IsWaiting && StandsWhereItArrived)
+            if (IsWaiting)
             {
-                return new Journey(State, Walk.Stopped(), Arrival, owesABeat);
+                return new Journey(State, Walk.Stopped(), Arrival, owesABeat, fight);
             }
 
-            return new Journey(State, Walk.Backtracked(), Arrival, owesABeat);
+            return new Journey(State, Walk.Backtracked(), Arrival, owesABeat, fight);
         }
 
         bool StandsWhereItArrived
@@ -115,6 +142,7 @@ namespace Game.Presentation.Pure
 
             return Walk.Equals(other.Walk)
                 && owesABeat == other.owesABeat
+                && fight.Equals(other.fight)
                 && ReferenceEquals(Arrival, other.Arrival)
                 && (State == null ? other.State == null : State.Equals(other.State));
         }
@@ -130,6 +158,7 @@ namespace Game.Presentation.Pure
             {
                 var hash = Walk.GetHashCode();
                 hash = (hash * 397) ^ (owesABeat ? 1 : 0);
+                hash = (hash * 397) ^ fight.GetHashCode();
                 hash = (hash * 397) ^ (State == null ? 0 : State.GetHashCode());
                 return hash;
             }
