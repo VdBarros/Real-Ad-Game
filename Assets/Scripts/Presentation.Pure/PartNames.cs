@@ -15,6 +15,8 @@ namespace Game.Presentation.Pure
 
         public const string Weapon = "Weapon";
 
+        public const string Rig = "CameraRig";
+
         public static string Floor(int floor)
         {
             return "Floor_" + floor.ToString(CultureInfo.InvariantCulture);

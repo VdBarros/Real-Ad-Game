@@ -1,12 +1,10 @@
 using System.Globalization;
-using System.IO;
 using Game.Domain;
 using Game.Presentation;
 using Game.Presentation.Pure;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
 namespace Game.EditorTooling
@@ -14,10 +12,6 @@ namespace Game.EditorTooling
     public static class WorldPreviewCommand
     {
         const long PreviewSeed = 20250824L;
-
-        const int CaptureWidth = 1080;
-
-        const int CaptureHeight = 1920;
 
         const float CameraDistance = 60f;
 
@@ -113,42 +107,13 @@ namespace Game.EditorTooling
             var root = builder.Build(level.Graph);
             PowerPump.Settle(builder.PlayerBadge, power);
             var camera = Rig(onTheStart ? Start(level.Graph) : Centre(blueprint), distance, orthographicSize);
-            Sun();
+            PreviewFilm.Sun();
 
-            var target = new RenderTexture(CaptureWidth, CaptureHeight, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-            camera.targetTexture = target;
-            Render(camera, target);
-
-            var frame = new Texture2D(CaptureWidth, CaptureHeight, TextureFormat.RGB24, false);
-            var previous = RenderTexture.active;
-            RenderTexture.active = target;
-            frame.ReadPixels(new Rect(0, 0, CaptureWidth, CaptureHeight), 0, 0);
-            frame.Apply();
-            RenderTexture.active = previous;
-
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllBytes(path, frame.EncodeToPNG());
-
-            camera.targetTexture = null;
-            Object.DestroyImmediate(frame);
-            target.Release();
-            Object.DestroyImmediate(target);
+            PreviewFilm.Shoot(camera, path);
 
             Report(blueprint, BadgeBlueprintBuilder.Build(level.Graph, PowerTuning.Ship.StartingPower), root, path);
 
             builder.Dispose();
-        }
-
-        static void Render(Camera camera, RenderTexture target)
-        {
-            var request = new RenderPipeline.StandardRequest { destination = target };
-            if (RenderPipeline.SupportsRenderRequest(camera, request))
-            {
-                camera.SubmitRenderRequest(request);
-                return;
-            }
-
-            camera.Render();
         }
 
         static Camera Rig(Vector3 centre, float distance, float orthographicSize)
@@ -159,22 +124,11 @@ namespace Game.EditorTooling
             camera.transform.position = centre - camera.transform.forward * distance;
             camera.orthographic = true;
             camera.orthographicSize = orthographicSize;
-            camera.aspect = (float)CaptureWidth / CaptureHeight;
             camera.nearClipPlane = 0.03f;
             camera.farClipPlane = distance * 3f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.06f, 0.07f, 0.09f);
             return camera;
-        }
-
-        static void Sun()
-        {
-            var light = new GameObject("PreviewSun").AddComponent<Light>();
-            light.type = LightType.Directional;
-            light.transform.rotation = Quaternion.Euler(50f, 200f, 0f);
-            light.intensity = 1.6f;
-            RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.34f, 0.34f, 0.34f);
         }
 
         static Vector3 Centre(LevelBlueprint blueprint)
