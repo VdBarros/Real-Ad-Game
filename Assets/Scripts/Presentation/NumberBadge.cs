@@ -49,6 +49,16 @@ namespace Game.Presentation
             Show(part.Value);
         }
 
+        public Color Colour
+        {
+            get { return background == null ? Color.clear : background.color; }
+        }
+
+        internal void Wash(Color colour)
+        {
+            background.color = colour;
+        }
+
         public void Show(int value)
         {
             Value = value;
