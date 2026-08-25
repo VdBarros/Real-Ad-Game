@@ -96,6 +96,36 @@ namespace Game.Presentation.Pure
             }
         }
 
+        public WorldPoint Facing
+        {
+            get
+            {
+                if (route == null || route.Steps < 1)
+                {
+                    return default(WorldPoint);
+                }
+
+                var ahead = IsWaiting ? (int)travelled : (int)travelled + 1;
+                if (ahead > route.Steps)
+                {
+                    ahead = route.Steps;
+                }
+
+                return Heading(route.Tiles[ahead - 1], route.Tiles[ahead]);
+            }
+        }
+
+        static WorldPoint Heading(TilePosition from, TilePosition to)
+        {
+            var start = IsoProjection.Of(from);
+            var end = IsoProjection.Of(to);
+            var x = end.X - start.X;
+            var z = end.Z - start.Z;
+            var length = (float)Math.Sqrt(x * x + z * z);
+
+            return length <= 0f ? default(WorldPoint) : new WorldPoint(x / length, 0f, z / length);
+        }
+
         public Walk Advanced(float deltaSeconds)
         {
             if (deltaSeconds < 0f)
