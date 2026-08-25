@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 
@@ -92,21 +91,7 @@ namespace Game.Domain.Tests
 
         static string AsmdefPath(string assembly)
         {
-            return Directory
-                .GetFiles(ScriptsRoot(), assembly + ".asmdef", SearchOption.AllDirectories)
-                .SingleOrDefault();
-        }
-
-        static string ScriptsRoot([CallerFilePath] string sourceFile = "")
-        {
-            var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile));
-            while (directory != null && directory.Name != "Scripts")
-            {
-                directory = directory.Parent;
-            }
-
-            Assert.That(directory, Is.Not.Null, $"No Scripts folder above {sourceFile}.");
-            return directory.FullName;
+            return SourceTree.PathTo(assembly + ".asmdef");
         }
     }
 }

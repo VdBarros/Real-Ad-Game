@@ -12,6 +12,8 @@ namespace Game.Presentation
             {
                 case PartStyle.Floor:
                     return new Color(0.24f, 0.25f, 0.30f);
+                case PartStyle.Cleared:
+                    return new Color(0.87f, 0.89f, 0.83f);
                 case PartStyle.Wall:
                     return new Color(0.44f, 0.46f, 0.53f);
                 case PartStyle.Ramp:
