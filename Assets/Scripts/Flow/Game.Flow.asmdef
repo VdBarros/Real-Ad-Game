@@ -5,7 +5,10 @@
         "Game.Domain",
         "Game.Presentation",
         "Game.Presentation.Pure",
-        "Game.Interaction"
+        "Game.Interaction",
+        "Unity.InputSystem",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
