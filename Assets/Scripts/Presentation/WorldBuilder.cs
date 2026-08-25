@@ -83,7 +83,7 @@ namespace Game.Presentation
                     var badge = BadgeFactory.Raise(part, badges.Plan, badgeAssets, group);
                     var prop = nodes.Find(PartNames.Node(part.NodeId));
                     var target = badge.gameObject.AddComponent<NodeTarget>();
-                    target.Begin(part, TapAim.AnchorOf(graph.Decisions.Node(part.NodeId)));
+                    target.Begin(part);
                     Targets.Adopt(target);
 
                     if (part.Style == BadgeStyle.Player)

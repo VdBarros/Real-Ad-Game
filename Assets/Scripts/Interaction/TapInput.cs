@@ -16,6 +16,16 @@ namespace Game.Interaction
 
         RunState run;
 
+        IReadOnlyList<TapCandidate> candidates;
+
+        CameraFraming projected;
+
+        int projectedWidth;
+
+        int projectedHeight;
+
+        float reach;
+
         public event Action<TargetPreview> Aimed;
 
         public event Action<TargetPreview> Tapped;
@@ -24,7 +34,11 @@ namespace Game.Interaction
 
         public float Reach
         {
-            get { return TouchTargets.ReachOn(TouchTargets.DotsPerInchOr(Screen.dpi)); }
+            get
+            {
+                Project();
+                return reach;
+            }
         }
 
         public CameraFraming Framing
@@ -90,14 +104,34 @@ namespace Game.Interaction
             }
 
             run = state;
+            candidates = null;
             Preview = TargetPreview.None;
             board.Show(run, Preview);
         }
 
         public IReadOnlyList<TapCandidate> Candidates()
         {
+            Project();
+            return candidates;
+        }
+
+        void Project()
+        {
             RequireARun();
-            return TapAim.Candidates(run, rig.Framing, FrameWidth, FrameHeight);
+
+            if (candidates != null
+                && projected.Equals(rig.Framing)
+                && projectedWidth == FrameWidth
+                && projectedHeight == FrameHeight)
+            {
+                return;
+            }
+
+            projected = rig.Framing;
+            projectedWidth = FrameWidth;
+            projectedHeight = FrameHeight;
+            reach = TouchTargets.ReachOn(TouchTargets.DotsPerInchOr(Screen.dpi));
+            candidates = TapAim.Candidates(run, projected, projectedWidth, projectedHeight);
         }
 
         public void AimAt(ScreenPoint finger)
@@ -110,7 +144,8 @@ namespace Game.Interaction
                 return;
             }
 
-            var aimed = TapAim.Of(Candidates(), finger, Reach);
+            Project();
+            var aimed = TapAim.Of(candidates, finger, reach);
 
             if (aimed == Preview.NodeId)
             {
@@ -178,7 +213,7 @@ namespace Game.Interaction
             {
                 ReleaseAt(finger);
             }
-            else if (pointer.press.isPressed)
+            else if (pointer.press.isPressed || pointer is Mouse)
             {
                 AimAt(finger);
             }

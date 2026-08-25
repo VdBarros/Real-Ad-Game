@@ -108,12 +108,7 @@ namespace Game.EditorTooling
                             + resolved.State.Power + ".");
                     }
 
-                    if (builder.Targets.Of(candidate.NodeId).Mark != Marked(preview.Outcome))
-                    {
-                        Debug.LogError(
-                            "Node " + candidate.NodeId + " previews " + preview.Outcome + " and wears "
-                            + builder.Targets.Of(candidate.NodeId).Mark + ".");
-                    }
+                    WearsThePreview(builder.Targets, state, preview, candidate.NodeId);
 
                     previewed++;
                     if (preview.Route.Count > 2)
@@ -159,7 +154,7 @@ namespace Game.EditorTooling
                     Debug.LogError("Releasing over node " + stepped + " did not commit that node.");
                 }
 
-                state = tapped[tapped.Count - 1].After;
+                state = ActionResolver.Resolve(state, stepped).State;
                 builder.Floor.Show(state);
                 builder.PlayerBadge.Show(state.Power);
             }
@@ -241,18 +236,32 @@ namespace Game.EditorTooling
                 input.FrameHeight);
         }
 
-        static TargetMark Marked(ActionOutcome outcome)
+        static void WearsThePreview(TargetBoard board, RunState state, TargetPreview preview, int nodeId)
         {
-            switch (outcome)
+            var target = board.Of(nodeId);
+            var mark = TargetMarks.Of(state, nodeId, preview);
+
+            if (target.Mark != mark)
             {
-                case ActionOutcome.Win:
-                    return TargetMark.Win;
-                case ActionOutcome.Tie:
-                    return TargetMark.Tie;
-                case ActionOutcome.Loss:
-                    return TargetMark.Loss;
-                default:
-                    return TargetMark.Walk;
+                Debug.LogError("Node " + nodeId + " should wear " + mark + " and wears " + target.Mark + ".");
+            }
+
+            var badge = target.GetComponent<NumberBadge>();
+            var look = TargetMarks.Look(mark);
+            var washed = Color.Lerp(BadgePalette.Of(badge.Style), Tints.Of(look.Tint), look.Weight);
+
+            if (badge.Colour != washed)
+            {
+                Debug.LogError(
+                    "Node " + nodeId + " wears " + mark + " but its badge is painted " + badge.Colour
+                    + " rather than " + washed + ".");
+            }
+
+            if (TargetMarks.IsAimed(mark) && badge.Value != preview.Power)
+            {
+                Debug.LogError(
+                    "Node " + nodeId + " is aimed at and reads " + badge.Value
+                    + " rather than the " + preview.Power + " the walk arrives with.");
             }
         }
 

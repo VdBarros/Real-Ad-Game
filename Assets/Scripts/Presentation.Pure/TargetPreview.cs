@@ -59,10 +59,5 @@ namespace Game.Presentation.Pure
         {
             get { return resolved == null ? NoRoute : resolved.Route; }
         }
-
-        public RunState After
-        {
-            get { return resolved == null ? null : resolved.State; }
-        }
     }
 }

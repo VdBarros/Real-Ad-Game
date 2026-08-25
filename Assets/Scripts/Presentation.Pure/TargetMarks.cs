@@ -5,20 +5,16 @@ namespace Game.Presentation.Pure
 {
     public static class TargetMarks
     {
-        static readonly Tint[] tints =
+        static readonly MarkLook[] looks =
         {
-            new Tint(1f, 1f, 1f),
-            new Tint(0.16f, 0.17f, 0.20f),
-            new Tint(0.16f, 0.17f, 0.20f),
-            new Tint(0.92f, 0.96f, 1f),
-            new Tint(0.25f, 0.80f, 0.35f),
-            new Tint(0.98f, 0.76f, 0.20f),
-            new Tint(0.92f, 0.16f, 0.16f)
+            new MarkLook(new Tint(1f, 1f, 1f), 0f, 1f),
+            new MarkLook(new Tint(0.24f, 0.26f, 0.30f), 0.45f, 1f),
+            new MarkLook(new Tint(0.10f, 0.10f, 0.12f), 0.92f, 0.86f),
+            new MarkLook(new Tint(0.92f, 0.96f, 1f), 0.55f, 1.18f),
+            new MarkLook(new Tint(0.25f, 0.80f, 0.35f), 1f, 1.18f),
+            new MarkLook(new Tint(0.98f, 0.76f, 0.20f), 1f, 1.18f),
+            new MarkLook(new Tint(0.92f, 0.16f, 0.16f), 1f, 0.88f)
         };
-
-        static readonly float[] weights = { 0f, 0.45f, 0.92f, 0.55f, 1f, 1f, 1f };
-
-        static readonly float[] scales = { 1f, 1f, 0.86f, 1.18f, 1.18f, 1.18f, 0.88f };
 
         public static TargetMark Of(RunState state, int nodeId, TargetPreview preview)
         {
@@ -30,6 +26,11 @@ namespace Game.Presentation.Pure
             if (preview == null)
             {
                 throw new ArgumentNullException(nameof(preview));
+            }
+
+            if (nodeId == state.PositionNodeId)
+            {
+                return TargetMark.Idle;
             }
 
             if (preview.IsAimed && preview.NodeId == nodeId)
@@ -45,24 +46,30 @@ namespace Game.Presentation.Pure
             return preview.IsAimed ? TargetMark.Aside : TargetMark.Idle;
         }
 
-        public static bool IsTappable(TargetMark mark)
+        public static bool IsAimed(TargetMark mark)
         {
-            return Slot(mark) != Slot(TargetMark.Unreachable);
+            switch (mark)
+            {
+                case TargetMark.Walk:
+                case TargetMark.Win:
+                case TargetMark.Tie:
+                case TargetMark.Loss:
+                    return true;
+                default:
+                    Look(mark);
+                    return false;
+            }
         }
 
-        public static Tint TintOf(TargetMark mark)
+        public static MarkLook Look(TargetMark mark)
         {
-            return tints[Slot(mark)];
-        }
+            var slot = (int)mark;
+            if (slot < 0 || slot >= looks.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(mark), mark, "No look for that mark.");
+            }
 
-        public static float WeightOf(TargetMark mark)
-        {
-            return weights[Slot(mark)];
-        }
-
-        public static float ScaleOf(TargetMark mark)
-        {
-            return scales[Slot(mark)];
+            return looks[slot];
         }
 
         static TargetMark OutcomeOf(ActionOutcome outcome)
@@ -80,17 +87,6 @@ namespace Game.Presentation.Pure
                 default:
                     return TargetMark.Unreachable;
             }
-        }
-
-        static int Slot(TargetMark mark)
-        {
-            var slot = (int)mark;
-            if (slot < 0 || slot >= tints.Length)
-            {
-                throw new ArgumentOutOfRangeException(nameof(mark), mark, "No look for that mark.");
-            }
-
-            return slot;
         }
     }
 }

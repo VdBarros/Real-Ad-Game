@@ -17,13 +17,10 @@ namespace Game.Presentation
             get { return targets; }
         }
 
-        public TargetPreview Preview { get; private set; }
-
         internal void Begin(int nodeCount)
         {
             targets.Clear();
             byNode = new NodeTarget[nodeCount];
-            Preview = TargetPreview.None;
         }
 
         internal void Adopt(NodeTarget target)
@@ -57,11 +54,10 @@ namespace Game.Presentation
             }
 
             RequireABeginning();
-            Preview = preview;
 
             foreach (var target in targets)
             {
-                target.Wear(TargetMarks.Of(state, target.NodeId, preview));
+                target.Wear(TargetMarks.Of(state, target.NodeId, preview), preview.Power);
             }
         }
 
