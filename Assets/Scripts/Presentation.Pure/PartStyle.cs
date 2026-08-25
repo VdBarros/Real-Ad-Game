@@ -10,6 +10,7 @@ namespace Game.Presentation.Pure
         Enemy,
         Boss,
         Additive,
-        Multiplier
+        Multiplier,
+        Trail
     }
 }

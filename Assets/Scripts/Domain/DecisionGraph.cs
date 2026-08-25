@@ -130,6 +130,22 @@ namespace Game.Domain
             return corridorsByNode[nodeId];
         }
 
+        public Corridor CorridorBetween(int firstNodeId, int secondNodeId)
+        {
+            RequireNode(firstNodeId);
+            RequireNode(secondNodeId);
+
+            foreach (var corridor in corridorsByNode[firstNodeId])
+            {
+                if (corridor.Joins(firstNodeId, secondNodeId))
+                {
+                    return corridor;
+                }
+            }
+
+            return null;
+        }
+
         void RequireNode(int nodeId)
         {
             if (nodeId < 0 || nodeId >= nodes.Count)

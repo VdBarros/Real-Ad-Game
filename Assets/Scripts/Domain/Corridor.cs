@@ -42,6 +42,30 @@ namespace Game.Domain
             get { return tilePath; }
         }
 
+        public bool Joins(int firstNodeId, int secondNodeId)
+        {
+            return (LowNodeId == firstNodeId && HighNodeId == secondNodeId)
+                || (LowNodeId == secondNodeId && HighNodeId == firstNodeId);
+        }
+
+        public IReadOnlyList<TilePosition> TilesLeaving(int nodeId)
+        {
+            if (nodeId == LowNodeId)
+            {
+                return tilePath;
+            }
+
+            if (nodeId != HighNodeId)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(nodeId), nodeId, "Corridor " + this + " does not end at that node.");
+            }
+
+            var backwards = new List<TilePosition>(tilePath);
+            backwards.Reverse();
+            return backwards;
+        }
+
         public bool Equals(Corridor other)
         {
             if (ReferenceEquals(other, null))

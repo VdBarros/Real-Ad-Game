@@ -17,6 +17,8 @@ namespace Game.Presentation.Pure
 
         public const string Rig = "CameraRig";
 
+        public const string TrailGroup = "Trail";
+
         public static string Floor(int floor)
         {
             return "Floor_" + floor.ToString(CultureInfo.InvariantCulture);
@@ -45,6 +47,11 @@ namespace Game.Presentation.Pure
         public static string Badge(int nodeId)
         {
             return "Badge_" + nodeId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static string Dot(int index)
+        {
+            return "Dot_" + index.ToString(CultureInfo.InvariantCulture);
         }
 
         public static string Trophy(int slot)
