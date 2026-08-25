@@ -20,6 +20,8 @@ namespace Game.Interaction
 
         CameraFraming projected;
 
+        TapHold hold = TapHold.Idle;
+
         int projectedWidth;
 
         int projectedHeight;
@@ -216,17 +218,27 @@ namespace Game.Interaction
                 return;
             }
 
+            hold = hold.Reading(
+                pointer.press.wasPressedThisFrame,
+                pointer.press.wasReleasedThisFrame,
+                pointer.press.isPressed,
+                pointer is Mouse);
+
+            if (hold.Gesture == TapGesture.Ignore)
+            {
+                return;
+            }
+
             var position = pointer.position.ReadValue();
             var finger = new ScreenPoint(position.x, position.y);
 
-            if (pointer.press.wasReleasedThisFrame)
+            if (hold.Gesture == TapGesture.Release)
             {
                 ReleaseAt(finger);
+                return;
             }
-            else if (pointer.press.isPressed || pointer is Mouse)
-            {
-                AimAt(finger);
-            }
+
+            AimAt(finger);
         }
 
         void RequireARun()
