@@ -27,6 +27,7 @@ namespace Game.Presentation.Pure
             {
                 WorldPart prop;
                 if (nodeId == state.PositionNodeId
+                    || state.IsConsumed(nodeId)
                     || !LevelBlueprintBuilder.TryProp(state.Level.Decisions.Node(nodeId), out prop))
                 {
                     continue;

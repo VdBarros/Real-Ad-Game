@@ -27,6 +27,8 @@ namespace Game.Presentation
 
         public FightBoard Fights { get; private set; }
 
+        public PickupBoard Pickups { get; private set; }
+
         public GameObject Build(LevelGraph graph)
         {
             if (graph == null)
@@ -47,11 +49,13 @@ namespace Game.Presentation
             Targets.Begin(graph.Decisions.Nodes.Count);
             Fights = root.AddComponent<FightBoard>();
             Fights.Dress(materials.Of(PartStyle.Spark));
+            Pickups = root.AddComponent<PickupBoard>();
             Trail = Group(root.transform, PartNames.TrailGroup).gameObject.AddComponent<TrailBoard>();
             Trail.Dress(materials.Of(PartStyle.Trail));
             NumberBadge playerNumber = null;
             PlayerFigure playerFigure = null;
             var enemies = new List<EnemyFigure>();
+            var pickups = new List<PickupProp>();
             var groundByName = new Dictionary<string, TilePosition>(graph.Tiles.Tiles.Count);
             WarnIfTheCameraHasTurned();
 
@@ -109,11 +113,22 @@ namespace Game.Presentation
                         enemy.Begin(badge.transform, part.NodeId, part.Value);
                         enemies.Add(enemy);
                     }
+                    else if (part.Style == BadgeStyle.Additive || part.Style == BadgeStyle.Multiplier)
+                    {
+                        WorldPart gem;
+                        if (LevelBlueprintBuilder.TryProp(graph.Decisions.Node(part.NodeId), out gem))
+                        {
+                            var pickup = prop.gameObject.AddComponent<PickupProp>();
+                            pickup.Begin(gem, part.NodeId, badge.transform);
+                            pickups.Add(pickup);
+                        }
+                    }
                 }
             }
 
             var opening = RunState.Begin(graph, startingPower);
             Fights.Begin(graph.Decisions.Nodes.Count, playerFigure, enemies);
+            Pickups.Begin(graph.Decisions.Nodes.Count, pickups, opening);
             Floor.Begin(opening);
             Targets.Show(opening, TargetPreview.None);
 
