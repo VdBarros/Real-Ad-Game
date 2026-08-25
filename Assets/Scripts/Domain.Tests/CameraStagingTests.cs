@@ -95,17 +95,12 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ABeatCancelsAFlightItInterruptsRatherThanRunningBehindIt()
+        public void ABeatCannotFireWhileTheFlightStillOwnsInput()
         {
-            var graph = Graph();
-            var staging = CameraStaging.Over(graph).Advanced(0.5f).CutTo(Multiplier);
+            var flying = CameraStaging.Over(Graph()).Advanced(0.5f);
 
-            Assert.That(staging.Framing, Is.EqualTo(LevelFraming.CloseUp(Multiplier)));
-
-            staging = staging.Advanced(ZoomBeat.CapSeconds);
-
-            Assert.That(staging.IsBusy, Is.False);
-            Assert.That(staging.Framing, Is.EqualTo(LevelFraming.Play(graph)));
+            Assert.That(() => flying.CutTo(Multiplier), Throws.InstanceOf<System.InvalidOperationException>());
+            Assert.That(flying.Skipped().CutTo(Multiplier).IsBusy, Is.True);
         }
     }
 }

@@ -33,6 +33,14 @@ namespace Game.Presentation.Pure
             }
         }
 
+        public float DepthOf(WorldPoint point)
+        {
+            var camera = Position;
+            return WorldPoint.Dot(
+                new WorldPoint(point.X - camera.X, point.Y - camera.Y, point.Z - camera.Z),
+                IsoProjection.CameraForward);
+        }
+
         public static CameraFraming Between(CameraFraming from, CameraFraming to, float t)
         {
             if (t <= 0f)

@@ -46,8 +46,7 @@ namespace Game.EditorTooling
                 .Append(':');
 
             var peak = 0f;
-            var previous = lens.transform.position;
-            var previousSize = lens.orthographicSize;
+            var previous = rig.Framing;
             var frames = 0;
             var midflight = false;
 
@@ -56,14 +55,13 @@ namespace Game.EditorTooling
                 rig.Advance(Frame);
                 frames++;
 
-                var speed = PanPixels(previous, previousSize, lens.transform.position, lens.orthographicSize) / Frame;
+                var speed = ScreenFrame.PanPixels(previous, rig.Framing) / Frame;
                 if (speed > peak)
                 {
                     peak = speed;
                 }
 
-                previous = lens.transform.position;
-                previousSize = lens.orthographicSize;
+                previous = rig.Framing;
 
                 if (!midflight && frames * Frame >= CameraFlight.Seconds * 0.5f)
                 {
@@ -129,20 +127,7 @@ namespace Game.EditorTooling
                 CultureInfo.InvariantCulture,
                 ", peak pan {0:0} px/s of {1} allowed",
                 peak,
-                PreviewFilm.Width);
-        }
-
-        static float PanPixels(Vector3 from, float fromSize, Vector3 to, float toSize)
-        {
-            var delta = to - from;
-            var right = IsoProjection.CameraRight;
-            var up = IsoProjection.CameraUp;
-
-            var across = delta.x * right.X + delta.y * right.Y + delta.z * right.Z;
-            var along = delta.x * up.X + delta.y * up.Y + delta.z * up.Z;
-            var pixelsPerMetre = PreviewFilm.Height * 0.5f / Mathf.Min(fromSize, toSize);
-
-            return Mathf.Sqrt(across * across + along * along) * pixelsPerMetre;
+                ScreenFrame.PanCeiling);
         }
 
         static TilePosition Multiplier(LevelGraph graph)
@@ -155,7 +140,8 @@ namespace Game.EditorTooling
                 }
             }
 
-            return graph.Decisions.Nodes[0].Position;
+            throw new System.InvalidOperationException(
+                "Every ship level ships two multipliers for the beat to cut to, and this one has none.");
         }
     }
 }

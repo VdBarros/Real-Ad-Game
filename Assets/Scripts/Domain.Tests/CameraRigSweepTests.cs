@@ -47,7 +47,7 @@ namespace Game.Domain.Tests
                 while (!flight.IsSettled)
                 {
                     flight = flight.Advanced(Frame);
-                    var speed = CameraGeometry.PanPixels(previous, flight.Framing) / Frame;
+                    var speed = ScreenFrame.PanPixels(previous, flight.Framing) / Frame;
                     if (speed > peak)
                     {
                         peak = speed;
@@ -69,13 +69,13 @@ namespace Game.Domain.Tests
             Console.WriteLine("ship, " + Seeds + " seeds, flight over " + CameraFlight.Seconds + " s");
             Console.WriteLine("  peak pan median  " + peaks[peaks.Count / 2].ToString("0") + " px/s");
             Console.WriteLine("  peak pan worst   " + worst.ToString("0") + " px/s on seed " + worstSeed);
-            Console.WriteLine("  budget           " + CameraGeometry.PanBudget.ToString("0") + " px/s");
+            Console.WriteLine("  ceiling          " + ScreenFrame.PanCeiling.ToString("0") + " px/s");
 
             Assert.That(
                 worst,
-                Is.LessThan(CameraGeometry.PanBudget),
-                "Seed " + worstSeed + " pans at " + worst + " px/s on a "
-                + CameraGeometry.FrameWidth + "-wide frame.");
+                Is.LessThan(ScreenFrame.PanCeiling),
+                "Seed " + worstSeed + " pans at " + worst + " px/s, over the "
+                + ScreenFrame.PanCeiling + " px/s ceiling for a " + ScreenFrame.Width + "-wide portrait frame.");
         }
 
         [Test]
@@ -98,7 +98,7 @@ namespace Game.Domain.Tests
                 {
                     foreach (var part in blueprint.AllParts)
                     {
-                        var depth = CameraGeometry.Depth(framing, part.Position);
+                        var depth = framing.DepthOf(part.Position);
                         if (depth < nearest)
                         {
                             nearest = depth;

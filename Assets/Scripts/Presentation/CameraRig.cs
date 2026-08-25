@@ -23,6 +23,11 @@ namespace Game.Presentation
             get { return staged && staging.IsBusy; }
         }
 
+        public CameraFraming Framing
+        {
+            get { return applied; }
+        }
+
         public static CameraRig Raise()
         {
             var carrier = new GameObject(PartNames.Rig) { tag = MainCameraTag };

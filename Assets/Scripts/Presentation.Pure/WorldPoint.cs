@@ -18,6 +18,11 @@ namespace Game.Presentation.Pure
 
         public float Z { get; }
 
+        public static float Dot(WorldPoint first, WorldPoint second)
+        {
+            return first.X * second.X + first.Y * second.Y + first.Z * second.Z;
+        }
+
         public bool Equals(WorldPoint other)
         {
             return X.Equals(other.X) && Y.Equals(other.Y) && Z.Equals(other.Z);

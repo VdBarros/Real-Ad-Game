@@ -60,8 +60,8 @@ namespace Game.Domain.Tests
             var early = CameraFlight.Over(graph).Advanced(CameraFlight.Seconds * 0.1f).Framing;
             var middle = CameraFlight.Over(graph).Advanced(CameraFlight.Seconds * 0.5f).Framing;
 
-            var travelled = CameraGeometry.PanPixels(opening, early);
-            var half = CameraGeometry.PanPixels(opening, middle);
+            var travelled = ScreenFrame.PanPixels(opening, early);
+            var half = ScreenFrame.PanPixels(opening, middle);
 
             Assert.That(travelled, Is.LessThan(half * 0.1f));
             Assert.That(middle.OrthographicSize, Is.EqualTo(

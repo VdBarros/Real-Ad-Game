@@ -41,7 +41,14 @@ namespace Game.Presentation.Pure
 
         public CameraStaging CutTo(TilePosition position)
         {
-            return new CameraStaging(flight.Skipped(), ZoomBeat.On(LevelFraming.CloseUp(position)));
+            if (!flight.IsSettled)
+            {
+                throw new InvalidOperationException(
+                    "A beat fires on a pickup or on arrival at the boss, and the flight owns input until it lands. "
+                    + "Skip the flight before cutting away from the constant.");
+            }
+
+            return new CameraStaging(flight, ZoomBeat.On(LevelFraming.CloseUp(position)));
         }
 
         public CameraStaging Released()

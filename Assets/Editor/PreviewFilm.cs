@@ -1,4 +1,5 @@
 using System.IO;
+using Game.Presentation.Pure;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -6,23 +7,24 @@ namespace Game.EditorTooling
 {
     public static class PreviewFilm
     {
-        public const int Width = 1080;
-
-        public const int Height = 1920;
-
         public static void Shoot(Camera camera, string path)
         {
             var aspect = camera.aspect;
-            camera.aspect = (float)Width / Height;
+            camera.aspect = (float)ScreenFrame.Width / ScreenFrame.Height;
 
-            var target = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var target = new RenderTexture(
+                ScreenFrame.Width,
+                ScreenFrame.Height,
+                24,
+                RenderTextureFormat.ARGB32,
+                RenderTextureReadWrite.sRGB);
             camera.targetTexture = target;
             Render(camera, target);
 
-            var frame = new Texture2D(Width, Height, TextureFormat.RGB24, false);
+            var frame = new Texture2D(ScreenFrame.Width, ScreenFrame.Height, TextureFormat.RGB24, false);
             var previous = RenderTexture.active;
             RenderTexture.active = target;
-            frame.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
+            frame.ReadPixels(new Rect(0, 0, ScreenFrame.Width, ScreenFrame.Height), 0, 0);
             frame.Apply();
             RenderTexture.active = previous;
 
