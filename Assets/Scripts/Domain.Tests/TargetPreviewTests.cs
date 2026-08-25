@@ -84,6 +84,36 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void ASpentPickupIsNotATargetBecauseThereIsNothingLeftToTake()
+        {
+            var state = RunFixture.Begin(2);
+
+            Assert.That(TapAim.Aimable(state), Has.Member(RunFixture.Multiplier));
+
+            var taken = ActionResolver.Resolve(state, RunFixture.Multiplier).State;
+            taken = ActionResolver.Resolve(taken, RunFixture.Start).State;
+
+            Assert.That(taken.IsConsumed(RunFixture.Multiplier), Is.True);
+            Assert.That(taken.IsReachable(RunFixture.Multiplier), Is.True);
+            Assert.That(TapAim.Aimable(taken), Has.No.Member(RunFixture.Multiplier));
+            Assert.That(
+                TapAim.Aimable(taken),
+                Has.Member(RunFixture.AdditiveBeyondTheMultiplier),
+                "The walk still routes over the spent pedestal to reach what lies past it.");
+        }
+
+        [Test]
+        public void ADefeatedEnemyIsNotATargetEither()
+        {
+            var state = ActionResolver
+                .Resolve(RunFixture.Begin(RunFixture.DoorstepEnemyValue + 1), RunFixture.DoorstepEnemy)
+                .State;
+
+            Assert.That(state.IsConsumed(RunFixture.DoorstepEnemy), Is.True);
+            Assert.That(TapAim.Aimable(state), Has.No.Member(RunFixture.DoorstepEnemy));
+        }
+
+        [Test]
         public void OnlyDrawnNodesAreAimedAtBecauseATapLandsOnWhatItCanSee()
         {
             var state = RunFixture.Begin(2);

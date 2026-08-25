@@ -320,6 +320,7 @@ namespace Game.EditorTooling
             walker.Advance(Frame);
             rig.Advance(Frame);
             builder.Floor.Advance(Frame);
+            builder.Pickups.Advance(Frame);
 
             if (builder.PlayerBadge != null)
             {

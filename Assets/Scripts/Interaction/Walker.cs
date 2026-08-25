@@ -22,6 +22,8 @@ namespace Game.Interaction
 
         FightBoard fights;
 
+        PickupBoard pickups;
+
         Journey journey = Journey.Nowhere;
 
         bool landed;
@@ -99,6 +101,12 @@ namespace Game.Interaction
             floor = world.Floor;
             trail = world.Trail;
             fights = world.Fights;
+            pickups = world.Pickups;
+
+            if (pickups != null)
+            {
+                pickups.Settle(opening);
+            }
 
             journey = Journey.Nowhere;
             landed = false;
@@ -224,6 +232,12 @@ namespace Game.Interaction
             }
 
             floor.Show(Run);
+
+            if (pickups != null)
+            {
+                pickups.Show(Run);
+            }
+
             input.Show(Run);
             input.IsLocked = true;
 

@@ -116,6 +116,66 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void TakingTheMultiplierFirstAndTheAdditiveFirstEndOnDifferentPower()
+        {
+            var multiplyThenAdd = RunFixture.Begin(startingPower: 2);
+            multiplyThenAdd = ActionResolver.Resolve(multiplyThenAdd, RunFixture.Multiplier).State;
+            multiplyThenAdd = ActionResolver.Resolve(multiplyThenAdd, RunFixture.Additive).State;
+
+            var addThenMultiply = RunFixture.Begin(startingPower: 2);
+            addThenMultiply = ActionResolver.Resolve(addThenMultiply, RunFixture.Additive).State;
+            addThenMultiply = ActionResolver.Resolve(addThenMultiply, RunFixture.Multiplier).State;
+
+            Assert.That(
+                multiplyThenAdd.Power,
+                Is.EqualTo(2 * RunFixture.MultiplierValue + RunFixture.AdditiveValue));
+            Assert.That(
+                addThenMultiply.Power,
+                Is.EqualTo((2 + RunFixture.AdditiveValue) * RunFixture.MultiplierValue));
+            Assert.That(addThenMultiply.Power, Is.Not.EqualTo(multiplyThenAdd.Power));
+            Assert.That(
+                addThenMultiply.ConsumedNodes,
+                Is.EqualTo(multiplyThenAdd.ConsumedNodes),
+                "Both orders spend the same two pickups, so only the order is left to explain the gap.");
+        }
+
+        [Test]
+        public void ASpentPickupIsWalkedOverAndAppliedNoSecondTime()
+        {
+            var taken = ActionResolver
+                .Resolve(RunFixture.Begin(startingPower: 2), RunFixture.Multiplier)
+                .State;
+
+            var again = ActionResolver.Resolve(taken, RunFixture.Multiplier);
+
+            Assert.That(again.Outcome, Is.EqualTo(ActionOutcome.Walked));
+            Assert.That(again.State.Power, Is.EqualTo(taken.Power));
+            Assert.That(again.State, Is.EqualTo(taken));
+        }
+
+        [Test]
+        public void AWalkPastASpentPickupCarriesItsValueNoFurther()
+        {
+            var state = RunFixture.Begin(startingPower: 2);
+            state = ActionResolver.Resolve(state, RunFixture.Multiplier).State;
+            state = ActionResolver.Resolve(state, RunFixture.Start).State;
+
+            var result = ActionResolver.Resolve(state, RunFixture.AdditiveBeyondTheMultiplier);
+
+            Assert.That(
+                result.Route,
+                Is.EqualTo(new[]
+                {
+                    RunFixture.Start,
+                    RunFixture.Multiplier,
+                    RunFixture.AdditiveBeyondTheMultiplier
+                }));
+            Assert.That(
+                result.State.Power,
+                Is.EqualTo(2 * RunFixture.MultiplierValue + RunFixture.AdditiveBeyondTheMultiplierValue));
+        }
+
+        [Test]
         public void AnUnreachableTargetIsRejectedAndChangesNothing()
         {
             var before = RunFixture.Begin(startingPower: 2);
