@@ -10,6 +10,8 @@ namespace Game.Domain
 
         public static readonly MazePreset Stress = new MazePreset("stress", 9, 7, 3, 9, 0.25, 4, 90, 40, 20);
 
+        static readonly MazePreset[] Filed = { Tiny, Ship, Stress };
+
         public MazePreset(
             string name,
             int latticeWidth,
@@ -97,6 +99,24 @@ namespace Game.Domain
         public int RegionsPerFloor
         {
             get { return Math.Max(1, (int)Math.Floor((double)Regions / Floors + 0.5)); }
+        }
+
+        public static MazePreset Named(string name)
+        {
+            if (name == null)
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+
+            foreach (var preset in Filed)
+            {
+                if (string.Equals(preset.Name, name, StringComparison.Ordinal))
+                {
+                    return preset;
+                }
+            }
+
+            throw new ArgumentException("No preset is filed under the name " + name + ".", nameof(name));
         }
 
         public override string ToString()

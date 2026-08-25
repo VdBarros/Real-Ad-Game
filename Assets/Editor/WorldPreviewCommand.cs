@@ -23,6 +23,12 @@ namespace Game.EditorTooling
 
         const string CapturePath = "dev/scratch/t-08-world-preview.png";
 
+        const string BadgeCapturePath = "dev/scratch/t-09-badge-preview.png";
+
+        const float BadgeCameraDistance = 20f;
+
+        const float BadgeOrthographicSize = 4.2f;
+
         static WorldBuilder previewBuilder;
 
         [MenuItem("Tools/Real Ad Game/Build Preview Level")]
@@ -53,14 +59,41 @@ namespace Game.EditorTooling
 
             foreach (var material in Resources.FindObjectsOfTypeAll<Material>())
             {
-                if (material.name.StartsWith(WorldMaterials.NamePrefix, System.StringComparison.Ordinal))
+                if (material.name.StartsWith(WorldMaterials.NamePrefix, System.StringComparison.Ordinal)
+                    || material.name.StartsWith(BadgeAssets.NamePrefix, System.StringComparison.Ordinal))
                 {
                     WorldObjects.Destroy(material);
+                }
+            }
+
+            foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+            {
+                if (sprite.name.StartsWith(BadgeAssets.NamePrefix, System.StringComparison.Ordinal))
+                {
+                    WorldObjects.Destroy(sprite);
+                }
+            }
+
+            foreach (var texture in Resources.FindObjectsOfTypeAll<Texture2D>())
+            {
+                if (texture.name.StartsWith(BadgeAssets.NamePrefix, System.StringComparison.Ordinal))
+                {
+                    WorldObjects.Destroy(texture);
                 }
             }
         }
 
         public static void Capture()
+        {
+            Shoot(CapturePath, CameraDistance, IsoProjection.OrthographicSize, false);
+        }
+
+        public static void CaptureBadges()
+        {
+            Shoot(BadgeCapturePath, BadgeCameraDistance, BadgeOrthographicSize, true);
+        }
+
+        static void Shoot(string path, float distance, float orthographicSize, bool onTheStart)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -69,7 +102,7 @@ namespace Game.EditorTooling
 
             var builder = new WorldBuilder();
             var root = builder.Build(level.Graph);
-            var camera = Rig(Centre(blueprint));
+            var camera = Rig(onTheStart ? Start(level.Graph) : Centre(blueprint), distance, orthographicSize);
             Sun();
 
             var target = new RenderTexture(CaptureWidth, CaptureHeight, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
@@ -83,15 +116,15 @@ namespace Game.EditorTooling
             frame.Apply();
             RenderTexture.active = previous;
 
-            Directory.CreateDirectory(Path.GetDirectoryName(CapturePath));
-            File.WriteAllBytes(CapturePath, frame.EncodeToPNG());
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllBytes(path, frame.EncodeToPNG());
 
             camera.targetTexture = null;
             Object.DestroyImmediate(frame);
             target.Release();
             Object.DestroyImmediate(target);
 
-            Report(blueprint, root);
+            Report(blueprint, BadgeBlueprintBuilder.Build(level.Graph, PowerTuning.Ship.StartingPower), root, path);
 
             builder.Dispose();
         }
@@ -108,17 +141,17 @@ namespace Game.EditorTooling
             camera.Render();
         }
 
-        static Camera Rig(Vector3 centre)
+        static Camera Rig(Vector3 centre, float distance, float orthographicSize)
         {
             var camera = new GameObject("PreviewCamera").AddComponent<Camera>();
             camera.transform.rotation = Quaternion.Euler(
                 IsoProjection.CameraPitch, IsoProjection.CameraYaw, IsoProjection.CameraRoll);
-            camera.transform.position = centre - camera.transform.forward * CameraDistance;
+            camera.transform.position = centre - camera.transform.forward * distance;
             camera.orthographic = true;
-            camera.orthographicSize = IsoProjection.OrthographicSize;
+            camera.orthographicSize = orthographicSize;
             camera.aspect = (float)CaptureWidth / CaptureHeight;
             camera.nearClipPlane = 0.03f;
-            camera.farClipPlane = CameraDistance * 3f;
+            camera.farClipPlane = distance * 3f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.06f, 0.07f, 0.09f);
             return camera;
@@ -157,7 +190,23 @@ namespace Game.EditorTooling
             return (minimum + maximum) * 0.5f;
         }
 
-        static void Report(LevelBlueprint blueprint, GameObject root)
+        static Vector3 Start(LevelGraph graph)
+        {
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                if (node.Type != NodeType.Start)
+                {
+                    continue;
+                }
+
+                var point = IsoProjection.Of(node.Position);
+                return new Vector3(point.X, point.Y, point.Z);
+            }
+
+            throw new System.InvalidOperationException("A level always has one start to look at.");
+        }
+
+        static void Report(LevelBlueprint blueprint, BadgeBlueprint badges, GameObject root, string path)
         {
             var quads = 0;
             var walls = 0;
@@ -185,15 +234,23 @@ namespace Game.EditorTooling
 
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
-                "T-08 preview: {0} floors, {1} floor quads, {2} walls, {3} ramps, {4} props, {5} transforms under {6}, written to {7}",
+                "preview: {0} floors, {1} floor quads, {2} walls, {3} ramps, {4} props, {5} badges at "
+                + "{6} glyph cells ({7:0.###} x {8:0.###} units, font {9:0.###}, ceiling {10}), "
+                + "{11} transforms under {12}, written to {13}",
                 blueprint.Floors.Count,
                 quads,
                 walls,
                 ramps,
                 props,
+                badges.Badges.Count,
+                badges.Plan.Capacity,
+                badges.Plan.PlayerWidth,
+                badges.Plan.Height,
+                badges.Plan.FontSize,
+                badges.Plan.PowerCeiling,
                 root.GetComponentsInChildren<Transform>(true).Length,
                 PartNames.Root,
-                CapturePath));
+                path));
         }
     }
 }

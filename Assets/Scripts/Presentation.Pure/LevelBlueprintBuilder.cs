@@ -135,7 +135,7 @@ namespace Game.Presentation.Pure
                 new WorldPoint(RampThickness, RampHeight, RampThickness));
         }
 
-        static bool TryProp(DecisionNode node, out WorldPart prop)
+        public static bool TryProp(DecisionNode node, out WorldPart prop)
         {
             switch (node.Type)
             {

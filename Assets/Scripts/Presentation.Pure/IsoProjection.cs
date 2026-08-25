@@ -18,6 +18,11 @@ namespace Game.Presentation.Pure
 
         public const float OrthographicSize = 9.5f;
 
+        public static WorldPoint CameraRotation
+        {
+            get { return new WorldPoint(CameraPitch, CameraYaw, CameraRoll); }
+        }
+
         public static WorldPoint Of(TilePosition position)
         {
             return new WorldPoint(position.X * TileEdge, position.Floor * FloorHeight, position.Y * TileEdge);

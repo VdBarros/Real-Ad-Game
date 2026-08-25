@@ -1,0 +1,28 @@
+using System;
+
+namespace Game.Presentation.Pure
+{
+    public static class WorldParts
+    {
+        public static float TopOf(WorldPart part)
+        {
+            return part.Position.Y + HalfHeight(part);
+        }
+
+        static float HalfHeight(WorldPart part)
+        {
+            switch (part.Shape)
+            {
+                case PartShape.Capsule:
+                    return part.Scale.Y;
+                case PartShape.Cube:
+                    return part.Scale.Y * 0.5f;
+                case PartShape.Quad:
+                    return 0f;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(part), part.Shape, "No height for that part shape.");
+            }
+        }
+    }
+}
