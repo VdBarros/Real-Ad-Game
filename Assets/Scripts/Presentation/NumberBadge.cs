@@ -15,6 +15,8 @@ namespace Game.Presentation
 
         string monospace;
 
+        float height;
+
         public BadgeStyle Style { get; private set; }
 
         public int Value { get; private set; }
@@ -22,6 +24,7 @@ namespace Game.Presentation
         internal void Compose(BadgePart part, BadgePlan plan, BadgeAssets assets)
         {
             Style = part.Style;
+            height = plan.Height;
             monospace = "<mspace=" + BadgeMetrics.MonospaceEm.ToString("0.###", CultureInfo.InvariantCulture) + "em>";
 
             background = gameObject.AddComponent<SpriteRenderer>();
@@ -47,6 +50,23 @@ namespace Game.Presentation
             label.color = BadgePalette.Text;
 
             Show(part.Value);
+        }
+
+        public Color Colour
+        {
+            get { return background.color; }
+        }
+
+        internal void Wash(Color colour)
+        {
+            background.color = colour;
+        }
+
+        internal void Fit(int cells)
+        {
+            var width = BadgeMetrics.WidthFor(cells);
+            background.size = new Vector2(width, height);
+            label.rectTransform.sizeDelta = new Vector2(width, height);
         }
 
         public void Show(int value)

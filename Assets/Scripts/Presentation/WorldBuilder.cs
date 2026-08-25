@@ -19,6 +19,8 @@ namespace Game.Presentation
 
         public FloorState Floor { get; private set; }
 
+        public TargetBoard Targets { get; private set; }
+
         public GameObject Build(LevelGraph graph)
         {
             if (graph == null)
@@ -34,6 +36,8 @@ namespace Game.Presentation
             PlayerBadge = null;
             Floor = root.AddComponent<FloorState>();
             Floor.Dress(materials.Of(PartStyle.Floor), materials.Of(PartStyle.Cleared));
+            Targets = root.AddComponent<TargetBoard>();
+            Targets.Begin(graph.Decisions.Nodes.Count);
             NumberBadge playerNumber = null;
             PlayerFigure playerFigure = null;
             var enemies = new List<EnemyFigure>();
@@ -78,6 +82,9 @@ namespace Game.Presentation
 
                     var badge = BadgeFactory.Raise(part, badges.Plan, badgeAssets, group);
                     var prop = nodes.Find(PartNames.Node(part.NodeId));
+                    var target = badge.gameObject.AddComponent<NodeTarget>();
+                    target.Begin(part);
+                    Targets.Adopt(target);
 
                     if (part.Style == BadgeStyle.Player)
                     {
@@ -94,7 +101,9 @@ namespace Game.Presentation
                 }
             }
 
-            Floor.Begin(RunState.Begin(graph, startingPower));
+            var opening = RunState.Begin(graph, startingPower);
+            Floor.Begin(opening);
+            Targets.Show(opening, TargetPreview.None);
 
             if (playerNumber != null)
             {

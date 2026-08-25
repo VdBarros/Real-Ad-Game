@@ -11,7 +11,7 @@ namespace Game.Presentation
 
         static MaterialPropertyBlock block;
 
-        static Color Of(Tint tint)
+        public static Color Of(Tint tint)
         {
             return new Color(tint.Red, tint.Green, tint.Blue);
         }
