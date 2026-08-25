@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Game.Domain;
 using Game.Presentation.Pure;
@@ -29,6 +30,9 @@ namespace Game.Presentation
             var root = new GameObject(blueprint.RootName);
 
             PlayerBadge = null;
+            NumberBadge playerNumber = null;
+            PlayerFigure playerFigure = null;
+            var enemies = new List<EnemyFigure>();
             WarnIfTheCameraHasTurned();
 
             foreach (var floor in blueprint.Floors)
@@ -56,23 +60,36 @@ namespace Game.Presentation
                         continue;
                     }
 
-                    Hang(part, badges.Plan, group, startingPower);
+                    var badge = BadgeFactory.Raise(part, badges.Plan, badgeAssets, group);
+                    var prop = nodes.Find(PartNames.Node(part.NodeId));
+
+                    if (part.Style == BadgeStyle.Player)
+                    {
+                        playerNumber = badge;
+                        playerFigure = prop.gameObject.AddComponent<PlayerFigure>();
+                        playerFigure.Stand(badge.transform);
+                    }
+                    else if (part.Style == BadgeStyle.Enemy || part.Style == BadgeStyle.Boss)
+                    {
+                        var enemy = prop.gameObject.AddComponent<EnemyFigure>();
+                        enemy.Begin(badge.transform, part.Value);
+                        enemies.Add(enemy);
+                    }
+                }
+            }
+
+            if (playerNumber != null)
+            {
+                PlayerBadge = playerNumber.gameObject.AddComponent<PowerBadge>();
+                PlayerBadge.Begin(playerNumber, playerFigure, startingPower);
+
+                foreach (var enemy in enemies)
+                {
+                    enemy.Follow(PlayerBadge);
                 }
             }
 
             return root;
-        }
-
-        void Hang(BadgePart part, BadgePlan plan, Transform parent, int startingPower)
-        {
-            var badge = BadgeFactory.Raise(part, plan, badgeAssets, parent);
-            if (part.Style != BadgeStyle.Player)
-            {
-                return;
-            }
-
-            PlayerBadge = badge.gameObject.AddComponent<PowerBadge>();
-            PlayerBadge.Begin(badge, startingPower);
         }
 
         [Conditional("UNITY_EDITOR")]
