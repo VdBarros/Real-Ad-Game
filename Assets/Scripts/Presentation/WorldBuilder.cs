@@ -17,6 +17,8 @@ namespace Game.Presentation
 
         public PowerBadge PlayerBadge { get; private set; }
 
+        public FloorState Floor { get; private set; }
+
         public GameObject Build(LevelGraph graph)
         {
             if (graph == null)
@@ -30,10 +32,18 @@ namespace Game.Presentation
             var root = new GameObject(blueprint.RootName);
 
             PlayerBadge = null;
+            Floor = root.AddComponent<FloorState>();
+            Floor.Dress(materials.Of(PartStyle.Floor), materials.Of(PartStyle.Cleared));
             NumberBadge playerNumber = null;
             PlayerFigure playerFigure = null;
             var enemies = new List<EnemyFigure>();
+            var groundByName = new Dictionary<string, TilePosition>(graph.Tiles.Tiles.Count);
             WarnIfTheCameraHasTurned();
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                groundByName.Add(PartNames.Tile(tile.Position), tile.Position);
+            }
 
             foreach (var floor in blueprint.Floors)
             {
@@ -43,7 +53,13 @@ namespace Game.Presentation
 
                 foreach (var part in floor.Tiles)
                 {
-                    Raise(part, tiles);
+                    var instance = Raise(part, tiles);
+
+                    TilePosition position;
+                    if (groundByName.TryGetValue(part.Name, out position))
+                    {
+                        Floor.Adopt(position, instance.GetComponent<Renderer>());
+                    }
                 }
 
                 foreach (var part in floor.Nodes)
@@ -77,6 +93,8 @@ namespace Game.Presentation
                     }
                 }
             }
+
+            Floor.Begin(RunState.Begin(graph, startingPower));
 
             if (playerNumber != null)
             {
@@ -115,7 +133,7 @@ namespace Game.Presentation
                 + "Badges do not billboard, so they will face the wrong way until the rig stops rotating.");
         }
 
-        void Raise(WorldPart part, Transform parent)
+        GameObject Raise(WorldPart part, Transform parent)
         {
             var instance = GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
             instance.name = part.Name;
@@ -129,6 +147,8 @@ namespace Game.Presentation
             {
                 WorldObjects.Destroy(instance.GetComponent<Collider>());
             }
+
+            return instance;
         }
 
         static Transform Group(Transform parent, string name)

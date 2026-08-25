@@ -122,6 +122,19 @@ namespace Game.Domain
             return route;
         }
 
+        public bool BlocksPassage(int nodeId)
+        {
+            RequireNode(nodeId);
+
+            if (consumed[nodeId])
+            {
+                return false;
+            }
+
+            var type = Level.Decisions.Node(nodeId).Type;
+            return type == NodeType.Enemy || type == NodeType.Boss;
+        }
+
         internal bool[] CopyConsumed()
         {
             return (bool[])consumed.Clone();
@@ -175,17 +188,6 @@ namespace Game.Domain
             found.Sort();
             reachableNodes = found;
             arrivedFrom = from;
-        }
-
-        bool BlocksPassage(int nodeId)
-        {
-            if (consumed[nodeId])
-            {
-                return false;
-            }
-
-            var type = Level.Decisions.Node(nodeId).Type;
-            return type == NodeType.Enemy || type == NodeType.Boss;
         }
 
         void RequireNode(int nodeId)

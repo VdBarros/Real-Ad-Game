@@ -3,6 +3,7 @@ namespace Game.Presentation.Pure
     public enum PartStyle
     {
         Floor,
+        Cleared,
         Wall,
         Ramp,
         Start,
