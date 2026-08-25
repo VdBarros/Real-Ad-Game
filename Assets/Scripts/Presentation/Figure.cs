@@ -9,13 +9,20 @@ namespace Game.Presentation
 
         Renderer skin;
 
-        float tileHeight;
+        WorldPoint ground;
+
+        bool stood;
 
         protected float BaseScale { get; private set; }
 
         protected float TileHeight
         {
-            get { return tileHeight; }
+            get { return ground.Y; }
+        }
+
+        public WorldPoint Ground
+        {
+            get { return ground; }
         }
 
         internal void Stand(Transform hangingBadge)
@@ -23,24 +30,40 @@ namespace Game.Presentation
             badge = hangingBadge;
             skin = GetComponent<Renderer>();
             BaseScale = transform.localScale.x;
-            tileHeight = transform.localPosition.y - BaseScale;
+
+            var standing = transform.localPosition;
+            ground = new WorldPoint(standing.x, standing.y - BaseScale, standing.z);
+            stood = true;
+        }
+
+        public void StandOn(WorldPoint tile)
+        {
+            ground = tile;
+            Replant();
         }
 
         protected void Wear(float scale, Tint tint)
         {
             transform.localScale = new Vector3(scale, scale, scale);
+            Replant();
+            Tints.Wash(skin, tint);
+        }
 
-            var standing = transform.localPosition;
-            transform.localPosition = new Vector3(standing.x, tileHeight + scale, standing.z);
+        void Replant()
+        {
+            if (!stood)
+            {
+                return;
+            }
+
+            var scale = transform.localScale.x;
+            transform.localPosition = new Vector3(ground.X, ground.Y + scale, ground.Z);
 
             if (badge != null)
             {
-                var hanging = badge.localPosition;
                 badge.localPosition = new Vector3(
-                    hanging.x, BadgeMetrics.AnchorAbove(tileHeight + scale * 2f), hanging.z);
+                    ground.X, BadgeMetrics.AnchorAbove(ground.Y + scale * 2f), ground.Z);
             }
-
-            Tints.Wash(skin, tint);
         }
     }
 }

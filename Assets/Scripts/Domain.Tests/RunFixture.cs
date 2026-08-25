@@ -76,6 +76,11 @@ namespace Game.Domain.Tests
             return RunState.Begin(Level(), startingPower);
         }
 
+        public static TileRoute PastTheMultiplier()
+        {
+            return TileRoute.Of(Level(), new[] { Start, Multiplier, AdditiveBeyondTheMultiplier });
+        }
+
         static IReadOnlyList<TilePosition> Path(params TilePosition[] tiles)
         {
             return tiles;

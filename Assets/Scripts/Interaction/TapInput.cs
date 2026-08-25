@@ -30,6 +30,10 @@ namespace Game.Interaction
 
         public event Action<TargetPreview> Tapped;
 
+        public event Action Released;
+
+        public bool IsLocked { get; set; }
+
         public TargetPreview Preview { get; private set; } = TargetPreview.None;
 
         public float Reach
@@ -138,7 +142,7 @@ namespace Game.Interaction
         {
             RequireARun();
 
-            if (rig.IsBusy)
+            if (rig.IsBusy || IsLocked)
             {
                 Cancel();
                 return;
@@ -168,6 +172,12 @@ namespace Game.Interaction
 
             var committed = Preview;
             Cancel();
+
+            var released = Released;
+            if (released != null)
+            {
+                released();
+            }
 
             if (!committed.IsLegal)
             {

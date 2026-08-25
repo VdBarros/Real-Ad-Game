@@ -54,10 +54,7 @@ namespace Game.Presentation.Pure
             }
 
             return new CameraFraming(
-                new WorldPoint(
-                    from.Target.X + (to.Target.X - from.Target.X) * t,
-                    from.Target.Y + (to.Target.Y - from.Target.Y) * t,
-                    from.Target.Z + (to.Target.Z - from.Target.Z) * t),
+                WorldPoint.Between(from.Target, to.Target, t),
                 from.OrthographicSize + (to.OrthographicSize - from.OrthographicSize) * t);
         }
 

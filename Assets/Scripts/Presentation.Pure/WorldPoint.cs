@@ -23,6 +23,14 @@ namespace Game.Presentation.Pure
             return first.X * second.X + first.Y * second.Y + first.Z * second.Z;
         }
 
+        public static WorldPoint Between(WorldPoint from, WorldPoint to, float amount)
+        {
+            return new WorldPoint(
+                from.X + (to.X - from.X) * amount,
+                from.Y + (to.Y - from.Y) * amount,
+                from.Z + (to.Z - from.Z) * amount);
+        }
+
         public bool Equals(WorldPoint other)
         {
             return X.Equals(other.X) && Y.Equals(other.Y) && Z.Equals(other.Z);

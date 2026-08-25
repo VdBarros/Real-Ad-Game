@@ -17,9 +17,13 @@ namespace Game.Presentation
 
         public PowerBadge PlayerBadge { get; private set; }
 
+        public PlayerFigure Player { get; private set; }
+
         public FloorState Floor { get; private set; }
 
         public TargetBoard Targets { get; private set; }
+
+        public TrailBoard Trail { get; private set; }
 
         public GameObject Build(LevelGraph graph)
         {
@@ -34,10 +38,13 @@ namespace Game.Presentation
             var root = new GameObject(blueprint.RootName);
 
             PlayerBadge = null;
+            Player = null;
             Floor = root.AddComponent<FloorState>();
             Floor.Dress(materials.Of(PartStyle.Floor), materials.Of(PartStyle.Cleared));
             Targets = root.AddComponent<TargetBoard>();
             Targets.Begin(graph.Decisions.Nodes.Count);
+            Trail = Group(root.transform, PartNames.TrailGroup).gameObject.AddComponent<TrailBoard>();
+            Trail.Dress(materials.Of(PartStyle.Trail));
             NumberBadge playerNumber = null;
             PlayerFigure playerFigure = null;
             var enemies = new List<EnemyFigure>();
@@ -107,6 +114,7 @@ namespace Game.Presentation
 
             if (playerNumber != null)
             {
+                Player = playerFigure;
                 PlayerBadge = playerNumber.gameObject.AddComponent<PowerBadge>();
                 PlayerBadge.Begin(playerNumber, playerFigure, startingPower);
 
