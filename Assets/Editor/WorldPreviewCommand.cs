@@ -25,6 +25,10 @@ namespace Game.EditorTooling
 
         const string BadgeCapturePath = "dev/scratch/t-09-badge-preview.png";
 
+        const string TierCapturePath = "dev/scratch/t-10-tier-preview.png";
+
+        const int TopTierPower = 420;
+
         const float BadgeCameraDistance = 20f;
 
         const float BadgeOrthographicSize = 4.2f;
@@ -85,15 +89,20 @@ namespace Game.EditorTooling
 
         public static void Capture()
         {
-            Shoot(CapturePath, CameraDistance, IsoProjection.OrthographicSize, false);
+            Shoot(CapturePath, CameraDistance, IsoProjection.OrthographicSize, false, PowerTuning.Ship.StartingPower);
         }
 
         public static void CaptureBadges()
         {
-            Shoot(BadgeCapturePath, BadgeCameraDistance, BadgeOrthographicSize, true);
+            Shoot(BadgeCapturePath, BadgeCameraDistance, BadgeOrthographicSize, true, PowerTuning.Ship.StartingPower);
         }
 
-        static void Shoot(string path, float distance, float orthographicSize, bool onTheStart)
+        public static void CaptureTiers()
+        {
+            Shoot(TierCapturePath, BadgeCameraDistance, BadgeOrthographicSize, true, TopTierPower);
+        }
+
+        static void Shoot(string path, float distance, float orthographicSize, bool onTheStart, int power)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -102,6 +111,7 @@ namespace Game.EditorTooling
 
             var builder = new WorldBuilder();
             var root = builder.Build(level.Graph);
+            PowerPump.Settle(builder.PlayerBadge, power);
             var camera = Rig(onTheStart ? Start(level.Graph) : Centre(blueprint), distance, orthographicSize);
             Sun();
 

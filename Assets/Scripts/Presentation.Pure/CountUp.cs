@@ -37,6 +37,11 @@ namespace Game.Presentation.Pure
             get { return elapsed >= Seconds || from == to; }
         }
 
+        public float Remaining
+        {
+            get { return IsSettled ? 0f : Seconds - elapsed; }
+        }
+
         public int Display
         {
             get

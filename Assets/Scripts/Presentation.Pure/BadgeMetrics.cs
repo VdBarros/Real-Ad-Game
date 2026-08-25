@@ -36,7 +36,12 @@ namespace Game.Presentation.Pure
 
         public static float AnchorHeight(WorldPart prop)
         {
-            return WorldParts.TopOf(prop) + Clearance + Height * 0.5f;
+            return AnchorAbove(WorldParts.TopOf(prop));
+        }
+
+        public static float AnchorAbove(float top)
+        {
+            return top + Clearance + Height * 0.5f;
         }
 
         static void RequireCapacity(int capacity)
