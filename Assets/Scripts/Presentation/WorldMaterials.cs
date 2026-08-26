@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using Game.Presentation.Pure;
 using UnityEngine;
 
@@ -12,12 +13,17 @@ namespace Game.Presentation
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
 
-        static readonly string[] ShaderNames =
+        static readonly string[] shaderNames =
         {
             "Universal Render Pipeline/Lit",
             "Standard",
             "Unlit/Color"
         };
+
+        public static IReadOnlyList<string> ShaderNames
+        {
+            get { return shaderNames; }
+        }
 
         readonly Material[] byStyle;
 
@@ -75,7 +81,7 @@ namespace Game.Presentation
                 return shader;
             }
 
-            foreach (var candidate in ShaderNames)
+            foreach (var candidate in shaderNames)
             {
                 shader = UnityEngine.Shader.Find(candidate);
                 if (shader != null)

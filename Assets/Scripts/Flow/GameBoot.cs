@@ -1,5 +1,6 @@
 using System;
 using Game.Domain;
+using Game.Presentation;
 using UnityEngine;
 
 namespace Game.Flow
@@ -21,12 +22,24 @@ namespace Game.Flow
             }
 
             RaiseTheSun();
+            StandDownEveryOtherCamera();
             GameLoop.Raise(SeedOfThisSession(), MazePreset.Ship, new PillarCutscene());
         }
 
         public static long SeedOfThisSession()
         {
             return DateTime.UtcNow.Ticks;
+        }
+
+        static void StandDownEveryOtherCamera()
+        {
+            foreach (var lens in UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsSortMode.None))
+            {
+                if (lens.GetComponent<CameraRig>() == null)
+                {
+                    lens.enabled = false;
+                }
+            }
         }
 
         static void RaiseTheSun()

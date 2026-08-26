@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using Game.Presentation;
 using UnityEditor;
 using UnityEditor.Build;
+using UnityEngine;
 
 namespace Game.EditorTooling
 {
@@ -29,9 +32,72 @@ namespace Game.EditorTooling
             PlayerSettings.SetApiCompatibilityLevel(NamedBuildTarget.Android, ApiCompatibilityLevel.NET_Standard);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
 
+            KeepRuntimeShadersInTheBuild();
+
             AssetDatabase.SaveAssets();
 
             AssertNewInputSystemIsActive();
+        }
+
+        public static IEnumerable<string> RuntimeShaderNames()
+        {
+            foreach (var name in WorldMaterials.ShaderNames)
+            {
+                yield return name;
+            }
+
+            foreach (var name in BadgeAssets.ShaderNames)
+            {
+                yield return name;
+            }
+        }
+
+        public static void KeepRuntimeShadersInTheBuild()
+        {
+            var settings = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset");
+            if (settings.Length == 0)
+            {
+                throw new InvalidOperationException("Could not load GraphicsSettings.asset to include runtime shaders.");
+            }
+
+            var serialized = new SerializedObject(settings[0]);
+            var included = serialized.FindProperty("m_AlwaysIncludedShaders");
+            if (included == null)
+            {
+                throw new InvalidOperationException("GraphicsSettings.asset has no m_AlwaysIncludedShaders property.");
+            }
+
+            var standing = new HashSet<Shader>();
+            for (var slot = 0; slot < included.arraySize; slot++)
+            {
+                var shader = included.GetArrayElementAtIndex(slot).objectReferenceValue as Shader;
+                if (shader != null)
+                {
+                    standing.Add(shader);
+                }
+            }
+
+            var added = 0;
+            foreach (var name in RuntimeShaderNames())
+            {
+                var shader = Shader.Find(name);
+                if (shader == null || !standing.Add(shader))
+                {
+                    continue;
+                }
+
+                included.InsertArrayElementAtIndex(included.arraySize);
+                included.GetArrayElementAtIndex(included.arraySize - 1).objectReferenceValue = shader;
+                added++;
+            }
+
+            if (added == 0)
+            {
+                return;
+            }
+
+            serialized.ApplyModifiedProperties();
+            Debug.Log("Always Included Shaders gained " + added + " shader(s) the runtime asks for by name.");
         }
 
         static void AssertNewInputSystemIsActive()
