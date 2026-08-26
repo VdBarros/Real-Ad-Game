@@ -82,7 +82,24 @@ recorded. Play framing follows the player; a drag pans away from it and release
 eases back over ~0.35 s, clamped to the level's bounding box plus a tile. The
 opening flight still ends on the whole-level frame and holds before easing to
 the player, because that reveal is the routing puzzle. `ZoomBeat` still outranks
-the follow, exactly as it outranked the held frame.
+the follow, exactly as it outranked the held frame, and hands the camera back to
+the player rather than to a constant.
+
+The premise [#16] rested on is measurably gone, and by a wide margin: at the
+play framing's orthographic 9.50 a `ship` level now needs **857 px of a 540 px
+half-width**, and **56 of 56 seeds run off the frame**. So the whole-level frame
+is no longer the play framing. It is its own framing, wide enough to hold every
+tile plus the headroom a boss and its badge take above one, and never tighter
+than the play size — **10.06 to 12.57** over 56 `ship` seeds. That also retires
+[#15]'s "the flight's endpoint needs no per-level fit": the endpoint fits the
+level, because a level is no longer one shape. The play framing itself keeps
+9.50, as the spec requires.
+
+The follow eases toward the player rather than tracking them rigidly, and its
+step is rate-limited to a share of the **1000 px/s** legibility ceiling [#15]
+set for the flight, so the settle off the reveal and the tracking during a walk
+are one mechanism obeying one rule. Measured worst over 56 `ship` seeds: 815
+px/s on the opening, 750 px/s on the follow.
 
 `TapHold` gains a position and `TapGesture` gains `Pan`: a press that travels
 more than the 4.5 mm touch reach becomes a pan and forfeits its tap. Below that

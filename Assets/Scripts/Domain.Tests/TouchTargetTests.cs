@@ -194,7 +194,7 @@ namespace Game.Domain.Tests
         static IReadOnlyList<TapCandidate> Candidates(RunState state)
         {
             return TapAim.Candidates(
-                state, LevelFraming.Play(state.Level), ScreenFrame.Width, ScreenFrame.Height);
+                state, LevelFraming.Play(LevelFraming.Centre(state.Level)), ScreenFrame.Width, ScreenFrame.Height);
         }
 
         static float NearestOtherCandidate(IReadOnlyList<TapCandidate> candidates, int index)
@@ -227,7 +227,7 @@ namespace Game.Domain.Tests
 
         static List<DrawnNode> Drawn(LevelGraph graph)
         {
-            return Drawn(graph, LevelFraming.Play(graph));
+            return Drawn(graph, LevelFraming.Play(LevelFraming.Centre(graph)));
         }
 
         static List<DrawnNode> Drawn(LevelGraph graph, CameraFraming framing)

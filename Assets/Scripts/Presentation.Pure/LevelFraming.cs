@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Game.Domain;
 
 namespace Game.Presentation.Pure
@@ -9,14 +10,17 @@ namespace Game.Presentation.Pure
 
         public const float CloseUpSize = 4f;
 
-        public static CameraFraming Play(LevelGraph graph)
+        public const float Headroom =
+            LevelBlueprintBuilder.BossScale * 2f + BadgeMetrics.Clearance + BadgeMetrics.Height;
+
+        public static CameraFraming Play(WorldPoint subject)
         {
-            return new CameraFraming(Centre(graph), IsoProjection.OrthographicSize);
+            return new CameraFraming(subject, IsoProjection.OrthographicSize);
         }
 
         public static CameraFraming Opening(LevelGraph graph)
         {
-            return new CameraFraming(IsoProjection.Of(Start(graph).Position), OpeningSize);
+            return new CameraFraming(StartPoint(graph), OpeningSize);
         }
 
         public static CameraFraming CloseUp(TilePosition position)
@@ -24,18 +28,51 @@ namespace Game.Presentation.Pure
             return new CameraFraming(IsoProjection.Of(position), CloseUpSize);
         }
 
-        public static WorldPoint Centre(LevelGraph graph)
+        public static CameraFraming Whole(LevelGraph graph)
         {
-            if (graph == null)
+            var tiles = Tiles(graph);
+            var right = IsoProjection.CameraRight;
+            var up = IsoProjection.CameraUp;
+            var across = IsoProjection.TileEdge * 0.5f * (Math.Abs(right.X) + Math.Abs(right.Z));
+            var alongside = IsoProjection.TileEdge * 0.5f * (Math.Abs(up.X) + Math.Abs(up.Z));
+
+            var lowAcross = float.MaxValue;
+            var highAcross = float.MinValue;
+            var lowUp = float.MaxValue;
+            var highUp = float.MinValue;
+
+            foreach (var tile in tiles)
             {
-                throw new ArgumentNullException(nameof(graph));
+                var point = IsoProjection.Of(tile.Position);
+                var sideways = WorldPoint.Dot(point, right);
+                var upwards = WorldPoint.Dot(point, up);
+
+                lowAcross = Math.Min(lowAcross, sideways - across);
+                highAcross = Math.Max(highAcross, sideways + across);
+                lowUp = Math.Min(lowUp, upwards - alongside);
+                highUp = Math.Max(highUp, upwards + alongside + Headroom * up.Y);
             }
 
-            var tiles = graph.Tiles.Tiles;
-            if (tiles.Count == 0)
-            {
-                throw new ArgumentException("A level with no tiles has no centre to frame.", nameof(graph));
-            }
+            var centre = Centre(graph);
+            var sidewaysDrift = (lowAcross + highAcross) * 0.5f - WorldPoint.Dot(centre, right);
+            var upwardsDrift = (lowUp + highUp) * 0.5f - WorldPoint.Dot(centre, up);
+
+            var target = new WorldPoint(
+                centre.X + right.X * sidewaysDrift + up.X * upwardsDrift,
+                centre.Y + right.Y * sidewaysDrift + up.Y * upwardsDrift,
+                centre.Z + right.Z * sidewaysDrift + up.Z * upwardsDrift);
+
+            var halfUp = (highUp - lowUp) * 0.5f;
+            var halfAcross = (highAcross - lowAcross) * 0.5f;
+            var byWidth = halfAcross * ScreenFrame.Height / ScreenFrame.Width;
+
+            return new CameraFraming(
+                target, Math.Max(IsoProjection.OrthographicSize, Math.Max(halfUp, byWidth)));
+        }
+
+        public static WorldPoint Centre(LevelGraph graph)
+        {
+            var tiles = Tiles(graph);
 
             var lowElevation = int.MaxValue;
             var highElevation = int.MinValue;
@@ -61,7 +98,7 @@ namespace Game.Presentation.Pure
                 (lowY + highY) * 0.5f * IsoProjection.TileEdge);
         }
 
-        static DecisionNode Start(LevelGraph graph)
+        public static WorldPoint StartPoint(LevelGraph graph)
         {
             if (graph == null)
             {
@@ -72,11 +109,27 @@ namespace Game.Presentation.Pure
             {
                 if (node.Type == NodeType.Start)
                 {
-                    return node;
+                    return IsoProjection.Of(node.Position);
                 }
             }
 
             throw new ArgumentException("A level always has one start to open on.", nameof(graph));
+        }
+
+        static IReadOnlyList<Tile> Tiles(LevelGraph graph)
+        {
+            if (graph == null)
+            {
+                throw new ArgumentNullException(nameof(graph));
+            }
+
+            var tiles = graph.Tiles.Tiles;
+            if (tiles.Count == 0)
+            {
+                throw new ArgumentException("A level with no tiles has no frame to fit it.", nameof(graph));
+            }
+
+            return tiles;
         }
     }
 }

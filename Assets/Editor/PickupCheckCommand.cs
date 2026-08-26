@@ -113,12 +113,11 @@ namespace Game.EditorTooling
             var opening = RunState.Begin(graph, Power);
             var input = TapInput.Raise(rig, builder.Targets, opening);
             var walker = Walker.Raise(rig, builder, input, opening);
-            var constant = LevelFraming.Play(graph);
             var leg = new Leg { Name = name, Taps = new Tap[order.Length] };
 
             for (var slot = 0; slot < order.Length; slot++)
             {
-                leg.Taps[slot] = Tapped(rig, builder, walker, constant, order[slot], name);
+                leg.Taps[slot] = Tapped(rig, builder, walker, order[slot], name);
             }
 
             leg.Settled = walker.Run;
@@ -135,7 +134,7 @@ namespace Game.EditorTooling
         }
 
         static Tap Tapped(
-            CameraRig rig, WorldBuilder builder, Walker walker, CameraFraming constant, int nodeId, string leg)
+            CameraRig rig, WorldBuilder builder, Walker walker, int nodeId, string leg)
         {
             var tap = new Tap
             {
@@ -160,7 +159,7 @@ namespace Game.EditorTooling
             for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
             {
                 Step(rig, builder, walker);
-                Watch(rig, builder, constant, tap);
+                Watch(rig, builder, tap);
             }
 
             if (walker.IsWalking)
@@ -172,7 +171,7 @@ namespace Game.EditorTooling
             for (var frame = 0; frame < SettleFrames; frame++)
             {
                 Step(rig, builder, walker);
-                Watch(rig, builder, constant, tap);
+                Watch(rig, builder, tap);
             }
 
             tap.After = walker.Run.Power;
@@ -196,9 +195,9 @@ namespace Game.EditorTooling
             return tap;
         }
 
-        static void Watch(CameraRig rig, WorldBuilder builder, CameraFraming constant, Tap tap)
+        static void Watch(CameraRig rig, WorldBuilder builder, Tap tap)
         {
-            if (!rig.Framing.Equals(constant))
+            if (!rig.Framing.Equals(rig.Following))
             {
                 tap.CutFrames++;
             }

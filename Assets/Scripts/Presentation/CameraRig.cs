@@ -28,6 +28,11 @@ namespace Game.Presentation
             get { return applied; }
         }
 
+        public CameraFraming Following
+        {
+            get { return staged ? staging.Following : applied; }
+        }
+
         public static CameraRig Raise()
         {
             var carrier = new GameObject(PartNames.Rig) { tag = MainCameraTag };
@@ -56,6 +61,20 @@ namespace Game.Presentation
             transform.position = new Vector3(framing.Position.X, framing.Position.Y, framing.Position.Z);
             Lens().orthographicSize = framing.OrthographicSize;
             enabled = false;
+        }
+
+        public void Follow(WorldPoint subject)
+        {
+            RequireALevel();
+
+            var following = staging.Follows(subject);
+            if (following.Equals(staging))
+            {
+                return;
+            }
+
+            staging = following;
+            Apply();
         }
 
         public void CutTo(TilePosition position)
@@ -90,6 +109,7 @@ namespace Game.Presentation
             var advanced = staging.Advanced(deltaSeconds);
             if (advanced.Equals(staging))
             {
+                enabled = !staging.IsSettled;
                 return;
             }
 
@@ -113,7 +133,7 @@ namespace Game.Presentation
         void Apply()
         {
             var framing = staging.Framing;
-            enabled = staging.IsBusy;
+            enabled = !staging.IsSettled;
 
             if (framing.Equals(applied))
             {

@@ -14,36 +14,109 @@ namespace Game.Domain.Tests
             return LevelGraphFixture.TwoTerraces();
         }
 
+        static CameraStaging Rested(CameraStaging staging)
+        {
+            for (var step = 0; step < 1200 && !staging.IsSettled; step++)
+            {
+                staging = staging.Advanced(Frame);
+            }
+
+            return staging;
+        }
+
         static CameraStaging Playing(LevelGraph graph)
         {
-            return CameraStaging.Over(graph).Skipped();
+            return Rested(CameraStaging.Over(graph).Skipped());
         }
 
         [Test]
-        public void TheRigIsBusyForTheFlightAndFreeOnceItLands()
+        public void TheRigIsBusyForTheOpeningAndFreeOnceItLetsGo()
         {
             var staging = CameraStaging.Over(Graph());
 
             Assert.That(staging.IsBusy, Is.True);
 
-            staging = staging.Advanced(CameraFlight.Seconds);
+            staging = staging.Advanced(CameraFlight.Duration);
 
             Assert.That(staging.IsBusy, Is.False);
         }
 
         [Test]
-        public void ATapDuringTheFlightReturnsControlImmediatelyAtTheConstant()
+        public void ATapDuringTheOpeningReturnsControlImmediatelyOnTheWholeLevel()
         {
             var graph = Graph();
             var staging = CameraStaging.Over(graph).Advanced(0.7f).Skipped();
 
             Assert.That(staging.IsBusy, Is.False);
-            Assert.That(staging.Framing, Is.EqualTo(staging.Constant));
-            Assert.That(staging.Framing, Is.EqualTo(LevelFraming.Play(graph)));
+            Assert.That(staging.Framing, Is.EqualTo(LevelFraming.Whole(graph)));
+            Assert.That(staging.Framing, Is.EqualTo(staging.Reveal));
         }
 
         [Test]
-        public void ABeatCutsAwayFromTheConstantAndTakesInputWithIt()
+        public void TheOpeningEasesOffTheWholeLevelOntoThePlayerRatherThanCuttingToIt()
+        {
+            var graph = Graph();
+            var player = LevelFraming.Play(LevelFraming.StartPoint(graph));
+            var staging = CameraStaging.Over(graph);
+
+            while (staging.IsBusy)
+            {
+                staging = staging.Advanced(Frame);
+                Assert.That(
+                    staging.Framing.Target,
+                    Is.Not.EqualTo(player.Target),
+                    "The opening reached the player before it had let go of the whole level.");
+            }
+
+            Assert.That(staging.Framing, Is.EqualTo(staging.Reveal));
+
+            var frames = 0;
+            var apart = ScreenFrame.PanPixels(staging.Framing, player);
+            while (!staging.IsSettled && frames < 1200)
+            {
+                staging = staging.Advanced(Frame);
+                frames++;
+
+                var closer = ScreenFrame.PanPixels(staging.Framing, player);
+                Assert.That(closer, Is.LessThanOrEqualTo(apart));
+                apart = closer;
+            }
+
+            Assert.That(frames, Is.GreaterThan(12), "The camera cut to the player rather than easing onto them.");
+            Assert.That(staging.Framing, Is.EqualTo(player));
+        }
+
+        [Test]
+        public void PlayFramingFollowsThePlayer()
+        {
+            var graph = Graph();
+            var staging = Playing(graph);
+            var walked = new WorldPoint(6f, 2f, 6f);
+
+            Assert.That(staging.Framing.Target, Is.EqualTo(LevelFraming.StartPoint(graph)));
+
+            staging = Rested(staging.Follows(walked));
+
+            Assert.That(staging.Framing.Target, Is.EqualTo(walked));
+            Assert.That(staging.Framing.OrthographicSize, Is.EqualTo(IsoProjection.OrthographicSize));
+        }
+
+        [Test]
+        public void TheFollowMovesTowardsThePlayerRatherThanCuttingToThem()
+        {
+            var graph = Graph();
+            var staging = Playing(graph).Follows(new WorldPoint(6f, 2f, 6f));
+            var stepped = staging.Advanced(Frame);
+
+            Assert.That(stepped.Framing, Is.Not.EqualTo(staging.Framing));
+            Assert.That(stepped.Framing.Target, Is.Not.EqualTo(stepped.Subject));
+            Assert.That(
+                ScreenFrame.PanPixels(stepped.Framing, LevelFraming.Play(stepped.Subject)),
+                Is.LessThan(ScreenFrame.PanPixels(staging.Framing, LevelFraming.Play(staging.Subject))));
+        }
+
+        [Test]
+        public void ABeatCutsAwayFromTheFollowAndTakesInputWithIt()
         {
             var graph = Graph();
             var staging = Playing(graph).CutTo(Multiplier);
@@ -53,54 +126,75 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ABeatExitsOnTheConstantExactly()
+        public void ABeatOutranksTheFollowAndHandsItBackWhenItIsDone()
         {
             var graph = Graph();
-            var staging = Playing(graph).CutTo(Multiplier);
+            var standing = IsoProjection.Of(Multiplier);
+            var staging = Rested(Playing(graph).Follows(standing)).CutTo(Multiplier);
+
+            for (var step = 0; step < 30; step++)
+            {
+                staging = staging.Advanced(Frame);
+                Assert.That(staging.Framing, Is.EqualTo(LevelFraming.CloseUp(Multiplier)));
+            }
 
             staging = staging.Advanced(ZoomBeat.FloorSeconds).Released();
 
             Assert.That(staging.IsBusy, Is.False);
-            Assert.That(staging.Framing, Is.EqualTo(LevelFraming.Play(graph)));
-            Assert.That(staging.Framing.Target, Is.EqualTo(staging.Constant.Target));
-            Assert.That(staging.Framing.OrthographicSize, Is.EqualTo(staging.Constant.OrthographicSize));
+            Assert.That(staging.Framing, Is.EqualTo(LevelFraming.Play(standing)));
+            Assert.That(staging.Framing, Is.EqualTo(staging.Following));
         }
 
         [Test]
-        public void ATapDuringABeatReturnsControlImmediatelyAtTheConstant()
+        public void ATapDuringABeatReturnsControlImmediatelyOnThePlayer()
         {
             var graph = Graph();
             var staging = Playing(graph).CutTo(Multiplier).Advanced(Frame).Skipped();
 
             Assert.That(staging.IsBusy, Is.False);
-            Assert.That(staging.Framing, Is.EqualTo(LevelFraming.Play(graph)));
+            Assert.That(staging.Framing, Is.EqualTo(staging.Following));
         }
 
         [Test]
-        public void EveryCameraStateIsTheConstantOrACutToAKnownTransform()
+        public void EveryCameraStateIsTheFollowOrACutToAKnownTransform()
         {
             var graph = Graph();
-            var constant = LevelFraming.Play(graph);
             var staging = Playing(graph);
 
-            Assert.That(staging.Framing, Is.EqualTo(constant));
+            Assert.That(staging.Framing, Is.EqualTo(LevelFraming.Play(LevelFraming.StartPoint(graph))));
 
             foreach (var node in graph.Decisions.Nodes)
             {
-                var beating = staging.CutTo(node.Position);
+                var standing = IsoProjection.Of(node.Position);
+                var beating = Rested(staging.Follows(standing)).CutTo(node.Position);
 
                 Assert.That(beating.Framing, Is.EqualTo(LevelFraming.CloseUp(node.Position)));
-                Assert.That(beating.Advanced(ZoomBeat.CapSeconds).Framing, Is.EqualTo(constant));
+                Assert.That(
+                    beating.Advanced(ZoomBeat.CapSeconds).Framing,
+                    Is.EqualTo(LevelFraming.Play(standing)));
             }
         }
 
         [Test]
-        public void ABeatCannotFireWhileTheFlightStillOwnsInput()
+        public void ABeatCannotFireWhileTheOpeningStillOwnsInput()
         {
             var flying = CameraStaging.Over(Graph()).Advanced(0.5f);
 
             Assert.That(() => flying.CutTo(Multiplier), Throws.InstanceOf<System.InvalidOperationException>());
             Assert.That(flying.Skipped().CutTo(Multiplier).IsBusy, Is.True);
+        }
+
+        [Test]
+        public void TheFollowStaysStillUntilTheOpeningHasLetGo()
+        {
+            var graph = Graph();
+            var staging = CameraStaging.Over(graph).Follows(new WorldPoint(6f, 2f, 6f));
+
+            while (staging.IsBusy)
+            {
+                Assert.That(staging.Following, Is.EqualTo(staging.Reveal));
+                staging = staging.Advanced(Frame);
+            }
         }
     }
 }

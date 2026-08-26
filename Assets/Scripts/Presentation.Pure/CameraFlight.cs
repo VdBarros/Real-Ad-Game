@@ -7,6 +7,10 @@ namespace Game.Presentation.Pure
     {
         public const float Seconds = 2f;
 
+        public const float HoldSeconds = 0.6f;
+
+        public const float Duration = Seconds + HoldSeconds;
+
         readonly CameraFraming from;
         readonly CameraFraming to;
         readonly float elapsed;
@@ -20,7 +24,7 @@ namespace Game.Presentation.Pure
 
         public static CameraFlight Over(LevelGraph graph)
         {
-            return new CameraFlight(LevelFraming.Opening(graph), LevelFraming.Play(graph), 0f);
+            return new CameraFlight(LevelFraming.Opening(graph), LevelFraming.Whole(graph), 0f);
         }
 
         public CameraFraming Destination
@@ -30,14 +34,19 @@ namespace Game.Presentation.Pure
 
         public bool IsSettled
         {
-            get { return elapsed >= Seconds; }
+            get { return elapsed >= Duration; }
+        }
+
+        public bool IsHolding
+        {
+            get { return elapsed >= Seconds && elapsed < Duration; }
         }
 
         public CameraFraming Framing
         {
             get
             {
-                if (IsSettled)
+                if (elapsed >= Seconds)
                 {
                     return to;
                 }
@@ -69,7 +78,7 @@ namespace Game.Presentation.Pure
                 return this;
             }
 
-            return new CameraFlight(from, to, Seconds);
+            return new CameraFlight(from, to, Duration);
         }
 
         static float EasedInAndOut(float t)
@@ -108,10 +117,15 @@ namespace Game.Presentation.Pure
         {
             if (IsSettled)
             {
-                return "landed on " + to;
+                return "let go of " + to;
             }
 
-            return string.Concat("flying from ", from.ToString(), " to ", to.ToString());
+            if (IsHolding)
+            {
+                return "holding on " + to;
+            }
+
+            return string.Concat("revealing ", from.ToString(), " out to ", to.ToString());
         }
     }
 }

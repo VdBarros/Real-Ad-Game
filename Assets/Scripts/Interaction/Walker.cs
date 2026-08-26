@@ -266,6 +266,8 @@ namespace Game.Interaction
 
         void Follow()
         {
+            rig.Follow(journey.Walk.Position);
+
             if (figure != null)
             {
                 figure.StandOn(journey.Walk.Position);

@@ -224,8 +224,6 @@ namespace Game.EditorTooling
 
         static void EnterPlay(GameLoop loop, Turn turn)
         {
-            var constant = LevelFraming.Play(loop.Level.Graph);
-
             if (turn.Skipped)
             {
                 loop.Input.ReleaseAt(new ScreenPoint(0f, 0f));
@@ -261,11 +259,11 @@ namespace Game.EditorTooling
                 return;
             }
 
-            if (!loop.Rig.Framing.Equals(constant))
+            if (!loop.Rig.Framing.Equals(loop.Rig.Following))
             {
                 Fail(
                     "Turn " + turn.Number + " entered play framed at " + loop.Rig.Framing
-                    + " rather than the constant " + constant + ".");
+                    + " rather than back on the player at " + loop.Rig.Following + ".");
             }
 
             if (loop.Input.IsLocked)
@@ -324,8 +322,6 @@ namespace Game.EditorTooling
 
         static void ATapDuringABeatReturnsControlImmediately(GameLoop loop, Turn turn)
         {
-            var constant = LevelFraming.Play(loop.Level.Graph);
-
             turn.BeatsSkipped++;
             loop.Input.ReleaseAt(new ScreenPoint(0f, 0f));
 
@@ -335,11 +331,11 @@ namespace Game.EditorTooling
                 return;
             }
 
-            if (!loop.Rig.Framing.Equals(constant))
+            if (!loop.Rig.Framing.Equals(loop.Rig.Following))
             {
                 Fail(
                     "Turn " + turn.Number + " left a skipped beat framed at " + loop.Rig.Framing
-                    + " rather than the constant " + constant + ".");
+                    + " rather than back on the player at " + loop.Rig.Following + ".");
             }
         }
 
