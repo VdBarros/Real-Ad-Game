@@ -6,9 +6,17 @@ Terms are added as decisions settle them. Open terms are listed at the bottom.
 
 ## Tile
 
-One walkable cell of the dungeon, addressed by integer `(x, y, floor)`. Tiles
-define geometry: what renders, and where a walk may physically go. A `ship`
-level holds roughly sixty of them.
+One walkable cell of the dungeon, addressed by integer `(x, y)` together with an
+elevation. Tiles define geometry: what renders, and where a walk may physically
+go. No two tiles share an `(x, y)`, so no two tiles can ever occupy the same
+place on screen. A `ship` level holds roughly sixty of them.
+
+## Elevation
+
+How high a tile sits, counted in whole steps of one world unit. It is the only
+thing left of what used to be a storey: elevation changes what a tile looks
+like and nothing about where a walk may go. Two tiles are neighbours because
+their `(x, y)` are adjacent, never because of their heights.
 
 ## Tile Grid
 
@@ -30,17 +38,25 @@ holds roughly twenty-four. Content nodes are what the size presets count.
 ## Junction Node
 
 A decision node that holds nothing. It exists because three or more corridors
-terminate at that tile, or because the tile changes floor. Junction nodes are
-never consumed, so they carry no state and enter no reasoning about power.
+terminate at that tile — which is why the tile at the foot of a staircase is one:
+the staircase is the third corridor. Junction nodes are never consumed, so they
+carry no state and enter no reasoning about power.
 
-## Stair
+## Terrace
 
-The only thing that joins two floors: a pair of tiles at the same `(x, y)` on
-adjacent floors, walkable in both directions. Tiles that merely sit one above
-the other are not connected — nothing but a stair crosses a floor, so a stair
-is data the level carries rather than a coincidence of coordinates. The
-corridor joining a stair's two tiles covers no tiles at all; it is the one
-corridor that is zero-length by construction.
+Every tile at one elevation, taken together. A terrace is read off the tiles
+rather than stored, and consecutive terraces never share an `(x, y)`: each sits
+above and behind the one before it with an unowned row between them and nothing
+underneath. The impression of having climbed a floor is all a terrace is.
+_Avoid_: floor, storey, tier.
+
+## Staircase
+
+The run of tiles climbing one step each from a lower terrace's far edge to the
+next terrace's near edge. A staircase is ordinary walkable corridor — no
+adjacency of its own, never a slot, and never a decision node, since its tiles
+have corridor-degree two like any other corridor tile.
+_Avoid_: stair, stair link, ramp.
 
 ## Corridor
 
@@ -58,10 +74,12 @@ undirected: nothing in the game is one-way.
 ## Region
 
 A contiguous group of tiles, used to scale content. Regions partition the tile
-grid completely: every tile belongs to exactly one, and none spans two floors.
-A decision node's region is simply its tile's region, so nothing is ever
-region-less. A corridor is said to cross a region boundary when the tiles at
-its two ends belong to different regions.
+grid completely: every tile belongs to exactly one, and none spans two terraces
+— a staircase belongs to the region of the terrace it leaves, so a terrace's
+`P_min` reads as the power a player arrives holding. A decision node's region is
+simply its tile's region, so nothing is ever region-less. A corridor is said to
+cross a region boundary when the tiles at its two ends belong to different
+regions.
 
 ## Power
 
@@ -160,15 +178,15 @@ and preset — the same pair always yields the same level.
 
 ## Lattice
 
-The coarse grid of rooms a floor is carved out of, before it becomes tiles.
+The coarse grid of rooms a terrace is carved out of, before it becomes tiles.
 One lattice cell becomes one tile, and the wall between two joined cells
-becomes another, so a floor holds rather more tiles than the lattice holds
-cells. The lattice is a preset's way of saying how big a floor is; nothing
+becomes another, so a terrace holds rather more tiles than the lattice holds
+cells. The lattice is a preset's way of saying how big a terrace is; nothing
 outside carving knows it exists.
 
 ## Carve
 
-Cutting a floor's corridors out of its lattice, by walking the cells in a
+Cutting a terrace's corridors out of its lattice, by walking the cells in a
 random order and knocking through the wall behind each step. Carving alone
 produces a maze with exactly one route between any two tiles, which is why
 braiding follows it.
@@ -229,7 +247,8 @@ directly instead of being produced and then filtered.
 
 ## Floor Repair
 
-The pass that makes the floor rule true after minting has finished. `P_min` is
+The pass that makes the floor rule true after minting has finished. The floor
+here is the bottom of a range of numbers, and has nothing to do with a terrace. `P_min` is
 a property of the completed level, so minting cannot see it; instead each
 region's cheapest enemy is pulled below that region's `P_min` afterwards.
 Lowering a number only ever lowers power, so the walls move down underneath the

@@ -152,8 +152,9 @@ multi-hop to it, resolving everything on the way.
 The domain holds **both** a tile grid and a decision graph, and they are not
 the same thing:
 
-- The **tile grid** is ~60 walkable `(x, y, floor)` cells. Geometry: what
-  renders, and where a walk may physically go.
+- The **tile grid** is ~60 walkable `(x, y)` cells, each carrying an elevation.
+  Geometry: what renders, and where a walk may physically go. No two cells share
+  an `(x, y)` (see [ADR-0001](adr/0001-terraces-instead-of-stacked-floors.md)).
 - The **decision graph** is the ~24 content-bearing nodes extracted from those
   tiles, joined by corridors. All reasoning about solvability, the power
   envelope and fuzzing happens here.
@@ -317,7 +318,7 @@ recipe's counts exact.
 | purpose | exhaustive verification | what ships | generation-time regression |
 | content nodes | **11** | 24 | 90 |
 | tiles | — | ~60 | — |
-| floors | 1 | 2 | 3 |
+| terraces | 1 | 2 | 3 |
 | regions | 2 | 4 | 9 |
 | `D_min` | — | **16** | — |
 
@@ -336,18 +337,37 @@ to agree.
 
 ### Maze construction ([#7])
 
-Recursive backtracker per floor → **braid 0.25** → stairs → **Voronoi**
+Recursive backtracker per terrace → **braid 0.25** → staircases → **Voronoi**
 regions → extract the decision graph.
+
+Terraces are offset by `(Δ, Δ)` tiles and lifted two steps, Δ chosen so that
+consecutive footprints are disjoint with an unowned row between them — Δ = **6**
+for `ship`. That offset is along world `x + y`, which is straight up the screen,
+so it costs no width: the `ship` level already spends **79%** of a 1080×1920
+portrait frame's width at orthographic size 9.5 and only **31%** of its height.
+Growing the map sideways is not available; growing it up-screen has threefold
+headroom. Screen separation at the worst-aligned column is **3.15 m** against
+the **1.94 m** a boss badge needs to clear the terrace above.
 
 Braid is the load-bearing knob. At 0 the maze is 53% gates and has a single
 forced order; at 1.0 it is 3% gates and no puzzle. **0.25 gives ~30% gates and
 ~2.3 pockets per level**, and the placement policy has to fit that supply.
 
-A tile becomes a decision node when its corridor-degree is not 2, or it is a
-stair, or it is the start. Junctions promote to never-consumed `Empty` nodes.
-**Stairs are exempt from the empty-path assertion** — a stair is two tiles, one
-per floor at the same `(x, y)`, joined by one edge, so it is zero-length by
-construction.
+A tile becomes a decision node when its corridor-degree is not 2, or it is the
+start. Junctions promote to never-consumed `Empty` nodes. **There is no
+exemption from the empty-path assertion**, because there is no longer a
+zero-length corridor: a staircase is a run of ordinary walkable tiles climbing
+one step each, from a lower terrace's far edge to the next terrace's near edge,
+and its tiles have corridor-degree 2 like any other corridor tile. The tile at
+the foot gains a neighbour and so promotes to a junction on its own.
+
+Staircase tiles must be **excluded from slot candidacy explicitly**.
+`SlotSelector` draws candidates from every second tile of a corridor run, and a
+staircase is a corridor run — without the exclusion, content is minted standing
+halfway up a flight of stairs. A staircase runs in an L when the terraces' `x`
+ranges do not line up, which costs ~4 tiles per staircase (~8 for `ship`, +13%);
+confining staircases to the straight-run window would put both of `ship`'s next
+to each other, and two adjacent staircases are not a routing choice.
 
 ---
 
@@ -392,16 +412,25 @@ gives deterministic ordering anyway — the model must.
 no camera parameters, no wall data. Projection constants are compile-time,
 walls are derived from absent neighbours rather than stored, and props are a
 switch on `NodeType`. Determinism comes from three rules: names are a function
-of the tile key rather than a counter, sibling order is the `(floor, y, x)`
+of the tile key rather than a counter, sibling order is the `(elevation, y, x)`
 sweep that also assigns node ids, and no `Dictionary`/`HashSet` iteration
 appears in the build path.
 
-**The camera is two states, not three modes** ([#15], [#16]): a per-preset
-constant — `euler(30, 45, 0)`, orthographic, size **9.50** — and cuts away from
-it. Follow mode does not exist, because the whole level is on screen at that
-framing for every seed. **The rig exposes no rotation field**, which is what
-lets #11 copy each badge's rotation once at construction instead of
-billboarding every frame.
+**The camera is three states** — reversing [#15] and [#16], which recorded two
+and said follow mode does not exist. The rotation and size are still constants
+(`euler(30, 45, 0)`, orthographic, **9.50**), and the opening flight still ends
+on the whole-level frame, because that reveal is what makes this a routing
+puzzle rather than an exploration game. But play framing now **follows the
+player**, a drag pans away from it, and release eases back over ~0.35 s clamped
+to the level's bounding box plus a tile. `ZoomBeat` outranks the follow exactly
+as it outranked the held frame. See
+[ADR-0001](adr/0001-terraces-instead-of-stacked-floors.md) for why.
+
+`TapHold` grows a position to make this possible: a press that travels more than
+the 4.5 mm touch reach becomes a pan and forfeits its tap, and below that
+threshold sliding still re-aims. **The rig still exposes no rotation field**,
+which is what lets #11 copy each badge's rotation once at construction instead
+of billboarding every frame.
 
 **Teardown is one `LevelRoot`**, but the real leak risk is not GameObjects: the
 procedurally generated badge `Texture2D` and `Material` ([#11]) are not
