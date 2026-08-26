@@ -4,11 +4,13 @@ namespace Game.Presentation.Pure
 {
     public readonly struct TapHold : IEquatable<TapHold>
     {
+        readonly bool held;
         readonly bool owns;
         readonly TapGesture gesture;
 
-        TapHold(bool owns, TapGesture gesture)
+        TapHold(bool held, bool owns, TapGesture gesture)
         {
+            this.held = held;
             this.owns = owns;
             this.gesture = gesture;
         }
@@ -16,6 +18,11 @@ namespace Game.Presentation.Pure
         public static TapHold Idle
         {
             get { return default(TapHold); }
+        }
+
+        public bool HoldsAPress
+        {
+            get { return held; }
         }
 
         public bool OwnsThePress
@@ -28,26 +35,28 @@ namespace Game.Presentation.Pure
             get { return gesture; }
         }
 
-        public TapHold Reading(bool pressedNow, bool releasedNow, bool isPressed, bool hovers)
+        public TapHold Reading(bool pressedNow, bool releasedNow, bool isPressed, bool hovers, bool locked)
         {
-            var mine = owns || pressedNow;
+            var holding = held || pressedNow;
+            var mine = owns || (pressedNow && !locked);
 
             if (releasedNow)
             {
-                return new TapHold(false, mine ? TapGesture.Release : TapGesture.Ignore);
+                return new TapHold(
+                    false, false, mine || (holding && locked) ? TapGesture.Release : TapGesture.Ignore);
             }
 
             if (isPressed)
             {
-                return new TapHold(mine, mine ? TapGesture.Aim : TapGesture.Ignore);
+                return new TapHold(holding, mine, mine ? TapGesture.Aim : TapGesture.Ignore);
             }
 
-            return new TapHold(false, hovers ? TapGesture.Aim : TapGesture.Ignore);
+            return new TapHold(false, false, hovers ? TapGesture.Aim : TapGesture.Ignore);
         }
 
         public bool Equals(TapHold other)
         {
-            return owns == other.owns && gesture == other.gesture;
+            return held == other.held && owns == other.owns && gesture == other.gesture;
         }
 
         public override bool Equals(object obj)
@@ -59,13 +68,21 @@ namespace Game.Presentation.Pure
         {
             unchecked
             {
-                return (owns.GetHashCode() * 397) ^ (int)gesture;
+                var hash = held.GetHashCode();
+                hash = (hash * 397) ^ owns.GetHashCode();
+                hash = (hash * 397) ^ (int)gesture;
+                return hash;
             }
         }
 
         public override string ToString()
         {
-            return owns ? gesture + " on a press of its own" : gesture.ToString();
+            if (owns)
+            {
+                return gesture + " on a press of its own";
+            }
+
+            return held ? gesture + " on a press it may not aim" : gesture.ToString();
         }
     }
 }

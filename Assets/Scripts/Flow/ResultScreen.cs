@@ -58,6 +58,8 @@ namespace Game.Flow
 
         InputSystemUIInputModule module;
 
+        BaseInputModule displaced;
+
         TextMeshProUGUI reading;
 
         Button next;
@@ -167,10 +169,19 @@ namespace Game.Flow
                 return;
             }
 
-            if (standing.GetComponent<InputSystemUIInputModule>() == null)
+            if (standing.GetComponent<InputSystemUIInputModule>() != null)
             {
-                module = standing.gameObject.AddComponent<InputSystemUIInputModule>();
+                return;
             }
+
+            var other = standing.GetComponent<BaseInputModule>();
+            if (other != null && other.enabled)
+            {
+                other.enabled = false;
+                displaced = other;
+            }
+
+            module = standing.gameObject.AddComponent<InputSystemUIInputModule>();
         }
 
         static TextMeshProUGUI Write(
@@ -249,6 +260,12 @@ namespace Game.Flow
 
             WorldObjects.Destroy(module);
             module = null;
+
+            if (displaced != null)
+            {
+                displaced.enabled = true;
+                displaced = null;
+            }
 
             reading = null;
             disposed = true;
