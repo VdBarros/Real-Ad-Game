@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Game.Presentation.Pure;
 using UnityEngine;
 
@@ -8,12 +9,17 @@ namespace Game.Presentation
     {
         public const string NamePrefix = "Badge_";
 
-        static readonly string[] ShaderNames =
+        static readonly string[] shaderNames =
         {
             "Universal Render Pipeline/2D/Sprite-Unlit-Default",
             "Sprites/Default",
             "Unlit/Transparent"
         };
+
+        public static IReadOnlyList<string> ShaderNames
+        {
+            get { return shaderNames; }
+        }
 
         readonly Sprite[] byShape;
 
@@ -117,7 +123,7 @@ namespace Game.Presentation
 
         static Shader BadgeShader()
         {
-            foreach (var candidate in ShaderNames)
+            foreach (var candidate in shaderNames)
             {
                 var shader = Shader.Find(candidate);
                 if (shader != null)
