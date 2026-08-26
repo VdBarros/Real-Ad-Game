@@ -5,14 +5,14 @@ namespace Game.Domain
 {
     public readonly struct TilePosition : IEquatable<TilePosition>, IComparable<TilePosition>
     {
-        public TilePosition(int floor, int x, int y)
+        public TilePosition(int elevation, int x, int y)
         {
-            Floor = floor;
+            Elevation = elevation;
             X = x;
             Y = y;
         }
 
-        public int Floor { get; }
+        public int Elevation { get; }
 
         public int X { get; }
 
@@ -20,10 +20,10 @@ namespace Game.Domain
 
         public int CompareTo(TilePosition other)
         {
-            var byFloor = Floor.CompareTo(other.Floor);
-            if (byFloor != 0)
+            var byElevation = Elevation.CompareTo(other.Elevation);
+            if (byElevation != 0)
             {
-                return byFloor;
+                return byElevation;
             }
 
             var byRow = Y.CompareTo(other.Y);
@@ -37,7 +37,7 @@ namespace Game.Domain
 
         public bool Equals(TilePosition other)
         {
-            return Floor == other.Floor && X == other.X && Y == other.Y;
+            return Elevation == other.Elevation && X == other.X && Y == other.Y;
         }
 
         public override bool Equals(object obj)
@@ -49,7 +49,7 @@ namespace Game.Domain
         {
             unchecked
             {
-                var hash = Floor;
+                var hash = Elevation;
                 hash = (hash * 397) ^ X;
                 hash = (hash * 397) ^ Y;
                 return hash;
@@ -60,7 +60,7 @@ namespace Game.Domain
         {
             return string.Concat(
                 "(",
-                Floor.ToString(CultureInfo.InvariantCulture),
+                Elevation.ToString(CultureInfo.InvariantCulture),
                 ":",
                 X.ToString(CultureInfo.InvariantCulture),
                 ",",

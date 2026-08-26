@@ -14,7 +14,7 @@ namespace Game.Domain.Tests
         [Test]
         public void EveryContentNodeWearsOneBadgeAndNothingElseDoes()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = BadgeBlueprintBuilder.Build(graph, StartingPower);
 
             var wearers = graph.Decisions.Nodes
@@ -31,7 +31,7 @@ namespace Game.Domain.Tests
         [Test]
         public void ThePrefixIsTheOnlyDifferenceBetweenAValueAndItsBadge()
         {
-            var blueprint = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoFloors(), StartingPower);
+            var blueprint = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces(), StartingPower);
 
             Assert.That(TextOn(blueprint, NodeType.Additive), Is.EqualTo("+12"));
             Assert.That(TextOn(blueprint, NodeType.Multiplier), Is.EqualTo("x3"));
@@ -43,7 +43,7 @@ namespace Game.Domain.Tests
         [Test]
         public void EnemiesWearAPillAndEverythingElseARoundedRect()
         {
-            var blueprint = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoFloors(), StartingPower);
+            var blueprint = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces(), StartingPower);
 
             foreach (var badge in blueprint.Badges)
             {
@@ -58,7 +58,7 @@ namespace Game.Domain.Tests
         [Test]
         public void EveryBadgeCarriesTheCameraRotationRatherThanFacingTheCameraItself()
         {
-            var blueprint = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoFloors(), StartingPower);
+            var blueprint = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces(), StartingPower);
 
             Assert.That(
                 blueprint.Badges.Select(badge => badge.Rotation).Distinct().ToList(),
@@ -69,7 +69,7 @@ namespace Game.Domain.Tests
         [Test]
         public void ABadgeClearsTheTopOfItsOwnNode()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = BadgeBlueprintBuilder.Build(graph, StartingPower);
 
             foreach (var badge in blueprint.Badges)
@@ -89,31 +89,31 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ABadgeHangsOnTheFloorItsNodeStandsOn()
+        public void ABadgeHangsOnTheTerraceItsNodeStandsOn()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = BadgeBlueprintBuilder.Build(graph, StartingPower);
 
-            var floors = new HashSet<int>();
+            var elevations = new HashSet<int>();
             foreach (var badge in blueprint.Badges)
             {
                 var node = graph.Decisions.Node(badge.NodeId);
 
-                Assert.That(badge.Floor, Is.EqualTo(node.Position.Floor), badge.ToString());
+                Assert.That(badge.Elevation, Is.EqualTo(node.Position.Elevation), badge.ToString());
                 Assert.That(
                     badge.Position.Y,
                     Is.GreaterThan(IsoProjection.Of(node.Position).Y),
                     badge.ToString());
-                floors.Add(badge.Floor);
+                elevations.Add(badge.Elevation);
             }
 
-            Assert.That(floors, Is.EquivalentTo(new[] { 0, 1 }));
+            Assert.That(elevations, Is.EquivalentTo(new[] { 0, 2 }));
         }
 
         [Test]
         public void OnlyThePlayerBadgeIsSizedForTheLargestValueTheLevelCanHold()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = BadgeBlueprintBuilder.Build(graph, StartingPower);
 
             foreach (var badge in blueprint.Badges)
@@ -133,8 +133,8 @@ namespace Game.Domain.Tests
         [Test]
         public void RebuildingFromTheSameGraphIsIdentical()
         {
-            var first = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoFloors(), StartingPower);
-            var second = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoFloors(), StartingPower);
+            var first = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces(), StartingPower);
+            var second = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces(), StartingPower);
 
             Assert.That(second.Badges, Is.EqualTo(first.Badges));
         }
@@ -142,9 +142,9 @@ namespace Game.Domain.Tests
         [Test]
         public void BuildingFromAGraphAssembledBackwardsIsIdentical()
         {
-            var forwards = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoFloors(), StartingPower);
+            var forwards = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces(), StartingPower);
             var backwards = BadgeBlueprintBuilder.Build(
-                LevelGraphFixture.TwoFloorsAssembledBackwards(), StartingPower);
+                LevelGraphFixture.TwoTerracesAssembledBackwards(), StartingPower);
 
             Assert.That(backwards.Badges, Is.EqualTo(forwards.Badges));
         }

@@ -6,7 +6,7 @@ namespace Game.Domain.Tests
 {
     public class ZoomBeatTests
     {
-        static readonly CameraFraming Subject = LevelFraming.CloseUp(new TilePosition(1, 3, 4));
+        static readonly CameraFraming Subject = LevelFraming.CloseUp(new TilePosition(2, 3, 4));
 
         [Test]
         public void NoBeatIsRunningUntilOneIsCutTo()

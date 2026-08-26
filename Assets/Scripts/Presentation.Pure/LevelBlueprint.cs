@@ -7,27 +7,27 @@ namespace Game.Presentation.Pure
     {
         readonly List<WorldPart> allParts;
 
-        public LevelBlueprint(IReadOnlyList<FloorBlueprint> floors)
+        public LevelBlueprint(IReadOnlyList<TerraceBlueprint> terraces)
         {
-            if (floors == null)
+            if (terraces == null)
             {
-                throw new ArgumentNullException(nameof(floors));
+                throw new ArgumentNullException(nameof(terraces));
             }
 
-            Floors = floors;
+            Terraces = terraces;
             RootName = PartNames.Root;
 
             allParts = new List<WorldPart>();
-            foreach (var floor in floors)
+            foreach (var terrace in terraces)
             {
-                allParts.AddRange(floor.Tiles);
-                allParts.AddRange(floor.Nodes);
+                allParts.AddRange(terrace.Tiles);
+                allParts.AddRange(terrace.Nodes);
             }
         }
 
         public string RootName { get; }
 
-        public IReadOnlyList<FloorBlueprint> Floors { get; }
+        public IReadOnlyList<TerraceBlueprint> Terraces { get; }
 
         public IReadOnlyList<WorldPart> AllParts
         {

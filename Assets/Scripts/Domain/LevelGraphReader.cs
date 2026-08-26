@@ -153,15 +153,15 @@ namespace Game.Domain
 
         static TilePosition ReadPosition(JsonScanner scanner)
         {
-            scanner.ExpectMember("floor");
-            var floor = scanner.ReadInt();
+            scanner.ExpectMember("elevation");
+            var elevation = scanner.ReadInt();
             scanner.Expect(',');
             scanner.ExpectMember("x");
             var x = scanner.ReadInt();
             scanner.Expect(',');
             scanner.ExpectMember("y");
             var y = scanner.ReadInt();
-            return new TilePosition(floor, x, y);
+            return new TilePosition(elevation, x, y);
         }
 
         static void ReadArray(JsonScanner scanner, string name, Action readElement)

@@ -21,9 +21,9 @@ namespace Game.Presentation.Pure
 
         public const string Spark = "Spark";
 
-        public static string Floor(int floor)
+        public static string Terrace(int elevation)
         {
-            return "Floor_" + floor.ToString(CultureInfo.InvariantCulture);
+            return "Terrace_" + elevation.ToString(CultureInfo.InvariantCulture);
         }
 
         public static string Tile(TilePosition position)
@@ -64,8 +64,8 @@ namespace Game.Presentation.Pure
         static string Key(TilePosition position)
         {
             return string.Concat(
-                "_f",
-                position.Floor.ToString(CultureInfo.InvariantCulture),
+                "_e",
+                position.Elevation.ToString(CultureInfo.InvariantCulture),
                 "_x",
                 position.X.ToString(CultureInfo.InvariantCulture),
                 "_y",

@@ -78,13 +78,13 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheStartIsADeadEndOnTheGroundFloor()
+        public void TheStartIsADeadEndOnTheGroundTerrace()
         {
             var layout = MazeLayoutGenerator.Generate(Seed, MazePreset.Ship);
             var start = layout.Graph.Decisions.Node(layout.StartNodeId);
 
             Assert.That(start.Type, Is.EqualTo(NodeType.Start));
-            Assert.That(start.Position.Floor, Is.EqualTo(0));
+            Assert.That(start.Position.Elevation, Is.EqualTo(0));
             Assert.That(layout.Graph.Tiles.Neighbours(start.Position).Count, Is.EqualTo(1));
         }
 
@@ -108,29 +108,29 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ATinyLevelIsOneFloorWithNoStairs()
+        public void ATinyLevelIsOneTerraceWithNoStairs()
         {
             var layout = MazeLayoutGenerator.Generate(Seed, MazePreset.Tiny);
 
             Assert.That(layout.Graph.Tiles.Stairs.Count, Is.EqualTo(0));
             foreach (var tile in layout.Graph.Tiles.Tiles)
             {
-                Assert.That(tile.Position.Floor, Is.EqualTo(0));
+                Assert.That(tile.Position.Elevation, Is.EqualTo(0));
             }
         }
 
         [Test]
-        public void AStressLevelStitchesThreeFloorsWithoutStackingTwoStairsOnOneTile()
+        public void AStressLevelStitchesThreeTerracesWithoutStackingTwoStairsOnOneTile()
         {
             var layout = MazeLayoutGenerator.Generate(Seed, MazePreset.Stress);
 
-            var floors = new HashSet<int>();
+            var elevations = new HashSet<int>();
             foreach (var tile in layout.Graph.Tiles.Tiles)
             {
-                floors.Add(tile.Position.Floor);
+                elevations.Add(tile.Position.Elevation);
             }
 
-            Assert.That(floors.Count, Is.EqualTo(3));
+            Assert.That(elevations.Count, Is.EqualTo(3));
             Assert.That(layout.DistanceFromStart.ReachedCount, Is.EqualTo(layout.Graph.Tiles.Tiles.Count));
         }
 
@@ -210,7 +210,7 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void APresetAboveTheGroundFloorMustCarryAStair()
+        public void APresetAboveTheGroundTerraceMustCarryAStair()
         {
             Assert.Throws<ArgumentOutOfRangeException>(
                 () => new MazePreset("stairless", 5, 3, 2, 4, 0.25, 0, 24, 16, 8));

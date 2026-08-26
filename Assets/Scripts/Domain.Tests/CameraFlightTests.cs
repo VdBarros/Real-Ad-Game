@@ -10,7 +10,7 @@ namespace Game.Domain.Tests
 
         static LevelGraph Graph()
         {
-            return LevelGraphFixture.TwoFloors();
+            return LevelGraphFixture.TwoTerraces();
         }
 
         [Test]
@@ -71,8 +71,8 @@ namespace Game.Domain.Tests
         [Test]
         public void TheSameSeedProducesTheSameFlightFrameForFrame()
         {
-            var first = CameraFlight.Over(LevelGraphFixture.TwoFloors());
-            var second = CameraFlight.Over(LevelGraphFixture.TwoFloorsAssembledBackwards());
+            var first = CameraFlight.Over(LevelGraphFixture.TwoTerraces());
+            var second = CameraFlight.Over(LevelGraphFixture.TwoTerracesAssembledBackwards());
 
             while (!first.IsSettled)
             {

@@ -13,7 +13,7 @@ namespace Game.Domain
 
         public TilePosition Upper
         {
-            get { return new TilePosition(Lower.Floor + 1, Lower.X, Lower.Y); }
+            get { return new TilePosition(Lower.Elevation + Terraces.Rise, Lower.X, Lower.Y); }
         }
 
         public static StairLink Between(TilePosition first, TilePosition second)
@@ -21,21 +21,21 @@ namespace Game.Domain
             if (first.X != second.X || first.Y != second.Y)
             {
                 throw new ArgumentException(
-                    "A stair joins the same (x, y) on adjacent floors, but got " + first + " and " + second + ".");
+                    "A stair joins the same (x, y) on consecutive terraces, but got " + first + " and " + second + ".");
             }
 
-            if (first.Floor + 1 == second.Floor)
+            if (first.Elevation + Terraces.Rise == second.Elevation)
             {
                 return new StairLink(first);
             }
 
-            if (second.Floor + 1 == first.Floor)
+            if (second.Elevation + Terraces.Rise == first.Elevation)
             {
                 return new StairLink(second);
             }
 
             throw new ArgumentException(
-                "A stair joins adjacent floors, but got " + first + " and " + second + ".");
+                "A stair joins consecutive terraces, but got " + first + " and " + second + ".");
         }
 
         public bool Equals(StairLink other)

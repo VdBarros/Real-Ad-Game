@@ -16,7 +16,7 @@ namespace Game.Domain
             string name,
             int latticeWidth,
             int latticeHeight,
-            int floors,
+            int terraces,
             int regions,
             double braidFactor,
             int stairs,
@@ -31,7 +31,7 @@ namespace Game.Domain
 
             RequirePositive(latticeWidth, nameof(latticeWidth));
             RequirePositive(latticeHeight, nameof(latticeHeight));
-            RequirePositive(floors, nameof(floors));
+            RequirePositive(terraces, nameof(terraces));
             RequirePositive(regions, nameof(regions));
             RequirePositive(contentSlots, nameof(contentSlots));
 
@@ -46,10 +46,10 @@ namespace Game.Domain
                 throw new ArgumentOutOfRangeException(nameof(stairs), stairs, "A preset cannot ask for fewer than no stairs.");
             }
 
-            if (floors > 1 && stairs < 1)
+            if (terraces > 1 && stairs < 1)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(stairs), stairs, "Floors above the ground are reachable only by stair.");
+                    nameof(stairs), stairs, "A terrace above the ground is reachable only by stair.");
             }
 
             if (minimumBossDepth < 0)
@@ -67,7 +67,7 @@ namespace Game.Domain
             Name = name;
             LatticeWidth = latticeWidth;
             LatticeHeight = latticeHeight;
-            Floors = floors;
+            Terraces = terraces;
             Regions = regions;
             BraidFactor = braidFactor;
             Stairs = stairs;
@@ -82,7 +82,7 @@ namespace Game.Domain
 
         public int LatticeHeight { get; }
 
-        public int Floors { get; }
+        public int Terraces { get; }
 
         public int Regions { get; }
 
@@ -96,9 +96,9 @@ namespace Game.Domain
 
         public int MinimumOffPathSlots { get; }
 
-        public int RegionsPerFloor
+        public int RegionsPerTerrace
         {
-            get { return Math.Max(1, (int)Math.Floor((double)Regions / Floors + 0.5)); }
+            get { return Math.Max(1, (int)Math.Floor((double)Regions / Terraces + 0.5)); }
         }
 
         public static MazePreset Named(string name)

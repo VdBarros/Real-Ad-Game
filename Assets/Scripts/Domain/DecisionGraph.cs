@@ -39,7 +39,7 @@ namespace Game.Domain
                 if (index > 0 && this.nodes[index - 1].Position.CompareTo(this.nodes[index].Position) >= 0)
                 {
                     throw new ArgumentException(
-                        "Ids are assigned by a (floor, y, x) sweep, so node " + index + " at "
+                        "Ids are assigned by an (elevation, y, x) sweep, so node " + index + " at "
                         + this.nodes[index].Position + " cannot follow "
                         + this.nodes[index - 1].Position + ".",
                         nameof(nodes));

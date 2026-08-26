@@ -18,13 +18,13 @@ namespace Game.Presentation.Pure
             switch (side)
             {
                 case TileSide.North:
-                    return new TilePosition(position.Floor, position.X, position.Y + 1);
+                    return new TilePosition(position.Elevation, position.X, position.Y + 1);
                 case TileSide.East:
-                    return new TilePosition(position.Floor, position.X + 1, position.Y);
+                    return new TilePosition(position.Elevation, position.X + 1, position.Y);
                 case TileSide.South:
-                    return new TilePosition(position.Floor, position.X, position.Y - 1);
+                    return new TilePosition(position.Elevation, position.X, position.Y - 1);
                 case TileSide.West:
-                    return new TilePosition(position.Floor, position.X - 1, position.Y);
+                    return new TilePosition(position.Elevation, position.X - 1, position.Y);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(side), side, "A tile has four sides.");
             }

@@ -8,14 +8,15 @@ namespace Game.Domain
         public static void Paint(long seed, MazePreset preset, LayoutPlan plan)
         {
             var topology = plan.Topology;
-            var perFloor = preset.RegionsPerFloor;
+            var perTerrace = preset.RegionsPerTerrace;
 
-            for (var floor = 0; floor < preset.Floors; floor++)
+            for (var terrace = 0; terrace < preset.Terraces; terrace++)
             {
-                var onThisFloor = topology.TilesOnFloor(floor);
-                var random = StageRandom.ForStage(seed, "regions:" + floor);
-                var sources = FarthestApart(random, topology, onThisFloor, perFloor);
-                var baseRegionId = floor * perFloor;
+                var elevation = Terraces.ElevationOf(terrace);
+                var onThisTerrace = topology.TilesAtElevation(elevation);
+                var random = StageRandom.ForStage(seed, "regions:" + terrace);
+                var sources = FarthestApart(random, topology, onThisTerrace, perTerrace);
+                var baseRegionId = terrace * perTerrace;
 
                 var queue = new List<int>();
                 for (var source = 0; source < sources.Count; source++)
@@ -29,7 +30,7 @@ namespace Game.Domain
                     var current = queue[head];
                     foreach (var neighbour in topology.Neighbours[current])
                     {
-                        if (topology.FloorOf(neighbour) != floor || plan.RegionOf(neighbour) >= 0)
+                        if (topology.ElevationOf(neighbour) != elevation || plan.RegionOf(neighbour) >= 0)
                         {
                             continue;
                         }
@@ -39,7 +40,7 @@ namespace Game.Domain
                     }
                 }
 
-                foreach (var tile in onThisFloor)
+                foreach (var tile in onThisTerrace)
                 {
                     if (plan.RegionOf(tile) < 0)
                     {
