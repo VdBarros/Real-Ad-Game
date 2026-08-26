@@ -193,6 +193,31 @@ namespace Game.Interaction
             }
         }
 
+        public void LookAt(ScreenPoint finger)
+        {
+            RequireARun();
+            Cancel();
+
+            if (rig.IsBusy || IsLocked)
+            {
+                return;
+            }
+
+            rig.Look(ScreenProjection.Drag(rig.Framing.OrthographicSize, hold.Origin, finger, FrameHeight));
+        }
+
+        public void LookBack()
+        {
+            RequireARun();
+
+            if (rig.IsBusy)
+            {
+                return;
+            }
+
+            rig.LookBack();
+        }
+
         public void Cancel()
         {
             if (!Preview.IsAimed)
@@ -210,6 +235,35 @@ namespace Game.Interaction
             }
         }
 
+        public void Reading(bool pressedNow, bool releasedNow, bool isPressed, bool hovers, ScreenPoint finger)
+        {
+            RequireARun();
+
+            hold = hold.Reading(
+                pressedNow, releasedNow, isPressed, hovers, IsLocked || rig.IsBusy, finger, Reach);
+
+            switch (hold.Gesture)
+            {
+                case TapGesture.Aim:
+                    AimAt(finger);
+                    return;
+                case TapGesture.Pan:
+                    if (hold.HoldsAPress)
+                    {
+                        LookAt(finger);
+                    }
+                    else
+                    {
+                        LookBack();
+                    }
+
+                    return;
+                case TapGesture.Release:
+                    ReleaseAt(finger);
+                    return;
+            }
+        }
+
         void Update()
         {
             var pointer = Pointer.current;
@@ -218,28 +272,14 @@ namespace Game.Interaction
                 return;
             }
 
-            hold = hold.Reading(
+            var position = pointer.position.ReadValue();
+
+            Reading(
                 pointer.press.wasPressedThisFrame,
                 pointer.press.wasReleasedThisFrame,
                 pointer.press.isPressed,
                 pointer is Mouse,
-                IsLocked || rig.IsBusy);
-
-            if (hold.Gesture == TapGesture.Ignore)
-            {
-                return;
-            }
-
-            var position = pointer.position.ReadValue();
-            var finger = new ScreenPoint(position.x, position.y);
-
-            if (hold.Gesture == TapGesture.Release)
-            {
-                ReleaseAt(finger);
-                return;
-            }
-
-            AimAt(finger);
+                new ScreenPoint(position.x, position.y));
         }
 
         void RequireARun()

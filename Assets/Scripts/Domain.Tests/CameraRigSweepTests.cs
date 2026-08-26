@@ -15,6 +15,8 @@ namespace Game.Domain.Tests
 
         const int FrameCap = 1200;
 
+        const float Horizon = 1000f;
+
         static List<LevelGraph> sweep;
 
         static IReadOnlyList<LevelGraph> Sweep()
@@ -38,6 +40,7 @@ namespace Game.Domain.Tests
         {
             var openings = new List<float>(Seeds);
             var follows = new List<float>(Seeds);
+            var returns = new List<float>(Seeds);
             var worst = 0f;
             long worstSeed = 0;
             var worstLeg = "opening";
@@ -83,17 +86,46 @@ namespace Game.Domain.Tests
                     worstSeed = graph.Seed;
                     worstLeg = "follow";
                 }
+
+                var came = 0f;
+                foreach (var pull in Compass())
+                {
+                    staging = staging.Looks(pull).LooksBack();
+                    previous = staging.Framing;
+
+                    for (var frame = 0; frame < FrameCap && !staging.IsSettled; frame++)
+                    {
+                        staging = staging.Advanced(Frame);
+                        came = Math.Max(came, ScreenFrame.PanPixels(previous, staging.Framing) / Frame);
+                        previous = staging.Framing;
+                    }
+
+                    Assert.That(
+                        staging.Framing,
+                        Is.EqualTo(LevelFraming.Play(staging.Subject)),
+                        "Seed " + graph.Seed + " let go of a drag and never came back to the player.");
+                }
+
+                returns.Add(came);
+                if (came > worst)
+                {
+                    worst = came;
+                    worstSeed = graph.Seed;
+                    worstLeg = "return";
+                }
             }
 
             openings.Sort();
             follows.Sort();
+            returns.Sort();
 
             Console.WriteLine(
                 "ship, " + Seeds + " seeds, opening over " + CameraFlight.Duration
                 + " s (" + CameraFlight.Seconds + " reveal, " + CameraFlight.HoldSeconds
-                + " hold) and then a follow settling onto the player");
+                + " hold), a follow settling onto the player, and a drag to each of eight horizons let go of");
             Console.WriteLine("  opening peak pan median  " + openings[openings.Count / 2].ToString("0") + " px/s");
             Console.WriteLine("  follow peak pan median   " + follows[follows.Count / 2].ToString("0") + " px/s");
+            Console.WriteLine("  return peak pan median   " + returns[returns.Count / 2].ToString("0") + " px/s");
             Console.WriteLine(
                 "  worst anywhere           " + worst.ToString("0") + " px/s on the " + worstLeg
                 + " of seed " + worstSeed);
@@ -223,6 +255,24 @@ namespace Game.Domain.Tests
             Console.WriteLine(
                 "  " + offAtPlay + " of " + Seeds
                 + " seeds run off a play-sized frame, which is why the camera follows rather than holds");
+        }
+
+        static IEnumerable<WorldPoint> Compass()
+        {
+            var right = IsoProjection.CameraRight;
+            var up = IsoProjection.CameraUp;
+
+            for (var step = 0; step < 8; step++)
+            {
+                var angle = step * Math.PI * 0.25;
+                var across = (float)Math.Cos(angle) * Horizon;
+                var along = (float)Math.Sin(angle) * Horizon;
+
+                yield return new WorldPoint(
+                    right.X * across + up.X * along,
+                    right.Y * across + up.Y * along,
+                    right.Z * across + up.Z * along);
+            }
         }
 
         static bool Spills(LevelGraph graph, CameraFraming framing)

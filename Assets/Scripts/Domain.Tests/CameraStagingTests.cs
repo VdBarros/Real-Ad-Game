@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Game.Presentation.Pure;
 using NUnit.Framework;
 
@@ -27,6 +29,54 @@ namespace Game.Domain.Tests
         static CameraStaging Playing(LevelGraph graph)
         {
             return Rested(CameraStaging.Over(graph).Skipped());
+        }
+
+        static WorldPoint Up(float metres)
+        {
+            return Times(IsoProjection.CameraUp, metres);
+        }
+
+        static WorldPoint Times(WorldPoint direction, float metres)
+        {
+            return new WorldPoint(direction.X * metres, direction.Y * metres, direction.Z * metres);
+        }
+
+        static IEnumerable<WorldPoint> Compass(float metres)
+        {
+            var right = IsoProjection.CameraRight;
+            var up = IsoProjection.CameraUp;
+
+            for (var step = 0; step < 8; step++)
+            {
+                var angle = step * Math.PI * 0.25;
+                var across = (float)Math.Cos(angle) * metres;
+                var along = (float)Math.Sin(angle) * metres;
+
+                yield return new WorldPoint(
+                    right.X * across + up.X * along,
+                    right.Y * across + up.Y * along,
+                    right.Z * across + up.Z * along);
+            }
+        }
+
+        static bool Shows(LevelGraph graph, CameraFraming framing)
+        {
+            var acrossHalf = framing.OrthographicSize * ScreenFrame.Width / ScreenFrame.Height;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                var point = IsoProjection.Of(tile.Position);
+                var apart = new WorldPoint(
+                    point.X - framing.Target.X, point.Y - framing.Target.Y, point.Z - framing.Target.Z);
+
+                if (Math.Abs(WorldPoint.Dot(apart, IsoProjection.CameraRight)) <= acrossHalf
+                    && Math.Abs(WorldPoint.Dot(apart, IsoProjection.CameraUp)) <= framing.OrthographicSize)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         [Test]
@@ -182,6 +232,108 @@ namespace Game.Domain.Tests
 
             Assert.That(() => flying.CutTo(Multiplier), Throws.InstanceOf<System.InvalidOperationException>());
             Assert.That(flying.Skipped().CutTo(Multiplier).IsBusy, Is.True);
+        }
+
+        [Test]
+        public void ADragLooksAwayFromThePlayerAndStaysThereWhileTheFingerIsDown()
+        {
+            var graph = Graph();
+            var staging = Playing(graph);
+            var player = staging.Framing;
+            var looking = staging.Looks(Up(4f));
+
+            Assert.That(
+                ScreenFrame.PanPixels(player, looking.Framing),
+                Is.GreaterThan(0f),
+                "A drag left the camera where it already was.");
+
+            for (var frame = 0; frame < 120; frame++)
+            {
+                looking = looking.Advanced(Frame);
+                Assert.That(
+                    looking.Framing,
+                    Is.EqualTo(staging.Looks(Up(4f)).Framing),
+                    "The camera crept back to the player while the finger was still down.");
+            }
+        }
+
+        [Test]
+        public void ReleasingADragEasesBackOntoThePlayerRatherThanCuttingToThem()
+        {
+            var graph = Graph();
+            var player = Playing(graph).Framing;
+            var staging = Playing(graph).Looks(Up(4f)).LooksBack();
+
+            var frames = 0;
+            var apart = ScreenFrame.PanPixels(staging.Framing, player);
+
+            Assert.That(apart, Is.GreaterThan(0f));
+
+            while (!staging.IsSettled && frames < 1200)
+            {
+                staging = staging.Advanced(Frame);
+                frames++;
+
+                var closer = ScreenFrame.PanPixels(staging.Framing, player);
+                Assert.That(closer, Is.LessThanOrEqualTo(apart));
+                apart = closer;
+            }
+
+            Assert.That(frames, Is.GreaterThan(12), "The camera cut back to the player rather than easing.");
+            Assert.That(staging.Framing, Is.EqualTo(player));
+        }
+
+        [Test]
+        public void NoDragCanLoseTheLevelOffTheEdgeOfTheWorld()
+        {
+            var graph = Graph();
+            var staging = Playing(graph);
+
+            foreach (var offset in Compass(1000f))
+            {
+                var looking = staging.Looks(offset);
+
+                Assert.That(
+                    ScreenFrame.PanPixels(staging.Framing, looking.Framing),
+                    Is.GreaterThan(0f),
+                    "A drag of " + offset + " moved the camera nowhere at all.");
+                Assert.That(
+                    Shows(graph, looking.Framing),
+                    Is.True,
+                    "A drag of " + offset + " left no tile of the level on screen.");
+            }
+        }
+
+        [Test]
+        public void ADragTakesTheCameraNoFurtherThanTheLevelAllowsHoweverHardItIsPulled()
+        {
+            var graph = Graph();
+            var staging = Playing(graph);
+
+            foreach (var offset in Compass(1f))
+            {
+                var far = staging.Looks(Times(offset, 50f));
+                var further = staging.Looks(Times(offset, 5000f));
+
+                Assert.That(
+                    ScreenFrame.PanPixels(far.Framing, further.Framing),
+                    Is.LessThan(1f),
+                    "Pulling a hundred times harder in the direction " + offset + " bought more of the world.");
+            }
+        }
+
+        [Test]
+        public void ABeatStillOutranksACameraTheFingerIsHoldingAway()
+        {
+            var graph = Graph();
+            var standing = IsoProjection.Of(Multiplier);
+            var staging = Rested(Playing(graph).Follows(standing)).Looks(Up(4f)).CutTo(Multiplier);
+
+            Assert.That(staging.Framing, Is.EqualTo(LevelFraming.CloseUp(Multiplier)));
+
+            staging = staging.Advanced(ZoomBeat.CapSeconds).LooksBack();
+
+            Assert.That(Rested(staging).Framing, Is.EqualTo(LevelFraming.Play(standing)));
         }
 
         [Test]

@@ -66,15 +66,19 @@ namespace Game.Presentation
         public void Follow(WorldPoint subject)
         {
             RequireALevel();
+            Stage(staging.Follows(subject));
+        }
 
-            var following = staging.Follows(subject);
-            if (following.Equals(staging))
-            {
-                return;
-            }
+        public void Look(WorldPoint offset)
+        {
+            RequireALevel();
+            Stage(staging.Looks(offset));
+        }
 
-            staging = following;
-            Apply();
+        public void LookBack()
+        {
+            RequireALevel();
+            Stage(staging.LooksBack());
         }
 
         public void CutTo(TilePosition position)
@@ -120,6 +124,17 @@ namespace Game.Presentation
         void Update()
         {
             Advance(Time.deltaTime);
+        }
+
+        void Stage(CameraStaging wanted)
+        {
+            if (wanted.Equals(staging))
+            {
+                return;
+            }
+
+            staging = wanted;
+            Apply();
         }
 
         void RequireALevel()

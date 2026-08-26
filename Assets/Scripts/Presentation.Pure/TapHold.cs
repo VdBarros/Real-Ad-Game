@@ -6,13 +6,17 @@ namespace Game.Presentation.Pure
     {
         readonly bool held;
         readonly bool owns;
+        readonly bool strayed;
         readonly TapGesture gesture;
+        readonly ScreenPoint origin;
 
-        TapHold(bool held, bool owns, TapGesture gesture)
+        TapHold(bool held, bool owns, bool strayed, TapGesture gesture, ScreenPoint origin)
         {
             this.held = held;
             this.owns = owns;
+            this.strayed = strayed;
             this.gesture = gesture;
+            this.origin = origin;
         }
 
         public static TapHold Idle
@@ -35,28 +39,60 @@ namespace Game.Presentation.Pure
             get { return gesture; }
         }
 
-        public TapHold Reading(bool pressedNow, bool releasedNow, bool isPressed, bool hovers, bool locked)
+        public ScreenPoint Origin
+        {
+            get { return origin; }
+        }
+
+        public TapHold Reading(
+            bool pressedNow,
+            bool releasedNow,
+            bool isPressed,
+            bool hovers,
+            bool locked,
+            ScreenPoint finger,
+            float reach)
         {
             var holding = held || pressedNow;
             var mine = owns || (pressedNow && !locked);
+            var from = pressedNow ? finger : origin;
+            var wandered = strayed || (holding && ScreenPoint.Distance(from, finger) > reach);
 
             if (releasedNow)
             {
+                if (mine && wandered)
+                {
+                    return new TapHold(false, false, false, TapGesture.Pan, finger);
+                }
+
                 return new TapHold(
-                    false, false, mine || (holding && locked) ? TapGesture.Release : TapGesture.Ignore);
+                    false,
+                    false,
+                    false,
+                    mine || (holding && locked) ? TapGesture.Release : TapGesture.Ignore,
+                    finger);
             }
 
             if (isPressed)
             {
-                return new TapHold(holding, mine, mine ? TapGesture.Aim : TapGesture.Ignore);
+                if (!mine)
+                {
+                    return new TapHold(holding, false, wandered, TapGesture.Ignore, from);
+                }
+
+                return new TapHold(holding, true, wandered, wandered ? TapGesture.Pan : TapGesture.Aim, from);
             }
 
-            return new TapHold(false, false, hovers ? TapGesture.Aim : TapGesture.Ignore);
+            return new TapHold(false, false, false, hovers ? TapGesture.Aim : TapGesture.Ignore, finger);
         }
 
         public bool Equals(TapHold other)
         {
-            return held == other.held && owns == other.owns && gesture == other.gesture;
+            return held == other.held
+                && owns == other.owns
+                && strayed == other.strayed
+                && gesture == other.gesture
+                && origin.Equals(other.origin);
         }
 
         public override bool Equals(object obj)
@@ -70,7 +106,9 @@ namespace Game.Presentation.Pure
             {
                 var hash = held.GetHashCode();
                 hash = (hash * 397) ^ owns.GetHashCode();
+                hash = (hash * 397) ^ strayed.GetHashCode();
                 hash = (hash * 397) ^ (int)gesture;
+                hash = (hash * 397) ^ origin.GetHashCode();
                 return hash;
             }
         }
@@ -79,7 +117,7 @@ namespace Game.Presentation.Pure
         {
             if (owns)
             {
-                return gesture + " on a press of its own";
+                return gesture + " on a press of its own from " + origin;
             }
 
             return held ? gesture + " on a press it may not aim" : gesture.ToString();
