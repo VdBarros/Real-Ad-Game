@@ -29,10 +29,22 @@ stored. Consecutive terraces are offset by `(Δ, Δ)` tiles — chosen so their
 footprints are disjoint with an unowned row between them — and lifted two steps,
 so a terrace floats above and behind the one before it with nothing underneath.
 
-A **staircase** is an ordinary run of walkable tiles climbing one step per tile
-from the lower terrace's far edge to the upper terrace's near edge. It is not a
-special adjacency: `TileGrid.Neighbours` is four-neighbour and nothing else, and
-`StairLink` is gone along with the zero-length corridor it used to justify.
+A **staircase** is an ordinary run of walkable tiles from the lower terrace's far
+edge to the upper terrace's near edge, one step up at each end. It is not a
+special adjacency: `TileGrid.Neighbours` is four-neighbour in `(x, y)` and
+nothing else — it no longer asks the two tiles to share an elevation, which is
+what lets a staircase tile be walked onto — and nothing is joined by a
+`StairLink` any more.
+
+Where a staircase bends, it bends one row **above** the unowned row rather than
+along it. The unowned row lies against the lower terrace's far row for its whole
+length, so a run along it would pick up a neighbour at every column and read as a
+ledge rather than a flight of steps; a run one row higher — in the strip that is
+beside the terrace above and beyond the terrace below — touches nothing but its
+own two ends. With a single unowned row there is no third place to put it, and Δ
+is not free to grow into one: Δ = 2·`latticeHeight` is at once the smallest
+offset that holds the footprints apart and the largest that leaves any column
+lined up at all.
 
 ## Considered options
 
@@ -82,6 +94,14 @@ terrace it leaves, so the upper terrace's `P_min` still reads as power on
 arrival. Staircase tiles have corridor-degree two, so they stay corridor tiles
 for free — but they must be excluded from slot candidacy explicitly, or content
 gets minted standing halfway up a flight of stairs.
+
+What does change is where a terrace is entered from below. A way up can only
+leave the far row of a terrace, so climbing now happens at the back rather than
+wherever a stair happened to land. Boss depth rises — `BossTooShallow` rejections
+fall from 140 to 2 over 5000 `ship` seeds — and the cheapest way into the terrace
+above gets dearer, so the median region's `P_max/P_min` spread halves from 48 to
+24.5. The power reasoning is untouched; the levels it reasons about are not the
+same levels.
 
 The serialized member `"floor"` becomes `"elevation"`. There are no golden files
 on disk; `LevelGraphDocumentTests` builds its expected document inline.

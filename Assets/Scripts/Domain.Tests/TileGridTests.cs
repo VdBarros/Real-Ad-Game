@@ -49,31 +49,45 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void OnlyAStairJoinsTheSameColumnOnConsecutiveTerraces()
+        public void AStaircaseTileIsANeighbourBecauseItsPlaceIsAdjacentAndForNoOtherReason()
         {
-            var lower = new TilePosition(elevation: 0, x: 3, y: 5);
-            var upper = new TilePosition(elevation: 2, x: 3, y: 5);
+            var foot = new TilePosition(elevation: 0, x: 3, y: 5);
+            var step = new TilePosition(elevation: 1, x: 3, y: 6);
+            var head = new TilePosition(elevation: 2, x: 3, y: 7);
             var grid = new TileGrid(
                 new[]
                 {
-                    new Tile(lower, regionId: 0),
+                    new Tile(foot, regionId: 0),
                     new Tile(new TilePosition(elevation: 0, x: 4, y: 5), regionId: 0),
-                    new Tile(upper, regionId: 1),
-                    new Tile(new TilePosition(elevation: 2, x: 4, y: 5), regionId: 1)
+                    new Tile(step, regionId: 0),
+                    new Tile(head, regionId: 1),
+                    new Tile(new TilePosition(elevation: 2, x: 4, y: 7), regionId: 1)
                 },
-                new[] { StairLink.Between(lower, upper) });
+                Array.Empty<StairLink>());
 
             Assert.That(
-                grid.Neighbours(lower),
-                Is.EqualTo(new[] { new TilePosition(elevation: 0, x: 4, y: 5), upper }));
+                grid.Neighbours(foot),
+                Is.EqualTo(new[] { new TilePosition(elevation: 0, x: 4, y: 5), step }));
+
+            Assert.That(grid.Neighbours(step), Is.EqualTo(new[] { foot, head }));
 
             Assert.That(
-                grid.Neighbours(upper),
-                Is.EqualTo(new[] { lower, new TilePosition(elevation: 2, x: 4, y: 5) }));
+                grid.Neighbours(head),
+                Is.EqualTo(new[] { step, new TilePosition(elevation: 2, x: 4, y: 7) }));
+        }
 
+        [Test]
+        public void TwoTilesCannotStandInTheSamePlace()
+        {
             Assert.That(
-                grid.Neighbours(new TilePosition(elevation: 0, x: 4, y: 5)),
-                Is.EqualTo(new[] { lower }));
+                () => new TileGrid(
+                    new[]
+                    {
+                        new Tile(new TilePosition(elevation: 0, x: 3, y: 5), regionId: 0),
+                        new Tile(new TilePosition(elevation: 2, x: 3, y: 5), regionId: 1)
+                    },
+                    Array.Empty<StairLink>()),
+                Throws.ArgumentException);
         }
 
         [Test]
@@ -89,23 +103,19 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TilesAndStairsAreHeldInSweepOrderWhateverOrderTheyArrivedIn()
+        public void TilesAreHeldInSweepOrderWhateverOrderTheyArrivedIn()
         {
             var grid = new TileGrid(
                 new[]
                 {
                     new Tile(new TilePosition(elevation: 0, x: 2, y: 1), regionId: 7),
-                    new Tile(new TilePosition(elevation: 2, x: 2, y: 0), regionId: 9),
+                    new Tile(new TilePosition(elevation: 2, x: 2, y: 8), regionId: 9),
                     new Tile(new TilePosition(elevation: 0, x: 1, y: 0), regionId: 7),
                     new Tile(new TilePosition(elevation: 0, x: 2, y: 0), regionId: 7),
-                    new Tile(new TilePosition(elevation: 2, x: 1, y: 0), regionId: 9),
+                    new Tile(new TilePosition(elevation: 2, x: 1, y: 8), regionId: 9),
                     new Tile(new TilePosition(elevation: 0, x: 1, y: 1), regionId: 7)
                 },
-                new[]
-                {
-                    new StairLink(new TilePosition(elevation: 0, x: 2, y: 0)),
-                    new StairLink(new TilePosition(elevation: 0, x: 1, y: 0))
-                });
+                Array.Empty<StairLink>());
 
             Assert.That(
                 grid.Tiles,
@@ -115,16 +125,8 @@ namespace Game.Domain.Tests
                     new Tile(new TilePosition(elevation: 0, x: 2, y: 0), regionId: 7),
                     new Tile(new TilePosition(elevation: 0, x: 1, y: 1), regionId: 7),
                     new Tile(new TilePosition(elevation: 0, x: 2, y: 1), regionId: 7),
-                    new Tile(new TilePosition(elevation: 2, x: 1, y: 0), regionId: 9),
-                    new Tile(new TilePosition(elevation: 2, x: 2, y: 0), regionId: 9)
-                }));
-
-            Assert.That(
-                grid.Stairs,
-                Is.EqualTo(new[]
-                {
-                    new StairLink(new TilePosition(elevation: 0, x: 1, y: 0)),
-                    new StairLink(new TilePosition(elevation: 0, x: 2, y: 0))
+                    new Tile(new TilePosition(elevation: 2, x: 1, y: 8), regionId: 9),
+                    new Tile(new TilePosition(elevation: 2, x: 2, y: 8), regionId: 9)
                 }));
         }
     }

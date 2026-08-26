@@ -63,7 +63,7 @@ namespace Game.Domain
                 return false;
             }
 
-            var plan = new LayoutPlan(topology, start);
+            var plan = new LayoutPlan(topology, start, carved.StaircaseTiles);
             RegionPainter.Paint(seed, preset, plan);
 
             rejection = SlotSelector.Fill(

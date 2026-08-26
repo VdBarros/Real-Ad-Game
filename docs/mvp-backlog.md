@@ -323,11 +323,17 @@ recipe's counts exact.
 | `D_min` | — | **16** | — |
 
 `ship`'s `D_min` was lowered from 20 to 16 on measured rejection rates ([#7]).
-The carve alone already spends ~11% of `ship` seeds and ~32% of `tiny` seeds;
+The carve alone already spends ~10% of `ship` seeds and ~32% of `tiny` seeds;
 envelope rejections stack on top, so the **combined** rate is what has to stay
-sane. Measured on `ship`: **443/500** seeds accepted on the first attempt, and
-of the 57 rejections **1** came from content placement — so the 89% is the
-*combined* rate, and placement alone passes 443 of the 444 seeds that reach it.
+sane. Re-measured on `ship` after terracing ([#58]): **441/500** seeds accepted
+on the first attempt against 443/500 before, and over 5000 seeds **12.0%** of
+attempts rejected against 10.91% before, with no new rejection reason. `tiny` is
+one terrace and is unchanged to the seed: 43.11% of attempts either way.
+Terracing moves the reasons around rather than adding to them — `BossTooShallow`
+falls from 140 to 2 because a way up now sits at the back of a terrace, and
+`TooFewOffPathSlots` rises from 442 to 561 for the same reason. That same shift
+halves what routing is worth: the median region's `P_max/P_min` spread falls
+from 48 to 24.5. Nothing in the power reasoning changed; the levels did.
 
 `tiny` counts **11** content nodes, not 12. #8's recipe — 1 boss, 3
 multipliers, 5 enemies, 2 additives — totals 11, and `Start` is geometric
@@ -356,18 +362,36 @@ forced order; at 1.0 it is 3% gates and no puzzle. **0.25 gives ~30% gates and
 A tile becomes a decision node when its corridor-degree is not 2, or it is the
 start. Junctions promote to never-consumed `Empty` nodes. **There is no
 exemption from the empty-path assertion**, because there is no longer a
-zero-length corridor: a staircase is a run of ordinary walkable tiles climbing
-one step each, from a lower terrace's far edge to the next terrace's near edge,
-and its tiles have corridor-degree 2 like any other corridor tile. The tile at
-the foot gains a neighbour and so promotes to a junction on its own.
+zero-length corridor: a staircase is a run of ordinary walkable tiles from a
+lower terrace's far edge to the next terrace's near edge, and its tiles have
+corridor-degree 2 like any other corridor tile. The tile at the foot gains a
+neighbour and so promotes to a junction on its own.
+
+A way up leaves from the far row of the lower terrace, at a lattice column
+chosen at least three cells from every other way up over the same gap. Where the
+column already lines up with a column of the terrace above — Δ/2 ≤ c ≤ W−1 —
+the staircase is a **single tile** in the unowned row. Where it does not, the
+staircase steps into the unowned row and then runs level along the row **above**
+it, which is the terrace above's near row extended sideways into empty space,
+until it reaches that terrace's leading column. It cannot instead run along the
+unowned row itself: that row is adjacent to the lower terrace's far row along
+its whole length, so every tile of such a run would gain neighbours and the
+staircase would become a ledge rather than a flight of steps. Running one row
+higher, a staircase touches nothing but its own two ends. Successive ways up over
+one gap take successive landing rows, leftmost highest, so their runs never
+cross; they therefore arrive spread down the leading column of the terrace above
+rather than piled into its corner. The L costs ~4 tiles per staircase (~8 for
+`ship`, +13%); confining staircases to the straight-run window would put both of
+`ship`'s next to each other, and two adjacent staircases are not a routing
+choice. Measured: confining them costs 6 points of layout acceptance
+(839/1000 against 902/1000) and lifts the mean gate ratio to 0.42, where the L
+holds it at 0.35 against 0.31 before terracing.
 
 Staircase tiles must be **excluded from slot candidacy explicitly**.
 `SlotSelector` draws candidates from every second tile of a corridor run, and a
 staircase is a corridor run — without the exclusion, content is minted standing
-halfway up a flight of stairs. A staircase runs in an L when the terraces' `x`
-ranges do not line up, which costs ~4 tiles per staircase (~8 for `ship`, +13%);
-confining staircases to the straight-run window would put both of `ship`'s next
-to each other, and two adjacent staircases are not a routing choice.
+halfway up a flight of stairs. A staircase belongs to the region of the terrace
+it **leaves**, so the region boundary sits at the top of the climb.
 
 ---
 

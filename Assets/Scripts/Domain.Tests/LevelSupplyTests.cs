@@ -8,7 +8,7 @@ namespace Game.Domain.Tests
     {
         const long Opening = 20250825L;
 
-        const long RetryingOpening = 1L;
+        const long RetryingOpening = 12L;
 
         const int Cycles = 20;
 

@@ -44,18 +44,23 @@ carry no state and enter no reasoning about power.
 
 ## Terrace
 
-Every tile at one elevation, taken together. A terrace is read off the tiles
-rather than stored, and consecutive terraces never share an `(x, y)`: each sits
-above and behind the one before it with an unowned row between them and nothing
-underneath. The impression of having climbed a floor is all a terrace is.
+Every tile at one terrace elevation, taken together. A terrace is read off the
+tiles rather than stored, and consecutive terraces never share an `(x, y)`: each
+sits above and behind the one before it with an unowned row between them and
+nothing underneath. A staircase's tiles stand at the odd elevation between two
+terraces and are on neither. The impression of having climbed a floor is all a
+terrace is.
 _Avoid_: floor, storey, tier.
 
 ## Staircase
 
-The run of tiles climbing one step each from a lower terrace's far edge to the
-next terrace's near edge. A staircase is ordinary walkable corridor — no
-adjacency of its own, never a slot, and never a decision node, since its tiles
-have corridor-degree two like any other corridor tile.
+The run of tiles that climbs from a lower terrace's far edge to the next
+terrace's near edge, one step up at each end and level in between. It bends into
+an L where the two terraces' columns do not line up, running through the space
+that is beside the terrace above and beyond the terrace below, so that it is
+never beside anything but its own two ends. A staircase is ordinary walkable
+corridor — no adjacency of its own, never a slot, and never a decision node,
+since its tiles have corridor-degree two like any other corridor tile.
 _Avoid_: stair, stair link, ramp.
 
 ## Corridor

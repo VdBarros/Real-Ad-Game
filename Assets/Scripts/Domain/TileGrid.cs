@@ -6,6 +6,7 @@ namespace Game.Domain
     public sealed class TileGrid : IEquatable<TileGrid>
     {
         readonly Dictionary<TilePosition, int> regionByPosition;
+        readonly Dictionary<long, TilePosition> tileByPlace;
         readonly Dictionary<TilePosition, TilePosition> stairPartnerByPosition;
         readonly List<Tile> orderedTiles;
         readonly List<StairLink> orderedStairs;
@@ -23,6 +24,7 @@ namespace Game.Domain
             }
 
             regionByPosition = new Dictionary<TilePosition, int>();
+            tileByPlace = new Dictionary<long, TilePosition>();
             orderedTiles = new List<Tile>();
             foreach (var tile in tiles)
             {
@@ -31,7 +33,17 @@ namespace Game.Domain
                     throw new ArgumentException("Tile " + tile.Position + " was added twice.", nameof(tiles));
                 }
 
+                TilePosition standingThere;
+                if (tileByPlace.TryGetValue(PlaceOf(tile.Position.X, tile.Position.Y), out standingThere))
+                {
+                    throw new ArgumentException(
+                        "Tile " + tile.Position + " stands in the same place as " + standingThere
+                        + ", so one of them would be hidden under the other.",
+                        nameof(tiles));
+                }
+
                 regionByPosition.Add(tile.Position, tile.RegionId);
+                tileByPlace.Add(PlaceOf(tile.Position.X, tile.Position.Y), tile.Position);
                 orderedTiles.Add(tile);
             }
 
@@ -64,6 +76,11 @@ namespace Game.Domain
             return regionByPosition.ContainsKey(position);
         }
 
+        public bool ContainsPlace(int x, int y)
+        {
+            return tileByPlace.ContainsKey(PlaceOf(x, y));
+        }
+
         public int RegionOf(TilePosition position)
         {
             int regionId;
@@ -82,8 +99,7 @@ namespace Game.Domain
                 return false;
             }
 
-            if (first.Elevation == second.Elevation
-                && Math.Abs(first.X - second.X) + Math.Abs(first.Y - second.Y) == 1)
+            if (Math.Abs(first.X - second.X) + Math.Abs(first.Y - second.Y) == 1)
             {
                 return true;
             }
@@ -106,26 +122,27 @@ namespace Game.Domain
             }
 
             var neighbours = new List<TilePosition>(5);
-            AddIfPresent(neighbours, new TilePosition(position.Elevation, position.X - 1, position.Y));
-            AddIfPresent(neighbours, new TilePosition(position.Elevation, position.X + 1, position.Y));
-            AddIfPresent(neighbours, new TilePosition(position.Elevation, position.X, position.Y - 1));
-            AddIfPresent(neighbours, new TilePosition(position.Elevation, position.X, position.Y + 1));
+            AddIfPresent(neighbours, position.X - 1, position.Y);
+            AddIfPresent(neighbours, position.X + 1, position.Y);
+            AddIfPresent(neighbours, position.X, position.Y - 1);
+            AddIfPresent(neighbours, position.X, position.Y + 1);
 
             TilePosition acrossTheStair;
-            if (stairPartnerByPosition.TryGetValue(position, out acrossTheStair))
+            if (stairPartnerByPosition.TryGetValue(position, out acrossTheStair) && Contains(acrossTheStair))
             {
-                AddIfPresent(neighbours, acrossTheStair);
+                neighbours.Add(acrossTheStair);
             }
 
             neighbours.Sort();
             return neighbours;
         }
 
-        void AddIfPresent(List<TilePosition> neighbours, TilePosition candidate)
+        void AddIfPresent(List<TilePosition> neighbours, int x, int y)
         {
-            if (Contains(candidate))
+            TilePosition standingThere;
+            if (tileByPlace.TryGetValue(PlaceOf(x, y), out standingThere))
             {
-                neighbours.Add(candidate);
+                neighbours.Add(standingThere);
             }
         }
 
@@ -197,6 +214,11 @@ namespace Game.Domain
 
                 return hash;
             }
+        }
+
+        static long PlaceOf(int x, int y)
+        {
+            return ((long)x << 32) ^ (uint)y;
         }
 
         static int CompareTiles(Tile left, Tile right)

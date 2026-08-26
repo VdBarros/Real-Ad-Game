@@ -18,34 +18,28 @@ namespace Game.Domain
             var walkable = new HashSet<TilePosition>();
             for (var terrace = 0; terrace < preset.Terraces; terrace++)
             {
-                var elevation = Terraces.ElevationOf(terrace);
-                CarveTerrace(StageRandom.ForStage(seed, "carve:" + terrace), preset, elevation, walkable);
-                Braid(StageRandom.ForStage(seed, "braid:" + terrace), preset, elevation, walkable);
+                CarveTerrace(StageRandom.ForStage(seed, "carve:" + terrace), preset, terrace, walkable);
+                Braid(StageRandom.ForStage(seed, "braid:" + terrace), preset, terrace, walkable);
             }
 
-            var stairs = LinkTerraces(StageRandom.ForStage(seed, "stairs"), preset);
+            var staircases = Climbs(StageRandom.ForStage(seed, "stairs"), preset);
+            walkable.UnionWith(staircases);
 
-            var stairTiles = new List<TilePosition>();
-            foreach (var stair in stairs)
-            {
-                stairTiles.Add(stair.Lower);
-                stairTiles.Add(stair.Upper);
-            }
-
-            stairTiles.Sort();
+            var staircaseTiles = new List<TilePosition>(staircases);
+            staircaseTiles.Sort();
 
             var tiles = new List<TilePosition>(walkable);
             tiles.Sort();
 
-            return new CarvedMaze(tiles, stairs, stairTiles);
+            return new CarvedMaze(tiles, Array.Empty<StairLink>(), staircaseTiles);
         }
 
-        static void CarveTerrace(StageRandom random, MazePreset preset, int elevation, HashSet<TilePosition> walkable)
+        static void CarveTerrace(StageRandom random, MazePreset preset, int terrace, HashSet<TilePosition> walkable)
         {
             var visited = new bool[preset.LatticeWidth * preset.LatticeHeight];
             var trail = new List<LatticeCell> { new LatticeCell(0, 0) };
             visited[0] = true;
-            walkable.Add(TileOfCell(elevation, new LatticeCell(0, 0)));
+            walkable.Add(TileOfCell(preset, terrace, new LatticeCell(0, 0)));
 
             while (trail.Count > 0)
             {
@@ -61,8 +55,8 @@ namespace Game.Domain
                     }
 
                     visited[IndexOfCell(preset, next)] = true;
-                    walkable.Add(TileOfCell(elevation, next));
-                    walkable.Add(TileBetweenCells(elevation, cell, next));
+                    walkable.Add(TileOfCell(preset, terrace, next));
+                    walkable.Add(TileBetweenCells(preset, terrace, cell, next));
                     trail.Add(next);
                     stepped = true;
                     break;
@@ -75,7 +69,7 @@ namespace Game.Domain
             }
         }
 
-        static void Braid(StageRandom random, MazePreset preset, int elevation, HashSet<TilePosition> walkable)
+        static void Braid(StageRandom random, MazePreset preset, int terrace, HashSet<TilePosition> walkable)
         {
             var deadEnds = new List<LatticeCell>();
             for (var y = 0; y < preset.LatticeHeight; y++)
@@ -83,7 +77,7 @@ namespace Game.Domain
                 for (var x = 0; x < preset.LatticeWidth; x++)
                 {
                     var cell = new LatticeCell(x, y);
-                    if (OpenSideCount(preset, elevation, walkable, cell) == 1)
+                    if (OpenSideCount(preset, terrace, walkable, cell) == 1)
                     {
                         deadEnds.Add(cell);
                     }
@@ -105,7 +99,7 @@ namespace Game.Domain
                         continue;
                     }
 
-                    var wall = TileBetweenCells(elevation, cell, beyond);
+                    var wall = TileBetweenCells(preset, terrace, cell, beyond);
                     if (!walkable.Contains(wall))
                     {
                         blocked.Add(wall);
@@ -121,52 +115,77 @@ namespace Game.Domain
             }
         }
 
-        static IReadOnlyList<StairLink> LinkTerraces(StageRandom random, MazePreset preset)
+        static IReadOnlyList<TilePosition> Climbs(StageRandom random, MazePreset preset)
         {
-            var links = new List<StairLink>();
+            var staircases = new HashSet<TilePosition>();
             if (preset.Terraces < 2 || preset.Stairs < 1)
             {
-                return links;
+                return new List<TilePosition>();
             }
 
-            var cells = new List<LatticeCell>();
-            for (var y = 0; y < preset.LatticeHeight; y++)
+            for (var gap = 0; gap < preset.Terraces - 1; gap++)
             {
-                for (var x = 0; x < preset.LatticeWidth; x++)
+                var landing = preset.LatticeHeight - 1;
+                foreach (var column in FootColumns(random, preset, WaysUpOverGap(preset, gap)))
                 {
-                    cells.Add(new LatticeCell(x, y));
+                    Climb(preset, gap, column, landing, staircases);
+                    if (column < preset.LatticeHeight)
+                    {
+                        landing--;
+                    }
                 }
             }
 
-            var chosen = new List<LatticeCell>();
-            foreach (var cell in random.Shuffled(cells))
+            var ordered = new List<TilePosition>(staircases);
+            ordered.Sort();
+            return ordered;
+        }
+
+        static int WaysUpOverGap(MazePreset preset, int gap)
+        {
+            var wanted = 0;
+            for (var index = 0; index < preset.Stairs; index++)
             {
-                if (chosen.Count >= preset.Stairs)
+                if (index % (preset.Terraces - 1) == gap)
+                {
+                    wanted++;
+                }
+            }
+
+            return wanted;
+        }
+
+        static IReadOnlyList<int> FootColumns(StageRandom random, MazePreset preset, int wanted)
+        {
+            var offered = new List<int>();
+            for (var column = 0; column < preset.LatticeWidth; column++)
+            {
+                offered.Add(column);
+            }
+
+            var chosen = new List<int>();
+            foreach (var column in random.Shuffled(offered))
+            {
+                if (chosen.Count >= wanted)
                 {
                     break;
                 }
 
-                if (FarEnoughFromAll(chosen, cell))
+                if (FarEnoughFromAll(chosen, column))
                 {
-                    chosen.Add(cell);
+                    chosen.Add(column);
                 }
             }
 
-            for (var index = 0; index < chosen.Count; index++)
-            {
-                var lowerTerrace = index % (preset.Terraces - 1);
-                links.Add(new StairLink(TileOfCell(Terraces.ElevationOf(lowerTerrace), chosen[index])));
-            }
-
-            links.Sort(CompareStairs);
-            return links;
+            chosen.Sort();
+            return chosen;
         }
 
-        static bool FarEnoughFromAll(IReadOnlyList<LatticeCell> chosen, LatticeCell cell)
+        static bool FarEnoughFromAll(IReadOnlyList<int> chosen, int column)
         {
             foreach (var other in chosen)
             {
-                if (Math.Abs(other.X - cell.X) + Math.Abs(other.Y - cell.Y) < 3)
+                if (Math.Abs(other - column) < 3)
                 {
                     return false;
                 }
@@ -175,13 +194,41 @@ namespace Game.Domain
             return true;
         }
 
-        static int OpenSideCount(MazePreset preset, int elevation, HashSet<TilePosition> walkable, LatticeCell cell)
+        static void Climb(
+            MazePreset preset, int gap, int column, int landing, HashSet<TilePosition> staircases)
+        {
+            var offset = preset.TerraceOffset * gap;
+            var step = offset + 2 * column;
+            var gapRow = offset + 2 * preset.LatticeHeight - 1;
+            var climbing = Terraces.ElevationOf(gap) + 1;
+
+            staircases.Add(new TilePosition(climbing, step, gapRow));
+
+            if (column >= preset.LatticeHeight)
+            {
+                return;
+            }
+
+            var landingRow = gapRow + 1 + 2 * Math.Max(landing, 0);
+
+            for (var row = gapRow + 1; row <= landingRow; row++)
+            {
+                staircases.Add(new TilePosition(climbing, step, row));
+            }
+
+            for (var across = step + 1; across < offset + preset.TerraceOffset; across++)
+            {
+                staircases.Add(new TilePosition(climbing, across, landingRow));
+            }
+        }
+
+        static int OpenSideCount(MazePreset preset, int terrace, HashSet<TilePosition> walkable, LatticeCell cell)
         {
             var open = 0;
             foreach (var step in Steps)
             {
                 var beyond = cell.Shifted(step);
-                if (InsideLattice(preset, beyond) && walkable.Contains(TileBetweenCells(elevation, cell, beyond)))
+                if (InsideLattice(preset, beyond) && walkable.Contains(TileBetweenCells(preset, terrace, cell, beyond)))
                 {
                     open++;
                 }
@@ -200,19 +247,17 @@ namespace Game.Domain
             return cell.Y * preset.LatticeWidth + cell.X;
         }
 
-        static TilePosition TileOfCell(int elevation, LatticeCell cell)
+        static TilePosition TileOfCell(MazePreset preset, int terrace, LatticeCell cell)
         {
-            return new TilePosition(elevation, 2 * cell.X, 2 * cell.Y);
+            var offset = preset.TerraceOffset * terrace;
+            return new TilePosition(Terraces.ElevationOf(terrace), offset + 2 * cell.X, offset + 2 * cell.Y);
         }
 
-        static TilePosition TileBetweenCells(int elevation, LatticeCell from, LatticeCell to)
+        static TilePosition TileBetweenCells(MazePreset preset, int terrace, LatticeCell from, LatticeCell to)
         {
-            return new TilePosition(elevation, from.X + to.X, from.Y + to.Y);
-        }
-
-        static int CompareStairs(StairLink left, StairLink right)
-        {
-            return left.Lower.CompareTo(right.Lower);
+            var offset = preset.TerraceOffset * terrace;
+            return new TilePosition(
+                Terraces.ElevationOf(terrace), offset + from.X + to.X, offset + from.Y + to.Y);
         }
 
         readonly struct LatticeCell

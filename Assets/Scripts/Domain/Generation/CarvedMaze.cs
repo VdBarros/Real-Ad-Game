@@ -7,17 +7,17 @@ namespace Game.Domain
         public CarvedMaze(
             IReadOnlyList<TilePosition> tiles,
             IReadOnlyList<StairLink> stairs,
-            IReadOnlyList<TilePosition> stairTiles)
+            IReadOnlyList<TilePosition> staircaseTiles)
         {
             Tiles = tiles;
             Stairs = stairs;
-            StairTiles = stairTiles;
+            StaircaseTiles = staircaseTiles;
         }
 
         public IReadOnlyList<TilePosition> Tiles { get; }
 
         public IReadOnlyList<StairLink> Stairs { get; }
 
-        public IReadOnlyList<TilePosition> StairTiles { get; }
+        public IReadOnlyList<TilePosition> StaircaseTiles { get; }
     }
 }

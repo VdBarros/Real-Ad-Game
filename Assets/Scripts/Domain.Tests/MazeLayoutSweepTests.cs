@@ -37,6 +37,28 @@ namespace Game.Domain.Tests
         }
 
         [TestCaseSource(nameof(EveryPreset))]
+        public void NoTwoTilesEverStandInTheSamePlace(MazePreset preset)
+        {
+            foreach (var layout in Sweep(preset))
+            {
+                var occupant = new Dictionary<long, TilePosition>();
+
+                foreach (var tile in layout.Graph.Tiles.Tiles)
+                {
+                    TilePosition already;
+                    if (occupant.TryGetValue(Place(tile.Position), out already))
+                    {
+                        Assert.Fail(
+                            "Seed " + layout.AttemptSeed + " put " + tile.Position + " and " + already
+                            + " in the same place, so one of them is hidden under the other.");
+                    }
+
+                    occupant.Add(Place(tile.Position), tile.Position);
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPreset))]
         public void EverySeedProducesAGraphConnectedAcrossEveryTerrace(MazePreset preset)
         {
             foreach (var layout in Sweep(preset))
@@ -49,7 +71,10 @@ namespace Game.Domain.Tests
                 var elevations = new HashSet<int>();
                 foreach (var tile in layout.Graph.Tiles.Tiles)
                 {
-                    elevations.Add(tile.Position.Elevation);
+                    if (Terraces.IsTerrace(tile.Position.Elevation))
+                    {
+                        elevations.Add(tile.Position.Elevation);
+                    }
                 }
 
                 Assert.That(
@@ -84,6 +109,18 @@ namespace Game.Domain.Tests
 
                 foreach (var tile in grid.Tiles)
                 {
+                    if (!membersOfRegion.ContainsKey(tile.RegionId))
+                    {
+                        membersOfRegion.Add(tile.RegionId, new List<TilePosition>());
+                    }
+
+                    membersOfRegion[tile.RegionId].Add(tile.Position);
+
+                    if (!Terraces.IsTerrace(tile.Position.Elevation))
+                    {
+                        continue;
+                    }
+
                     int elevation;
                     if (elevationOfRegion.TryGetValue(tile.RegionId, out elevation))
                     {
@@ -95,10 +132,7 @@ namespace Game.Domain.Tests
                     else
                     {
                         elevationOfRegion.Add(tile.RegionId, tile.Position.Elevation);
-                        membersOfRegion.Add(tile.RegionId, new List<TilePosition>());
                     }
-
-                    membersOfRegion[tile.RegionId].Add(tile.Position);
                 }
 
                 Assert.That(
@@ -144,41 +178,73 @@ namespace Game.Domain.Tests
             }
         }
 
-        [Test]
-        public void TheOnlyZeroLengthCorridorBetweenTwoEmptyNodesIsAStairAndSomeSeedHasOne()
+        [TestCaseSource(nameof(EveryPreset))]
+        public void AStaircaseBelongsToTheRegionOfTheTerraceItLeaves(MazePreset preset)
         {
-            var exercised = 0;
+            var climbed = 0;
 
-            foreach (var layout in Sweep(MazePreset.Ship))
+            foreach (var layout in Sweep(preset))
             {
-                foreach (var corridor in layout.Graph.Decisions.Corridors)
-                {
-                    if (corridor.TilePath.Count != 0)
-                    {
-                        continue;
-                    }
+                var terraceOfRegion = TerraceOfEveryRegion(layout);
 
-                    var low = layout.Graph.Decisions.Node(corridor.LowNodeId);
-                    var high = layout.Graph.Decisions.Node(corridor.HighNodeId);
-                    if (low.Type != NodeType.Empty || high.Type != NodeType.Empty)
+                foreach (var tile in layout.Graph.Tiles.Tiles)
+                {
+                    if (Terraces.IsTerrace(tile.Position.Elevation))
                     {
                         continue;
                     }
 
                     Assert.That(
-                        layout.Graph.Tiles.CarriesStair(low.Position)
-                            && layout.Graph.Tiles.CarriesStair(high.Position),
-                        Is.True,
-                        "Seed " + layout.AttemptSeed + " joined two Empty nodes with a zero-length corridor "
-                        + "that is not a stair.");
-                    exercised++;
+                        terraceOfRegion[tile.RegionId],
+                        Is.EqualTo(tile.Position.Elevation - 1),
+                        "Seed " + layout.AttemptSeed + " put the staircase tile at " + tile.Position
+                        + " in a region of the terrace at elevation " + terraceOfRegion[tile.RegionId]
+                        + " rather than the one it leaves.");
+                    climbed++;
                 }
             }
 
             Assert.That(
-                exercised,
-                Is.GreaterThan(0),
-                "The stair carve-out never fired, so it proves nothing.");
+                climbed > 0,
+                Is.EqualTo(preset.Terraces > 1),
+                "Seed sweep of " + preset + " did not carve the ways up the preset asks for.");
+        }
+
+        [Test]
+        public void NoCorridorJoinsTwoEmptyNodesWithNothingToWalkBetweenThem()
+        {
+            var climbs = 0;
+
+            foreach (var layout in Sweep(MazePreset.Ship))
+            {
+                foreach (var corridor in layout.Graph.Decisions.Corridors)
+                {
+                    var low = layout.Graph.Decisions.Node(corridor.LowNodeId);
+                    var high = layout.Graph.Decisions.Node(corridor.HighNodeId);
+
+                    if (low.Position.Elevation != high.Position.Elevation)
+                    {
+                        Assert.That(
+                            corridor.TilePath.Count,
+                            Is.GreaterThan(0),
+                            "Seed " + layout.AttemptSeed + " climbs from " + low.Position + " to "
+                            + high.Position + " with no ground in between.");
+                        climbs++;
+                    }
+
+                    if (corridor.TilePath.Count != 0)
+                    {
+                        continue;
+                    }
+
+                    Assert.That(
+                        low.Type == NodeType.Empty && high.Type == NodeType.Empty,
+                        Is.False,
+                        "Seed " + layout.AttemptSeed + " joined two Empty nodes with a zero-length corridor.");
+                }
+            }
+
+            Assert.That(climbs, Is.GreaterThan(0), "No seed ever climbed, so nothing was exercised.");
         }
 
         [Test]
@@ -191,7 +257,6 @@ namespace Game.Domain.Tests
                 foreach (var node in layout.Graph.Decisions.Nodes)
                 {
                     if (node.Type != NodeType.Empty
-                        || layout.Graph.Tiles.CarriesStair(node.Position)
                         || layout.Graph.Tiles.Neighbours(node.Position).Count != 2)
                     {
                         continue;
@@ -220,7 +285,8 @@ namespace Game.Domain.Tests
 
             foreach (var layout in sweep)
             {
-                Assert.That(layout.Metrics.TileCount, Is.EqualTo(60));
+                Assert.That(TerraceTilesOf(layout), Is.EqualTo(60));
+                Assert.That(layout.Metrics.TileCount, Is.GreaterThan(60));
                 Assert.That(layout.Metrics.SlotCount, Is.EqualTo(MazePreset.Ship.ContentSlots));
                 Assert.That(
                     layout.Metrics.NodeCount,
@@ -269,6 +335,40 @@ namespace Game.Domain.Tests
             return accepted;
         }
 
+        static Dictionary<int, int> TerraceOfEveryRegion(MazeLayout layout)
+        {
+            var terraceOfRegion = new Dictionary<int, int>();
+
+            foreach (var tile in layout.Graph.Tiles.Tiles)
+            {
+                if (Terraces.IsTerrace(tile.Position.Elevation))
+                {
+                    terraceOfRegion[tile.RegionId] = tile.Position.Elevation;
+                }
+            }
+
+            return terraceOfRegion;
+        }
+
+        static int TerraceTilesOf(MazeLayout layout)
+        {
+            var standing = 0;
+            foreach (var tile in layout.Graph.Tiles.Tiles)
+            {
+                if (Terraces.IsTerrace(tile.Position.Elevation))
+                {
+                    standing++;
+                }
+            }
+
+            return standing;
+        }
+
+        static long Place(TilePosition position)
+        {
+            return ((long)position.X << 32) ^ (uint)position.Y;
+        }
+
         static bool IsFourConnected(TileGrid grid, IReadOnlyList<TilePosition> members)
         {
             var inside = new HashSet<TilePosition>(members);
@@ -279,7 +379,7 @@ namespace Game.Domain.Tests
             {
                 foreach (var neighbour in grid.Neighbours(queue[head]))
                 {
-                    if (neighbour.Elevation != queue[head].Elevation || !inside.Contains(neighbour) || !seen.Add(neighbour))
+                    if (!inside.Contains(neighbour) || !seen.Add(neighbour))
                     {
                         continue;
                     }

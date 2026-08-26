@@ -96,6 +96,11 @@ namespace Game.Domain
 
         public int MinimumOffPathSlots { get; }
 
+        public int TerraceOffset
+        {
+            get { return 2 * LatticeHeight; }
+        }
+
         public int RegionsPerTerrace
         {
             get { return Math.Max(1, (int)Math.Floor((double)Regions / Terraces + 0.5)); }
