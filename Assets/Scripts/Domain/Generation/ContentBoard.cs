@@ -246,11 +246,6 @@ namespace Game.Domain
                 builder.AddTile(tile.Position, tile.RegionId);
             }
 
-            foreach (var stair in source.Tiles.Stairs)
-            {
-                builder.AddStair(stair.Lower, stair.Upper);
-            }
-
             foreach (var node in source.Decisions.Nodes)
             {
                 builder.AddNode(node.Position, types[node.Id], values[node.Id]);

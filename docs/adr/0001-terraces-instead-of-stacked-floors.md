@@ -33,8 +33,9 @@ A **staircase** is an ordinary run of walkable tiles from the lower terrace's fa
 edge to the upper terrace's near edge, one step up at each end. It is not a
 special adjacency: `TileGrid.Neighbours` is four-neighbour in `(x, y)` and
 nothing else — it no longer asks the two tiles to share an elevation, which is
-what lets a staircase tile be walked onto — and nothing is joined by a
-`StairLink` any more.
+what lets a staircase tile be walked onto — and the link that used to join two
+storeys, the partner lookup behind it and the query asking whether a tile carried
+one are all deleted.
 
 Where a staircase bends, it bends one row **above** the unowned row rather than
 along it. The unowned row lies against the lower terrace's far row for its whole

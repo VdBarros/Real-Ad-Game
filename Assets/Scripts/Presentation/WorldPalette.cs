@@ -16,7 +16,7 @@ namespace Game.Presentation
                     return new Color(0.87f, 0.89f, 0.83f);
                 case PartStyle.Wall:
                     return new Color(0.44f, 0.46f, 0.53f);
-                case PartStyle.Ramp:
+                case PartStyle.Pillar:
                     return new Color(0.66f, 0.52f, 0.30f);
                 case PartStyle.Start:
                     return new Color(0.20f, 0.75f, 0.35f);

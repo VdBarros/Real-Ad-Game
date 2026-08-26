@@ -31,7 +31,7 @@ namespace Game.Domain
             var tiles = new List<TilePosition>(walkable);
             tiles.Sort();
 
-            return new CarvedMaze(tiles, Array.Empty<StairLink>(), staircaseTiles);
+            return new CarvedMaze(tiles, staircaseTiles);
         }
 
         static void CarveTerrace(StageRandom random, MazePreset preset, int terrace, HashSet<TilePosition> walkable)

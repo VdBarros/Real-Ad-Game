@@ -7,20 +7,13 @@ namespace Game.Domain
     {
         readonly Dictionary<TilePosition, int> regionByPosition;
         readonly Dictionary<long, TilePosition> tileByPlace;
-        readonly Dictionary<TilePosition, TilePosition> stairPartnerByPosition;
         readonly List<Tile> orderedTiles;
-        readonly List<StairLink> orderedStairs;
 
-        public TileGrid(IEnumerable<Tile> tiles, IEnumerable<StairLink> stairs)
+        public TileGrid(IEnumerable<Tile> tiles)
         {
             if (tiles == null)
             {
                 throw new ArgumentNullException(nameof(tiles));
-            }
-
-            if (stairs == null)
-            {
-                throw new ArgumentNullException(nameof(stairs));
             }
 
             regionByPosition = new Dictionary<TilePosition, int>();
@@ -48,27 +41,11 @@ namespace Game.Domain
             }
 
             orderedTiles.Sort(CompareTiles);
-
-            stairPartnerByPosition = new Dictionary<TilePosition, TilePosition>();
-            orderedStairs = new List<StairLink>();
-            foreach (var stair in stairs)
-            {
-                Link(stair.Lower, stair.Upper);
-                Link(stair.Upper, stair.Lower);
-                orderedStairs.Add(stair);
-            }
-
-            orderedStairs.Sort(CompareStairs);
         }
 
         public IReadOnlyList<Tile> Tiles
         {
             get { return orderedTiles; }
-        }
-
-        public IReadOnlyList<StairLink> Stairs
-        {
-            get { return orderedStairs; }
         }
 
         public bool Contains(TilePosition position)
@@ -94,24 +71,9 @@ namespace Game.Domain
 
         public bool AreAdjacent(TilePosition first, TilePosition second)
         {
-            if (!Contains(first) || !Contains(second))
-            {
-                return false;
-            }
-
-            if (Math.Abs(first.X - second.X) + Math.Abs(first.Y - second.Y) == 1)
-            {
-                return true;
-            }
-
-            TilePosition acrossTheStair;
-            return stairPartnerByPosition.TryGetValue(first, out acrossTheStair)
-                && acrossTheStair.Equals(second);
-        }
-
-        public bool CarriesStair(TilePosition position)
-        {
-            return stairPartnerByPosition.ContainsKey(position);
+            return Contains(first)
+                && Contains(second)
+                && Math.Abs(first.X - second.X) + Math.Abs(first.Y - second.Y) == 1;
         }
 
         public IReadOnlyList<TilePosition> Neighbours(TilePosition position)
@@ -121,17 +83,11 @@ namespace Game.Domain
                 throw new ArgumentException("No tile at " + position + ".", nameof(position));
             }
 
-            var neighbours = new List<TilePosition>(5);
+            var neighbours = new List<TilePosition>(4);
             AddIfPresent(neighbours, position.X - 1, position.Y);
             AddIfPresent(neighbours, position.X + 1, position.Y);
             AddIfPresent(neighbours, position.X, position.Y - 1);
             AddIfPresent(neighbours, position.X, position.Y + 1);
-
-            TilePosition acrossTheStair;
-            if (stairPartnerByPosition.TryGetValue(position, out acrossTheStair) && Contains(acrossTheStair))
-            {
-                neighbours.Add(acrossTheStair);
-            }
 
             neighbours.Sort();
             return neighbours;
@@ -146,21 +102,6 @@ namespace Game.Domain
             }
         }
 
-        void Link(TilePosition from, TilePosition to)
-        {
-            if (!Contains(from))
-            {
-                throw new ArgumentException("A stair ends at " + from + ", where there is no tile.", "stairs");
-            }
-
-            if (stairPartnerByPosition.ContainsKey(from))
-            {
-                throw new ArgumentException("Tile " + from + " already carries a stair.", "stairs");
-            }
-
-            stairPartnerByPosition.Add(from, to);
-        }
-
         public bool Equals(TileGrid other)
         {
             if (ReferenceEquals(other, null))
@@ -168,7 +109,7 @@ namespace Game.Domain
                 return false;
             }
 
-            if (orderedTiles.Count != other.orderedTiles.Count || orderedStairs.Count != other.orderedStairs.Count)
+            if (orderedTiles.Count != other.orderedTiles.Count)
             {
                 return false;
             }
@@ -176,14 +117,6 @@ namespace Game.Domain
             for (var index = 0; index < orderedTiles.Count; index++)
             {
                 if (!orderedTiles[index].Equals(other.orderedTiles[index]))
-                {
-                    return false;
-                }
-            }
-
-            for (var index = 0; index < orderedStairs.Count; index++)
-            {
-                if (!orderedStairs[index].Equals(other.orderedStairs[index]))
                 {
                     return false;
                 }
@@ -207,11 +140,6 @@ namespace Game.Domain
                     hash = (hash * 397) ^ tile.GetHashCode();
                 }
 
-                foreach (var stair in orderedStairs)
-                {
-                    hash = (hash * 397) ^ stair.GetHashCode();
-                }
-
                 return hash;
             }
         }
@@ -224,11 +152,6 @@ namespace Game.Domain
         static int CompareTiles(Tile left, Tile right)
         {
             return left.Position.CompareTo(right.Position);
-        }
-
-        static int CompareStairs(StairLink left, StairLink right)
-        {
-            return left.Lower.CompareTo(right.Lower);
         }
     }
 }

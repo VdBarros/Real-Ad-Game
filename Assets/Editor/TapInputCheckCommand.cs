@@ -116,7 +116,7 @@ namespace Game.EditorTooling
                         multiHop++;
                     }
 
-                    var room = Photogenic(state, candidate.NodeId) ? Room(input, state, candidate) : 0f;
+                    var room = Room(input, state, candidate);
                     Clearest(ref clearestWin, ref winRoom, candidate, room, preview.Outcome == ActionOutcome.Win);
                     Clearest(ref clearestLoss, ref lossRoom, candidate, room, preview.Outcome == ActionOutcome.Loss);
 
@@ -275,14 +275,6 @@ namespace Game.EditorTooling
 
             clearest = candidate;
             clearestRoom = room;
-        }
-
-        static bool Photogenic(RunState state, int nodeId)
-        {
-            var position = state.Level.Decisions.Node(nodeId).Position;
-            var above = new TilePosition(position.Elevation + Terraces.Rise, position.X, position.Y);
-
-            return !state.Level.Tiles.Contains(above) || !state.Level.Tiles.AreAdjacent(position, above);
         }
 
         static float Room(TapInput input, RunState state, TapCandidate candidate)

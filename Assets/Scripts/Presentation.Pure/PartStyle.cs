@@ -5,7 +5,7 @@ namespace Game.Presentation.Pure
         Floor,
         Cleared,
         Wall,
-        Ramp,
+        Pillar,
         Start,
         Enemy,
         Boss,

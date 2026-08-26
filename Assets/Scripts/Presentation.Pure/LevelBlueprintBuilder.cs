@@ -12,12 +12,6 @@ namespace Game.Presentation.Pure
 
         public const float PickupScale = 0.5f;
 
-        public const float RampThickness = 0.6f;
-
-        public const float RampClearance = 0.02f;
-
-        public const float RampHeight = IsoProjection.StepHeight * Terraces.Rise - RampClearance;
-
         public static LevelBlueprint Build(LevelGraph graph)
         {
             if (graph == null)
@@ -42,11 +36,6 @@ namespace Game.Presentation.Pure
                     {
                         target.Add(Wall(tile.Position, side));
                     }
-                }
-
-                if (CarriesRamp(graph.Tiles, tile.Position))
-                {
-                    target.Add(Ramp(tile.Position));
                 }
             }
 
@@ -96,12 +85,6 @@ namespace Game.Presentation.Pure
             return Terraces.ElevationOf(Terraces.TerraceUnder(position.Elevation));
         }
 
-        static bool CarriesRamp(TileGrid tiles, TilePosition position)
-        {
-            var above = new TilePosition(position.Elevation + Terraces.Rise, position.X, position.Y);
-            return tiles.Contains(above) && tiles.AreAdjacent(position, above);
-        }
-
         static WorldPart FloorQuad(TilePosition position)
         {
             return new WorldPart(
@@ -128,19 +111,6 @@ namespace Game.Presentation.Pure
                     (tile.Z + neighbour.Z) * 0.5f),
                 new WorldPoint(0f, TileSides.InwardYaw(side), 0f),
                 new WorldPoint(IsoProjection.TileEdge, IsoProjection.WallHeight, 1f));
-        }
-
-        static WorldPart Ramp(TilePosition position)
-        {
-            var tile = IsoProjection.Of(position);
-
-            return new WorldPart(
-                PartNames.Ramp(position),
-                PartShape.Cube,
-                PartStyle.Ramp,
-                new WorldPoint(tile.X, tile.Y + RampHeight * 0.5f, tile.Z),
-                new WorldPoint(0f, 0f, 0f),
-                new WorldPoint(RampThickness, RampHeight, RampThickness));
         }
 
         public static bool TryProp(DecisionNode node, out WorldPart prop)

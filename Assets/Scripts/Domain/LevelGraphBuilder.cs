@@ -8,7 +8,6 @@ namespace Game.Domain
         readonly long seed;
         readonly string preset;
         readonly List<Tile> tiles = new List<Tile>();
-        readonly List<StairLink> stairs = new List<StairLink>();
         readonly List<PendingNode> pendingNodes = new List<PendingNode>();
         readonly List<PendingCorridor> pendingCorridors = new List<PendingCorridor>();
 
@@ -29,12 +28,6 @@ namespace Game.Domain
             return this;
         }
 
-        public LevelGraphBuilder AddStair(TilePosition first, TilePosition second)
-        {
-            stairs.Add(StairLink.Between(first, second));
-            return this;
-        }
-
         public LevelGraphBuilder AddNode(TilePosition position, NodeType type, int value = 0)
         {
             pendingNodes.Add(new PendingNode(position, type, value));
@@ -49,7 +42,7 @@ namespace Game.Domain
 
         public LevelGraph Build()
         {
-            var grid = new TileGrid(tiles, stairs);
+            var grid = new TileGrid(tiles);
 
             var sweep = new List<PendingNode>(pendingNodes);
             sweep.Sort(ComparePendingNodes);

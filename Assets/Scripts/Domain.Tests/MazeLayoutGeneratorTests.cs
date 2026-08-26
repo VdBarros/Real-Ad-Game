@@ -108,11 +108,10 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ATinyLevelIsOneTerraceWithNoStairs()
+        public void ATinyLevelIsOneTerraceAndNeverClimbs()
         {
             var layout = MazeLayoutGenerator.Generate(Seed, MazePreset.Tiny);
 
-            Assert.That(layout.Graph.Tiles.Stairs.Count, Is.EqualTo(0));
             foreach (var tile in layout.Graph.Tiles.Tiles)
             {
                 Assert.That(tile.Position.Elevation, Is.EqualTo(0));
@@ -213,10 +212,10 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void APresetAboveTheGroundTerraceMustCarryAStair()
+        public void APresetAboveTheGroundTerraceMustCarryAStaircase()
         {
             Assert.Throws<ArgumentOutOfRangeException>(
-                () => new MazePreset("stairless", 5, 3, 2, 4, 0.25, 0, 24, 16, 8));
+                () => new MazePreset("unclimbable", 5, 3, 2, 4, 0.25, 0, 24, 16, 8));
         }
     }
 }

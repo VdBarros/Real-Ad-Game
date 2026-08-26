@@ -22,7 +22,6 @@ namespace Game.Domain
             document.Append("  \"seed\": ").Append(Number(graph.Seed)).Append(",\n");
             document.Append("  \"preset\": ").Append(Quoted(graph.Preset)).Append(",\n");
             WriteTiles(document, graph.Tiles.Tiles);
-            WriteStairs(document, graph.Tiles.Stairs);
             WriteNodes(document, graph.Decisions.Nodes);
             WriteCorridors(document, graph.Decisions.Corridors);
             document.Append("}\n");
@@ -47,20 +46,6 @@ namespace Game.Domain
             }
 
             CloseSection(document, tiles.Count, last: false);
-        }
-
-        static void WriteStairs(StringBuilder document, IReadOnlyList<StairLink> stairs)
-        {
-            OpenSection(document, "stairs", stairs.Count);
-            for (var index = 0; index < stairs.Count; index++)
-            {
-                document.Append("    { ");
-                AppendPosition(document, stairs[index].Lower);
-                document.Append(" }");
-                CloseElement(document, index, stairs.Count);
-            }
-
-            CloseSection(document, stairs.Count, last: false);
         }
 
         static void WriteNodes(StringBuilder document, IReadOnlyList<DecisionNode> nodes)

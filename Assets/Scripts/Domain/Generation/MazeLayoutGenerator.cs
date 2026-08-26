@@ -53,7 +53,7 @@ namespace Game.Domain
             rejection = LayoutRejection.None;
 
             var carved = MazeCarver.Carve(seed, preset);
-            var geometry = new TileGrid(Unpainted(carved.Tiles), carved.Stairs);
+            var geometry = new TileGrid(Unpainted(carved.Tiles));
             var topology = new TileTopology(geometry);
 
             var start = ChooseStart(StageRandom.ForStage(seed, "start"), topology);
@@ -76,8 +76,7 @@ namespace Game.Domain
             var runs = CorridorExtractor.ExtractWithoutSelfLoopsOrParallelRuns(
                 topology.Neighbours, plan.NodeTiles);
 
-            var graph = Assemble(seed, preset, plan, carved, runs);
-            RequireEmptyCorridorsToJoinStairs(graph);
+            var graph = Assemble(seed, preset, plan, runs);
 
             var distanceFromStart = TileDistanceMap.From(graph.Tiles, topology[start]);
             var metrics = LayoutMetrics.Of(graph, distanceFromStart);
@@ -136,7 +135,6 @@ namespace Game.Domain
             long seed,
             MazePreset preset,
             LayoutPlan plan,
-            CarvedMaze carved,
             IReadOnlyList<CorridorRun> runs)
         {
             var topology = plan.Topology;
@@ -145,11 +143,6 @@ namespace Game.Domain
             for (var tile = 0; tile < topology.Count; tile++)
             {
                 builder.AddTile(topology[tile], plan.RegionOf(tile));
-            }
-
-            foreach (var stair in carved.Stairs)
-            {
-                builder.AddStair(stair.Lower, stair.Upper);
             }
 
             for (var tile = 0; tile < topology.Count; tile++)
@@ -172,33 +165,6 @@ namespace Game.Domain
             }
 
             return builder.Build();
-        }
-
-        static void RequireEmptyCorridorsToJoinStairs(LevelGraph graph)
-        {
-            foreach (var corridor in graph.Decisions.Corridors)
-            {
-                if (corridor.TilePath.Count != 0)
-                {
-                    continue;
-                }
-
-                var low = graph.Decisions.Node(corridor.LowNodeId);
-                var high = graph.Decisions.Node(corridor.HighNodeId);
-                if (low.Type != NodeType.Empty || high.Type != NodeType.Empty)
-                {
-                    continue;
-                }
-
-                if (graph.Tiles.CarriesStair(low.Position) && graph.Tiles.CarriesStair(high.Position))
-                {
-                    continue;
-                }
-
-                throw new InvalidOperationException(
-                    "Corridor " + corridor + " joins two Empty nodes with no tiles between them, "
-                    + "which only a stair may do.");
-            }
         }
     }
 }
