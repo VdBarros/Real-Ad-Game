@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace Game.Presentation.Pure
 {
-    public sealed class FloorBlueprint
+    public sealed class TerraceBlueprint
     {
-        public FloorBlueprint(int floor, IReadOnlyList<WorldPart> tiles, IReadOnlyList<WorldPart> nodes)
+        public TerraceBlueprint(int elevation, IReadOnlyList<WorldPart> tiles, IReadOnlyList<WorldPart> nodes)
         {
             if (tiles == null)
             {
@@ -17,13 +17,13 @@ namespace Game.Presentation.Pure
                 throw new ArgumentNullException(nameof(nodes));
             }
 
-            Floor = floor;
-            Name = PartNames.Floor(floor);
+            Elevation = elevation;
+            Name = PartNames.Terrace(elevation);
             Tiles = tiles;
             Nodes = nodes;
         }
 
-        public int Floor { get; }
+        public int Elevation { get; }
 
         public string Name { get; }
 

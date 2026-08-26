@@ -37,8 +37,8 @@ namespace Game.Presentation.Pure
                 throw new ArgumentException("A level with no tiles has no centre to frame.", nameof(graph));
             }
 
-            var lowFloor = int.MaxValue;
-            var highFloor = int.MinValue;
+            var lowElevation = int.MaxValue;
+            var highElevation = int.MinValue;
             var lowX = int.MaxValue;
             var highX = int.MinValue;
             var lowY = int.MaxValue;
@@ -47,8 +47,8 @@ namespace Game.Presentation.Pure
             foreach (var tile in tiles)
             {
                 var position = tile.Position;
-                lowFloor = Math.Min(lowFloor, position.Floor);
-                highFloor = Math.Max(highFloor, position.Floor);
+                lowElevation = Math.Min(lowElevation, position.Elevation);
+                highElevation = Math.Max(highElevation, position.Elevation);
                 lowX = Math.Min(lowX, position.X);
                 highX = Math.Max(highX, position.X);
                 lowY = Math.Min(lowY, position.Y);
@@ -57,7 +57,7 @@ namespace Game.Presentation.Pure
 
             return new WorldPoint(
                 (lowX + highX) * 0.5f * IsoProjection.TileEdge,
-                (lowFloor + highFloor) * 0.5f * IsoProjection.FloorHeight,
+                (lowElevation + highElevation) * 0.5f * IsoProjection.StepHeight,
                 (lowY + highY) * 0.5f * IsoProjection.TileEdge);
         }
 

@@ -275,8 +275,8 @@ namespace Game.Domain.Tests
         [Test]
         public void AJunctionNodeIsWalkedOverAndNeverConsumed()
         {
-            var level = LevelGraphFixture.TwoFloors();
-            var junction = level.Decisions.NodeAt(new TilePosition(floor: 0, x: 5, y: 0));
+            var level = LevelGraphFixture.TwoTerraces();
+            var junction = level.Decisions.NodeAt(new TilePosition(elevation: 0, x: 5, y: 0));
             var state = RunState.Begin(level, startingPower: 5);
 
             var result = ActionResolver.Resolve(state, junction.Id);

@@ -136,9 +136,9 @@ namespace Game.EditorTooling
             var minimum = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
             var maximum = new Vector3(float.MinValue, float.MinValue, float.MinValue);
 
-            foreach (var floor in blueprint.Floors)
+            foreach (var terrace in blueprint.Terraces)
             {
-                foreach (var part in floor.Tiles)
+                foreach (var part in terrace.Tiles)
                 {
                     if (part.Style != PartStyle.Floor)
                     {
@@ -198,10 +198,10 @@ namespace Game.EditorTooling
 
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
-                "preview: {0} floors, {1} floor quads, {2} walls, {3} ramps, {4} props, {5} badges at "
+                "preview: {0} terraces, {1} floor quads, {2} walls, {3} ramps, {4} props, {5} badges at "
                 + "{6} glyph cells ({7:0.###} x {8:0.###} units, font {9:0.###}, ceiling {10}), "
                 + "{11} transforms under {12}, written to {13}",
-                blueprint.Floors.Count,
+                blueprint.Terraces.Count,
                 quads,
                 walls,
                 ramps,

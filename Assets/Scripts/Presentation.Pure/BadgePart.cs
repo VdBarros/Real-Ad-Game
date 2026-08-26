@@ -7,7 +7,7 @@ namespace Game.Presentation.Pure
         public BadgePart(
             string name,
             int nodeId,
-            int floor,
+            int elevation,
             BadgeStyle style,
             int value,
             int cells,
@@ -21,7 +21,7 @@ namespace Game.Presentation.Pure
 
             Name = name;
             NodeId = nodeId;
-            Floor = floor;
+            Elevation = elevation;
             Style = style;
             Value = value;
             Cells = cells;
@@ -33,7 +33,7 @@ namespace Game.Presentation.Pure
 
         public int NodeId { get; }
 
-        public int Floor { get; }
+        public int Elevation { get; }
 
         public BadgeStyle Style { get; }
 
@@ -64,7 +64,7 @@ namespace Game.Presentation.Pure
         {
             return string.Equals(Name, other.Name, StringComparison.Ordinal)
                 && NodeId == other.NodeId
-                && Floor == other.Floor
+                && Elevation == other.Elevation
                 && Style == other.Style
                 && Value == other.Value
                 && Cells == other.Cells
@@ -83,7 +83,7 @@ namespace Game.Presentation.Pure
             {
                 var hash = Name == null ? 0 : Name.GetHashCode();
                 hash = (hash * 397) ^ NodeId;
-                hash = (hash * 397) ^ Floor;
+                hash = (hash * 397) ^ Elevation;
                 hash = (hash * 397) ^ (int)Style;
                 hash = (hash * 397) ^ Value.GetHashCode();
                 hash = (hash * 397) ^ Cells;

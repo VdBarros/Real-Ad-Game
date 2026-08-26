@@ -14,7 +14,7 @@ namespace Game.Domain.Tests
         [Test]
         public void TheCeilingIsEveryGainTakenBeforeEveryMultiplier()
         {
-            var ceiling = PowerCeiling.Of(LevelGraphFixture.TwoFloors(), StartingPower);
+            var ceiling = PowerCeiling.Of(LevelGraphFixture.TwoTerraces(), StartingPower);
 
             Assert.That(ceiling, Is.EqualTo((2 + 12 + 4 + 30) * 3));
         }
@@ -22,7 +22,7 @@ namespace Game.Domain.Tests
         [Test]
         public void NoRunCanOutgrowTheCeiling()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var ceiling = PowerCeiling.Of(graph, StartingPower);
             var random = new Random(20250824);
 
@@ -47,7 +47,7 @@ namespace Game.Domain.Tests
         [Test]
         public void CapacityHoldsTheWidestBadgeTheLevelCanShow()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var plan = BadgePlan.For(graph, StartingPower);
 
             Assert.That(plan.Capacity, Is.EqualTo(3));

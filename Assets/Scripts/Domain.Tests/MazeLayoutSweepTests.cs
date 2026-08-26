@@ -37,7 +37,7 @@ namespace Game.Domain.Tests
         }
 
         [TestCaseSource(nameof(EveryPreset))]
-        public void EverySeedProducesAGraphConnectedAcrossEveryFloor(MazePreset preset)
+        public void EverySeedProducesAGraphConnectedAcrossEveryTerrace(MazePreset preset)
         {
             foreach (var layout in Sweep(preset))
             {
@@ -46,16 +46,16 @@ namespace Game.Domain.Tests
                     Is.EqualTo(layout.Graph.Tiles.Tiles.Count),
                     "Seed " + layout.AttemptSeed + " left tiles the start cannot walk to.");
 
-                var floors = new HashSet<int>();
+                var elevations = new HashSet<int>();
                 foreach (var tile in layout.Graph.Tiles.Tiles)
                 {
-                    floors.Add(tile.Position.Floor);
+                    elevations.Add(tile.Position.Elevation);
                 }
 
                 Assert.That(
-                    floors.Count,
-                    Is.EqualTo(preset.Floors),
-                    "Seed " + layout.AttemptSeed + " lost a floor.");
+                    elevations.Count,
+                    Is.EqualTo(preset.Terraces),
+                    "Seed " + layout.AttemptSeed + " lost a terrace.");
             }
         }
 
@@ -74,27 +74,27 @@ namespace Game.Domain.Tests
         }
 
         [TestCaseSource(nameof(EveryPreset))]
-        public void RegionsAreContiguousTotalAndNeverSpanAFloor(MazePreset preset)
+        public void RegionsAreContiguousTotalAndNeverSpanATerrace(MazePreset preset)
         {
             foreach (var layout in Sweep(preset))
             {
                 var grid = layout.Graph.Tiles;
-                var floorOfRegion = new Dictionary<int, int>();
+                var elevationOfRegion = new Dictionary<int, int>();
                 var membersOfRegion = new Dictionary<int, List<TilePosition>>();
 
                 foreach (var tile in grid.Tiles)
                 {
-                    int floor;
-                    if (floorOfRegion.TryGetValue(tile.RegionId, out floor))
+                    int elevation;
+                    if (elevationOfRegion.TryGetValue(tile.RegionId, out elevation))
                     {
                         Assert.That(
-                            floor,
-                            Is.EqualTo(tile.Position.Floor),
-                            "Seed " + layout.AttemptSeed + " region " + tile.RegionId + " spans two floors.");
+                            elevation,
+                            Is.EqualTo(tile.Position.Elevation),
+                            "Seed " + layout.AttemptSeed + " region " + tile.RegionId + " spans two terraces.");
                     }
                     else
                     {
-                        floorOfRegion.Add(tile.RegionId, tile.Position.Floor);
+                        elevationOfRegion.Add(tile.RegionId, tile.Position.Elevation);
                         membersOfRegion.Add(tile.RegionId, new List<TilePosition>());
                     }
 
@@ -103,7 +103,7 @@ namespace Game.Domain.Tests
 
                 Assert.That(
                     membersOfRegion.Count,
-                    Is.EqualTo(preset.RegionsPerFloor * preset.Floors),
+                    Is.EqualTo(preset.RegionsPerTerrace * preset.Terraces),
                     "Seed " + layout.AttemptSeed + " did not paint every region.");
 
                 foreach (var region in membersOfRegion)
@@ -129,7 +129,7 @@ namespace Game.Domain.Tests
 
                 Assert.That(
                     regionsHoldingASlot.Count,
-                    Is.EqualTo(preset.RegionsPerFloor * preset.Floors),
+                    Is.EqualTo(preset.RegionsPerTerrace * preset.Terraces),
                     "Seed " + layout.AttemptSeed + " left a region with nothing in it to scale.");
             }
         }
@@ -279,7 +279,7 @@ namespace Game.Domain.Tests
             {
                 foreach (var neighbour in grid.Neighbours(queue[head]))
                 {
-                    if (neighbour.Floor != queue[head].Floor || !inside.Contains(neighbour) || !seen.Add(neighbour))
+                    if (neighbour.Elevation != queue[head].Elevation || !inside.Contains(neighbour) || !seen.Add(neighbour))
                     {
                         continue;
                     }

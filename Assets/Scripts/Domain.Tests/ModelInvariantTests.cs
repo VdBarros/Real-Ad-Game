@@ -21,8 +21,8 @@ namespace Game.Domain.Tests
         {
             var outOfOrder = new[]
             {
-                new DecisionNode(0, new TilePosition(floor: 0, x: 2, y: 2), NodeType.Start, 0),
-                new DecisionNode(1, new TilePosition(floor: 0, x: 1, y: 1), NodeType.Boss, 5)
+                new DecisionNode(0, new TilePosition(elevation: 0, x: 2, y: 2), NodeType.Start, 0),
+                new DecisionNode(1, new TilePosition(elevation: 0, x: 1, y: 1), NodeType.Boss, 5)
             };
 
             Assert.That(
@@ -34,10 +34,10 @@ namespace Game.Domain.Tests
         public void ALevelGraphBuiltDirectlyStillDemandsNodesStandOnTiles()
         {
             var grid = new TileGrid(
-                new[] { new Tile(new TilePosition(floor: 0, x: 1, y: 0), regionId: 0) },
+                new[] { new Tile(new TilePosition(elevation: 0, x: 1, y: 0), regionId: 0) },
                 Array.Empty<StairLink>());
             var adrift = new DecisionGraph(
-                new[] { new DecisionNode(0, new TilePosition(floor: 0, x: 9, y: 9), NodeType.Start, 0) },
+                new[] { new DecisionNode(0, new TilePosition(elevation: 0, x: 9, y: 9), NodeType.Start, 0) },
                 Array.Empty<Corridor>());
 
             Assert.That(
@@ -48,7 +48,7 @@ namespace Game.Domain.Tests
         [Test]
         public void ALevelGraphBuiltDirectlyStillDemandsCanonicalCorridorDirection()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var reversed = graph.Decisions.Corridors
                 .Select(corridor => corridor.TilePath.Count > 1
                     ? new Corridor(corridor.LowNodeId, corridor.HighNodeId, Backwards(corridor.TilePath))
@@ -67,7 +67,7 @@ namespace Game.Domain.Tests
         [Test]
         public void ALevelGraphBuiltDirectlyStillRefusesTwoCorridorsBetweenTheSameNodes()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var doubled = new List<Corridor>(graph.Decisions.Corridors) { graph.Decisions.Corridors[0] };
 
             Assert.That(

@@ -67,9 +67,9 @@ namespace Game.Domain
             return neighbours[tile].Length;
         }
 
-        public int FloorOf(int tile)
+        public int ElevationOf(int tile)
         {
-            return ordered[tile].Floor;
+            return ordered[tile].Elevation;
         }
 
         public int ReachedFrom(int source)
@@ -95,18 +95,18 @@ namespace Game.Domain
             return queue.Count;
         }
 
-        public List<int> TilesOnFloor(int floor)
+        public List<int> TilesAtElevation(int elevation)
         {
-            var onThisFloor = new List<int>();
+            var onThisTerrace = new List<int>();
             for (var tile = 0; tile < ordered.Count; tile++)
             {
-                if (ordered[tile].Floor == floor)
+                if (ordered[tile].Elevation == elevation)
                 {
-                    onThisFloor.Add(tile);
+                    onThisTerrace.Add(tile);
                 }
             }
 
-            return onThisFloor;
+            return onThisTerrace;
         }
     }
 }

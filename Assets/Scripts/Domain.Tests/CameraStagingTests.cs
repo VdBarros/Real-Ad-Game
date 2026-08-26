@@ -11,7 +11,7 @@ namespace Game.Domain.Tests
 
         static LevelGraph Graph()
         {
-            return LevelGraphFixture.TwoFloors();
+            return LevelGraphFixture.TwoTerraces();
         }
 
         static CameraStaging Playing(LevelGraph graph)

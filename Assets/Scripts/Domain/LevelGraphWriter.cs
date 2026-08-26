@@ -130,7 +130,7 @@ namespace Game.Domain
 
         static void AppendPosition(StringBuilder document, TilePosition position)
         {
-            document.Append("\"floor\": ").Append(Number(position.Floor));
+            document.Append("\"elevation\": ").Append(Number(position.Elevation));
             document.Append(", \"x\": ").Append(Number(position.X));
             document.Append(", \"y\": ").Append(Number(position.Y));
         }

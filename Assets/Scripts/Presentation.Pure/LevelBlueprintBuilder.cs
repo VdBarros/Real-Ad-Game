@@ -16,7 +16,7 @@ namespace Game.Presentation.Pure
 
         public const float RampClearance = 0.02f;
 
-        public const float RampHeight = IsoProjection.FloorHeight - RampClearance;
+        public const float RampHeight = IsoProjection.StepHeight * Terraces.Rise - RampClearance;
 
         public static LevelBlueprint Build(LevelGraph graph)
         {
@@ -25,13 +25,14 @@ namespace Game.Presentation.Pure
                 throw new ArgumentNullException(nameof(graph));
             }
 
-            var floors = new List<int>();
-            var tilesByFloor = new List<List<WorldPart>>();
-            var nodesByFloor = new List<List<WorldPart>>();
+            var elevations = new List<int>();
+            var tilesByTerrace = new List<List<WorldPart>>();
+            var nodesByTerrace = new List<List<WorldPart>>();
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                var target = tilesByFloor[FloorSlot(floors, tilesByFloor, nodesByFloor, tile.Position.Floor)];
+                var slot = TerraceSlot(elevations, tilesByTerrace, nodesByTerrace, tile.Position.Elevation);
+                var target = tilesByTerrace[slot];
                 target.Add(FloorQuad(tile.Position));
 
                 foreach (var side in TileSides.All)
@@ -56,41 +57,42 @@ namespace Game.Presentation.Pure
                     continue;
                 }
 
-                nodesByFloor[FloorSlot(floors, tilesByFloor, nodesByFloor, node.Position.Floor)].Add(prop);
+                var slot = TerraceSlot(elevations, tilesByTerrace, nodesByTerrace, node.Position.Elevation);
+                nodesByTerrace[slot].Add(prop);
             }
 
-            var blueprintFloors = new List<FloorBlueprint>(floors.Count);
-            for (var slot = 0; slot < floors.Count; slot++)
+            var terraces = new List<TerraceBlueprint>(elevations.Count);
+            for (var slot = 0; slot < elevations.Count; slot++)
             {
-                blueprintFloors.Add(new FloorBlueprint(floors[slot], tilesByFloor[slot], nodesByFloor[slot]));
+                terraces.Add(new TerraceBlueprint(elevations[slot], tilesByTerrace[slot], nodesByTerrace[slot]));
             }
 
-            return new LevelBlueprint(blueprintFloors);
+            return new LevelBlueprint(terraces);
         }
 
-        static int FloorSlot(
-            List<int> floors,
-            List<List<WorldPart>> tilesByFloor,
-            List<List<WorldPart>> nodesByFloor,
-            int floor)
+        static int TerraceSlot(
+            List<int> elevations,
+            List<List<WorldPart>> tilesByTerrace,
+            List<List<WorldPart>> nodesByTerrace,
+            int elevation)
         {
-            for (var slot = 0; slot < floors.Count; slot++)
+            for (var slot = 0; slot < elevations.Count; slot++)
             {
-                if (floors[slot] == floor)
+                if (elevations[slot] == elevation)
                 {
                     return slot;
                 }
             }
 
-            floors.Add(floor);
-            tilesByFloor.Add(new List<WorldPart>());
-            nodesByFloor.Add(new List<WorldPart>());
-            return floors.Count - 1;
+            elevations.Add(elevation);
+            tilesByTerrace.Add(new List<WorldPart>());
+            nodesByTerrace.Add(new List<WorldPart>());
+            return elevations.Count - 1;
         }
 
         static bool CarriesRamp(TileGrid tiles, TilePosition position)
         {
-            var above = new TilePosition(position.Floor + 1, position.X, position.Y);
+            var above = new TilePosition(position.Elevation + Terraces.Rise, position.X, position.Y);
             return tiles.Contains(above) && tiles.AreAdjacent(position, above);
         }
 

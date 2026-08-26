@@ -280,7 +280,7 @@ namespace Game.EditorTooling
         static bool Photogenic(RunState state, int nodeId)
         {
             var position = state.Level.Decisions.Node(nodeId).Position;
-            var above = new TilePosition(position.Floor + 1, position.X, position.Y);
+            var above = new TilePosition(position.Elevation + Terraces.Rise, position.X, position.Y);
 
             return !state.Level.Tiles.Contains(above) || !state.Level.Tiles.AreAdjacent(position, above);
         }

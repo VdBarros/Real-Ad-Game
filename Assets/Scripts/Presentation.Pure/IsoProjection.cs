@@ -7,7 +7,7 @@ namespace Game.Presentation.Pure
     {
         public const float TileEdge = 1f;
 
-        public const float FloorHeight = 2f;
+        public const float StepHeight = 1f;
 
         public const float WallHeight = 1f;
 
@@ -64,7 +64,7 @@ namespace Game.Presentation.Pure
 
         public static WorldPoint Of(TilePosition position)
         {
-            return new WorldPoint(position.X * TileEdge, position.Floor * FloorHeight, position.Y * TileEdge);
+            return new WorldPoint(position.X * TileEdge, position.Elevation * StepHeight, position.Y * TileEdge);
         }
 
         static double Sin(float degrees)

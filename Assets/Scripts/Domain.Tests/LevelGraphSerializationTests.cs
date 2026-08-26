@@ -7,7 +7,7 @@ namespace Game.Domain.Tests
         [Test]
         public void AGraphSurvivesBeingWrittenAndReadBack()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
 
             var restored = LevelGraphReader.Read(LevelGraphWriter.Write(graph));
 
@@ -17,7 +17,7 @@ namespace Game.Domain.Tests
         [Test]
         public void WritingTheSameGraphTwiceProducesIdenticalBytes()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
 
             Assert.That(LevelGraphWriter.WriteBytes(graph), Is.EqualTo(LevelGraphWriter.WriteBytes(graph)));
         }
@@ -26,22 +26,22 @@ namespace Game.Domain.Tests
         public void RebuildingTheGraphProducesIdenticalBytes()
         {
             Assert.That(
-                LevelGraphWriter.WriteBytes(LevelGraphFixture.TwoFloors()),
-                Is.EqualTo(LevelGraphWriter.WriteBytes(LevelGraphFixture.TwoFloors())));
+                LevelGraphWriter.WriteBytes(LevelGraphFixture.TwoTerraces()),
+                Is.EqualTo(LevelGraphWriter.WriteBytes(LevelGraphFixture.TwoTerraces())));
         }
 
         [Test]
         public void AssemblingTheGraphInTheOppositeOrderProducesIdenticalBytes()
         {
             Assert.That(
-                LevelGraphWriter.WriteBytes(LevelGraphFixture.TwoFloorsAssembledBackwards()),
-                Is.EqualTo(LevelGraphWriter.WriteBytes(LevelGraphFixture.TwoFloors())));
+                LevelGraphWriter.WriteBytes(LevelGraphFixture.TwoTerracesAssembledBackwards()),
+                Is.EqualTo(LevelGraphWriter.WriteBytes(LevelGraphFixture.TwoTerraces())));
         }
 
         [Test]
         public void WritingWhatWasReadProducesIdenticalBytes()
         {
-            var written = LevelGraphWriter.Write(LevelGraphFixture.TwoFloors());
+            var written = LevelGraphWriter.Write(LevelGraphFixture.TwoTerraces());
 
             var rewritten = LevelGraphWriter.Write(LevelGraphReader.Read(written));
 
@@ -51,8 +51,8 @@ namespace Game.Domain.Tests
         [Test]
         public void TheWrittenDocumentUsesLineFeedsAndNoByteOrderMark()
         {
-            var bytes = LevelGraphWriter.WriteBytes(LevelGraphFixture.TwoFloors());
-            var text = LevelGraphWriter.Write(LevelGraphFixture.TwoFloors());
+            var bytes = LevelGraphWriter.WriteBytes(LevelGraphFixture.TwoTerraces());
+            var text = LevelGraphWriter.Write(LevelGraphFixture.TwoTerraces());
 
             Assert.That(bytes[0], Is.EqualTo((byte)'{'));
             Assert.That(text, Does.Not.Contain("\r"));

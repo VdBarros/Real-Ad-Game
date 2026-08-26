@@ -86,7 +86,7 @@ namespace Game.Domain.Tests
         [Test]
         public void TheBuilderNeverRaisesAPartAlreadyCleared()
         {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
             Assert.That(
                 blueprint.AllParts.Any(part => part.Style == PartStyle.Cleared),

@@ -119,7 +119,7 @@ namespace Game.Domain
 
         static int ChooseStart(StageRandom random, TileTopology topology)
         {
-            var ground = topology.TilesOnFloor(0);
+            var ground = topology.TilesAtElevation(0);
             var rim = new List<int>();
             foreach (var tile in ground)
             {

@@ -172,7 +172,7 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheStressPresetFillsNinetySlotsAcrossThreeFloors()
+        public void TheStressPresetFillsNinetySlotsAcrossThreeTerraces()
         {
             var level = LevelGenerator.Generate(Seed, MazePreset.Stress);
             var content = 0;
@@ -187,7 +187,7 @@ namespace Game.Domain.Tests
             }
 
             Assert.That(content, Is.EqualTo(ContentRecipe.Stress.Slots));
-            Assert.That(level.Envelope.Regions.Count, Is.EqualTo(MazePreset.Stress.RegionsPerFloor * 3));
+            Assert.That(level.Envelope.Regions.Count, Is.EqualTo(MazePreset.Stress.RegionsPerTerrace * 3));
             Assert.That(level.BossPower, Is.GreaterThan(level.ShortestPathPower));
             Assert.That(level.BossPower, Is.LessThan(level.InvariantBBound));
         }

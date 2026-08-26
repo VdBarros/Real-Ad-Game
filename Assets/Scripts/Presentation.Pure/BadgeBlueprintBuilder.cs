@@ -33,7 +33,7 @@ namespace Game.Presentation.Pure
                 badges.Add(new BadgePart(
                     PartNames.Badge(node.Id),
                     node.Id,
-                    node.Position.Floor,
+                    node.Position.Elevation,
                     style,
                     value,
                     isPlayer ? plan.Capacity : BadgeText.Cells(style, value),

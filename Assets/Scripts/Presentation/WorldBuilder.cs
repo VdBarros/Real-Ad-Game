@@ -64,13 +64,13 @@ namespace Game.Presentation
                 groundByName.Add(PartNames.Tile(tile.Position), tile.Position);
             }
 
-            foreach (var floor in blueprint.Floors)
+            foreach (var terrace in blueprint.Terraces)
             {
-                var floorRoot = Group(root.transform, floor.Name);
-                var tiles = Group(floorRoot, PartNames.TilesGroup);
-                var nodes = Group(floorRoot, PartNames.NodesGroup);
+                var terraceRoot = Group(root.transform, terrace.Name);
+                var tiles = Group(terraceRoot, PartNames.TilesGroup);
+                var nodes = Group(terraceRoot, PartNames.NodesGroup);
 
-                foreach (var part in floor.Tiles)
+                foreach (var part in terrace.Tiles)
                 {
                     var instance = Raise(part, tiles);
 
@@ -81,16 +81,16 @@ namespace Game.Presentation
                     }
                 }
 
-                foreach (var part in floor.Nodes)
+                foreach (var part in terrace.Nodes)
                 {
                     Raise(part, nodes);
                 }
 
-                var group = Group(floorRoot, PartNames.BadgesGroup);
+                var group = Group(terraceRoot, PartNames.BadgesGroup);
 
                 foreach (var part in badges.Badges)
                 {
-                    if (part.Floor != floor.Floor)
+                    if (part.Elevation != terrace.Elevation)
                     {
                         continue;
                     }

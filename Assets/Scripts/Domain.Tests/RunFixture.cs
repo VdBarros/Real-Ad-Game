@@ -88,7 +88,7 @@ namespace Game.Domain.Tests
 
         static TilePosition At(int x, int y)
         {
-            return new TilePosition(floor: 0, x: x, y: y);
+            return new TilePosition(elevation: 0, x: x, y: y);
         }
     }
 }

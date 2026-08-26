@@ -94,7 +94,7 @@ namespace Game.EditorTooling
 
         static TilePosition At(int x)
         {
-            return new TilePosition(floor: 0, x: x, y: 0);
+            return new TilePosition(elevation: 0, x: x, y: 0);
         }
 
         static Tally Fought(int startingPower, int enemyValue, string leg)

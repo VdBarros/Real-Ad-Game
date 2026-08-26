@@ -15,7 +15,7 @@ namespace Game.Domain.Tests
         [Test]
         public void ProjectionPutsATileOnTheFixedLattice()
         {
-            var world = IsoProjection.Of(new TilePosition(1, 3, 4));
+            var world = IsoProjection.Of(new TilePosition(2, 3, 4));
 
             Assert.That(world.X, Is.EqualTo(3f));
             Assert.That(world.Y, Is.EqualTo(2f));
@@ -34,8 +34,8 @@ namespace Game.Domain.Tests
         [Test]
         public void RebuildingFromTheSameGraphIsIdentical()
         {
-            var first = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
-            var second = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
+            var first = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
+            var second = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
             Assert.That(second.AllParts, Is.EqualTo(first.AllParts));
         }
@@ -43,25 +43,27 @@ namespace Game.Domain.Tests
         [Test]
         public void BuildingFromAGraphAssembledBackwardsIsIdentical()
         {
-            var forwards = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
-            var backwards = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloorsAssembledBackwards());
+            var forwards = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
+            var backwards = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerracesAssembledBackwards());
 
             Assert.That(backwards.AllParts, Is.EqualTo(forwards.AllParts));
         }
 
         [Test]
-        public void FloorsRunFromTheGroundUp()
+        public void TerracesRunFromTheGroundUp()
         {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
-            Assert.That(blueprint.Floors.Select(floor => floor.Floor), Is.EqualTo(new[] { 0, 1 }));
-            Assert.That(blueprint.Floors.Select(floor => floor.Name), Is.EqualTo(new[] { "Floor_0", "Floor_1" }));
+            Assert.That(blueprint.Terraces.Select(terrace => terrace.Elevation), Is.EqualTo(new[] { 0, 2 }));
+            Assert.That(
+                blueprint.Terraces.Select(terrace => terrace.Name),
+                Is.EqualTo(new[] { "Terrace_0", "Terrace_2" }));
         }
 
         [Test]
         public void EveryTileGetsOneFloorQuad()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             var quads = PartsStyled(blueprint, PartStyle.Floor);
@@ -76,9 +78,9 @@ namespace Game.Domain.Tests
         [Test]
         public void FloorQuadsLieFlatOnTheirTile()
         {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
-            var quad = PartsStyled(blueprint, PartStyle.Floor).First(part => part.Name == PartNames.Tile(new TilePosition(1, 6, 1)));
+            var quad = PartsStyled(blueprint, PartStyle.Floor).First(part => part.Name == PartNames.Tile(new TilePosition(2, 6, 1)));
 
             Assert.That(quad.Position, Is.EqualTo(new WorldPoint(6f, 2f, 1f)));
             Assert.That(quad.Rotation, Is.EqualTo(new WorldPoint(90f, 0f, 0f)));
@@ -86,19 +88,19 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void SiblingOrderIsTheFloorYXSweep()
+        public void SiblingOrderIsTheElevationYXSweep()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
-            foreach (var floor in blueprint.Floors)
+            foreach (var terrace in blueprint.Terraces)
             {
                 var swept = graph.Tiles.Tiles
-                    .Where(tile => tile.Position.Floor == floor.Floor)
+                    .Where(tile => tile.Position.Elevation == terrace.Elevation)
                     .Select(tile => PartNames.Tile(tile.Position))
                     .ToList();
 
-                var built = floor.Tiles
+                var built = terrace.Tiles
                     .Where(part => part.Style == PartStyle.Floor)
                     .Select(part => part.Name)
                     .ToList();
@@ -110,7 +112,7 @@ namespace Game.Domain.Tests
         [Test]
         public void NodePropsFollowTheirNodeIds()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             var expected = graph.Decisions.Nodes
@@ -118,7 +120,7 @@ namespace Game.Domain.Tests
                 .Select(node => PartNames.Node(node.Id))
                 .ToList();
 
-            var built = blueprint.Floors.SelectMany(floor => floor.Nodes).Select(part => part.Name).ToList();
+            var built = blueprint.Terraces.SelectMany(terrace => terrace.Nodes).Select(part => part.Name).ToList();
 
             Assert.That(built, Is.EqualTo(expected));
         }
@@ -126,7 +128,7 @@ namespace Game.Domain.Tests
         [Test]
         public void WallsStandOnAbsentNeighboursAndNowhereElse()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             var walls = new HashSet<string>(PartsStyled(blueprint, PartStyle.Wall).Select(part => part.Name));
@@ -157,7 +159,7 @@ namespace Game.Domain.Tests
         [Test]
         public void AWallStandsHalfwayBetweenItsTileAndTheAbsentNeighbour()
         {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
             var wall = PartsStyled(blueprint, PartStyle.Wall)
                 .First(part => part.Name == PartNames.Wall(new TilePosition(0, 1, 0), TileSide.South));
@@ -170,7 +172,7 @@ namespace Game.Domain.Tests
         [Test]
         public void EveryWallShowsItsFaceToTheTileItBelongsTo()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             foreach (var tile in graph.Tiles.Tiles)
@@ -198,7 +200,7 @@ namespace Game.Domain.Tests
         [Test]
         public void EveryFloorQuadShowsItsFaceUpwards()
         {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
             foreach (var quad in PartsStyled(blueprint, PartStyle.Floor))
             {
@@ -207,9 +209,9 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AStairGetsARampSpanningBothFloors()
+        public void AStairGetsARampSpanningBothTerraces()
         {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
             var ramps = PartsStyled(blueprint, PartStyle.Ramp);
 
@@ -218,16 +220,18 @@ namespace Game.Domain.Tests
             Assert.That(ramps[0].Shape, Is.EqualTo(PartShape.Cube));
             Assert.That(ramps[0].Position.X, Is.EqualTo(5f));
             Assert.That(ramps[0].Position.Z, Is.EqualTo(0f));
-            Assert.That(ramps[0].Scale.Y, Is.EqualTo(IsoProjection.FloorHeight).Within(LevelBlueprintBuilder.RampClearance));
+            Assert.That(
+                ramps[0].Scale.Y,
+                Is.EqualTo(IsoProjection.StepHeight * Terraces.Rise).Within(LevelBlueprintBuilder.RampClearance));
         }
 
         [Test]
-        public void TheRampHangsUnderTheLowerFloor()
+        public void TheRampHangsUnderTheLowerTerrace()
         {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
-            var lower = blueprint.Floors.First(floor => floor.Floor == 0);
-            var upper = blueprint.Floors.First(floor => floor.Floor == 1);
+            var lower = blueprint.Terraces.First(terrace => terrace.Elevation == 0);
+            var upper = blueprint.Terraces.First(terrace => terrace.Elevation == Terraces.Rise);
 
             Assert.That(lower.Tiles.Any(part => part.Style == PartStyle.Ramp), Is.True);
             Assert.That(upper.Tiles.Any(part => part.Style == PartStyle.Ramp), Is.False);
@@ -236,7 +240,7 @@ namespace Game.Domain.Tests
         [Test]
         public void EmptyNodesInstantiateNothing()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             var emptyNames = graph.Decisions.Nodes
@@ -251,7 +255,7 @@ namespace Game.Domain.Tests
         [Test]
         public void PropsFollowTheNodeTypeTable()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             AssertProp(graph, blueprint, NodeType.Start, PartShape.Capsule, PartStyle.Start);
@@ -264,7 +268,7 @@ namespace Game.Domain.Tests
         [Test]
         public void TheBossStandsTallerThanAnEnemy()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             var boss = Prop(graph, blueprint, NodeType.Boss);
@@ -276,7 +280,7 @@ namespace Game.Domain.Tests
         [Test]
         public void AMultiplierIsACubeTurnedFortyFiveDegrees()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             Assert.That(Prop(graph, blueprint, NodeType.Multiplier).Rotation, Is.EqualTo(new WorldPoint(0f, 45f, 0f)));
@@ -286,7 +290,7 @@ namespace Game.Domain.Tests
         [Test]
         public void EveryPropStandsOnTopOfItsTile()
         {
-            var graph = LevelGraphFixture.TwoFloors();
+            var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             foreach (var node in graph.Decisions.Nodes)
@@ -306,11 +310,13 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EveryPartHangsUnderAFloorGroup()
+        public void EveryPartHangsUnderATerraceGroup()
         {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
-            var grouped = blueprint.Floors.SelectMany(floor => floor.Tiles.Concat(floor.Nodes)).Count();
+            var grouped = blueprint.Terraces
+                .SelectMany(terrace => terrace.Tiles.Concat(terrace.Nodes))
+                .Count();
 
             Assert.That(grouped, Is.EqualTo(blueprint.AllParts.Count));
             Assert.That(blueprint.AllParts, Is.Not.Empty);
@@ -319,7 +325,7 @@ namespace Game.Domain.Tests
         [Test]
         public void PartNamesAreUnique()
         {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoFloors());
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
             var names = blueprint.AllParts.Select(part => part.Name).ToList();
 

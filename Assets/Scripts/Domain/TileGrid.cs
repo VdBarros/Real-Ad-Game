@@ -82,7 +82,7 @@ namespace Game.Domain
                 return false;
             }
 
-            if (first.Floor == second.Floor
+            if (first.Elevation == second.Elevation
                 && Math.Abs(first.X - second.X) + Math.Abs(first.Y - second.Y) == 1)
             {
                 return true;
@@ -106,10 +106,10 @@ namespace Game.Domain
             }
 
             var neighbours = new List<TilePosition>(5);
-            AddIfPresent(neighbours, new TilePosition(position.Floor, position.X - 1, position.Y));
-            AddIfPresent(neighbours, new TilePosition(position.Floor, position.X + 1, position.Y));
-            AddIfPresent(neighbours, new TilePosition(position.Floor, position.X, position.Y - 1));
-            AddIfPresent(neighbours, new TilePosition(position.Floor, position.X, position.Y + 1));
+            AddIfPresent(neighbours, new TilePosition(position.Elevation, position.X - 1, position.Y));
+            AddIfPresent(neighbours, new TilePosition(position.Elevation, position.X + 1, position.Y));
+            AddIfPresent(neighbours, new TilePosition(position.Elevation, position.X, position.Y - 1));
+            AddIfPresent(neighbours, new TilePosition(position.Elevation, position.X, position.Y + 1));
 
             TilePosition acrossTheStair;
             if (stairPartnerByPosition.TryGetValue(position, out acrossTheStair))
