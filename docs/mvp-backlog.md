@@ -97,6 +97,7 @@ collapse 47% of enemies into one look. The badge never changes; the model does.
 [#14]: https://github.com/VdBarros/Real-Ad-Game/issues/14
 [#15]: https://github.com/VdBarros/Real-Ad-Game/issues/15
 [#16]: https://github.com/VdBarros/Real-Ad-Game/issues/16
+[#61]: https://github.com/VdBarros/Real-Ad-Game/issues/61
 
 ### Calls I made — override any of these if you disagree
 
@@ -441,13 +442,26 @@ sweep that also assigns node ids, and no `Dictionary`/`HashSet` iteration
 appears in the build path.
 
 **The camera is three states** — reversing [#15] and [#16], which recorded two
-and said follow mode does not exist. The rotation and size are still constants
-(`euler(30, 45, 0)`, orthographic, **9.50**), and the opening flight still ends
-on the whole-level frame, because that reveal is what makes this a routing
-puzzle rather than an exploration game. But play framing now **follows the
-player**, a drag pans away from it, and release eases back over ~0.35 s clamped
-to the level's bounding box plus a tile. `ZoomBeat` outranks the follow exactly
-as it outranked the held frame. See
+and said follow mode does not exist. Rotation stays a constant
+(`euler(30, 45, 0)`) and **play framing keeps orthographic 9.50**, but that size
+no longer holds a whole level: at 9.50 a `ship` level spends **857 px of a 540 px
+half-width**, and **56 of 56 seeds run off the frame**. So the opening flight
+ends on a **reveal framing** that widens until every tile — plus the headroom a
+boss and its badge need above one — is on screen, holds it for **0.6 s**, and
+only then lets go. That reveal is the one moment the whole level is visible, and
+it is what makes this a routing puzzle rather than an exploration game. It is a
+per-seed fit (**10.06 to 12.57** over 56 `ship` seeds), never tighter than the
+play size, which is where [#15]'s "the flight's endpoint needs no per-level fit"
+stops being true.
+
+Play framing then **follows the player**: the camera eases toward wherever the
+player stands, rate-limited so automatic motion never crosses the **1000 px/s**
+legibility ceiling — measured worst is 815 px/s on the opening and 750 px/s on
+the follow. The settle off the reveal and the tracking during a walk are the
+same mechanism, which is also what [#61]'s release-eases-back will use. A drag
+pans away from it, and release eases back over ~0.35 s clamped to the level's
+bounding box plus a tile. `ZoomBeat` outranks the follow exactly as it outranked
+the held frame, and hands back to the player rather than to a constant. See
 [ADR-0001](adr/0001-terraces-instead-of-stacked-floors.md) for why.
 
 `TapHold` grows a position to make this possible: a press that travels more than

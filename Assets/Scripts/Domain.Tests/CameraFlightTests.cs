@@ -14,21 +14,21 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AFlightOpensTightOnTheStartAndEndsOnTheConstant()
+        public void AFlightOpensTightOnTheStartAndEndsOnTheWholeLevel()
         {
             var graph = Graph();
             var flight = CameraFlight.Over(graph);
 
             Assert.That(flight.Framing, Is.EqualTo(LevelFraming.Opening(graph)));
             Assert.That(flight.Framing.OrthographicSize, Is.EqualTo(LevelFraming.OpeningSize));
-            Assert.That(flight.Destination, Is.EqualTo(LevelFraming.Play(graph)));
-            Assert.That(flight.Destination.OrthographicSize, Is.EqualTo(IsoProjection.OrthographicSize));
+            Assert.That(flight.Destination, Is.EqualTo(LevelFraming.Whole(graph)));
         }
 
         [Test]
-        public void TheLastFrameEqualsTheConstantExactlyWithNoSnapIntoPlay()
+        public void TheLastFrameEqualsTheWholeLevelExactlyWithNoSnapIntoTheHold()
         {
             var graph = Graph();
+            var whole = LevelFraming.Whole(graph);
             var flight = CameraFlight.Over(graph);
 
             while (!flight.IsSettled)
@@ -36,9 +36,57 @@ namespace Game.Domain.Tests
                 flight = flight.Advanced(Frame);
             }
 
-            Assert.That(flight.Framing, Is.EqualTo(LevelFraming.Play(graph)));
-            Assert.That(flight.Framing.Target, Is.EqualTo(LevelFraming.Play(graph).Target));
-            Assert.That(flight.Framing.OrthographicSize, Is.EqualTo(IsoProjection.OrthographicSize));
+            Assert.That(flight.Framing, Is.EqualTo(whole));
+            Assert.That(flight.Framing.Target, Is.EqualTo(whole.Target));
+            Assert.That(flight.Framing.OrthographicSize, Is.EqualTo(whole.OrthographicSize));
+        }
+
+        [Test]
+        public void TheFlightArrivesOnTheWholeLevelAndHoldsThereBeforeItLetsGo()
+        {
+            var graph = Graph();
+            var whole = LevelFraming.Whole(graph);
+            var flight = CameraFlight.Over(graph);
+            var held = 0f;
+
+            while (!flight.IsSettled)
+            {
+                flight = flight.Advanced(Frame);
+
+                if (flight.Framing.Equals(whole) && !flight.IsSettled)
+                {
+                    held += Frame;
+                }
+            }
+
+            Assert.That(
+                held,
+                Is.GreaterThanOrEqualTo(0.3f),
+                "The opening never rests on the whole level long enough to be read as a reveal.");
+        }
+
+        [Test]
+        public void TheWholeLevelIsOnScreenAtTheFrameTheOpeningHoldsOn()
+        {
+            var graph = Graph();
+            var whole = LevelFraming.Whole(graph);
+            var acrossHalf = whole.OrthographicSize * ScreenFrame.Width / ScreenFrame.Height;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                var point = IsoProjection.Of(tile.Position);
+                var apart = new WorldPoint(
+                    point.X - whole.Target.X, point.Y - whole.Target.Y, point.Z - whole.Target.Z);
+
+                Assert.That(
+                    Math.Abs(WorldPoint.Dot(apart, IsoProjection.CameraRight)),
+                    Is.LessThanOrEqualTo(acrossHalf),
+                    tile.Position + " falls off the side of the frame the reveal holds on.");
+                Assert.That(
+                    Math.Abs(WorldPoint.Dot(apart, IsoProjection.CameraUp)),
+                    Is.LessThanOrEqualTo(whole.OrthographicSize),
+                    tile.Position + " falls off the top or bottom of the frame the reveal holds on.");
+            }
         }
 
         [Test]
@@ -48,7 +96,7 @@ namespace Game.Domain.Tests
             var skipped = CameraFlight.Over(graph).Advanced(0.4f).Skipped();
 
             Assert.That(skipped.IsSettled, Is.True);
-            Assert.That(skipped.Framing, Is.EqualTo(LevelFraming.Play(graph)));
+            Assert.That(skipped.Framing, Is.EqualTo(LevelFraming.Whole(graph)));
         }
 
         [Test]
@@ -65,7 +113,7 @@ namespace Game.Domain.Tests
 
             Assert.That(travelled, Is.LessThan(half * 0.1f));
             Assert.That(middle.OrthographicSize, Is.EqualTo(
-                (LevelFraming.OpeningSize + IsoProjection.OrthographicSize) * 0.5f).Within(1e-4f));
+                (LevelFraming.OpeningSize + LevelFraming.Whole(graph).OrthographicSize) * 0.5f).Within(1e-4f));
         }
 
         [Test]
@@ -94,7 +142,7 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheFlightIsTheOnlyInterpolationInTheRig()
+        public void ABeatHoldsStillWhileTheOpeningAndTheFollowBothMove()
         {
             var graph = Graph();
             var staging = CameraStaging.Over(graph);
@@ -112,7 +160,7 @@ namespace Game.Domain.Tests
                 previous = staging.Framing;
             }
 
-            var beating = staging.CutTo(new TilePosition(0, 1, 1));
+            var beating = staging.CutTo(new TilePosition(0, 1, 1)).Follows(new WorldPoint(9f, 2f, 9f));
             var held = beating.Framing;
             for (var step = 0; step < 30; step++)
             {

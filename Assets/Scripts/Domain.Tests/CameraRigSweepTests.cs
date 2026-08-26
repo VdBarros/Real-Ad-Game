@@ -13,6 +13,8 @@ namespace Game.Domain.Tests
 
         const float PartExtent = 1.5f;
 
+        const int FrameCap = 1200;
+
         static List<LevelGraph> sweep;
 
         static IReadOnlyList<LevelGraph> Sweep()
@@ -34,47 +36,73 @@ namespace Game.Domain.Tests
         [Test]
         public void ThePeakOnScreenPanStaysUnderOneScreenWidthPerSecond()
         {
-            var peaks = new List<float>(Seeds);
+            var openings = new List<float>(Seeds);
+            var follows = new List<float>(Seeds);
             var worst = 0f;
             long worstSeed = 0;
+            var worstLeg = "opening";
 
             foreach (var graph in Sweep())
             {
-                var flight = CameraFlight.Over(graph);
-                var previous = flight.Framing;
+                var staging = CameraStaging.Over(graph);
+                var previous = staging.Framing;
                 var peak = 0f;
 
-                while (!flight.IsSettled)
+                while (staging.IsBusy || !staging.IsSettled)
                 {
-                    flight = flight.Advanced(Frame);
-                    var speed = ScreenFrame.PanPixels(previous, flight.Framing) / Frame;
-                    if (speed > peak)
-                    {
-                        peak = speed;
-                    }
-
-                    previous = flight.Framing;
+                    staging = staging.Advanced(Frame);
+                    peak = Math.Max(peak, ScreenFrame.PanPixels(previous, staging.Framing) / Frame);
+                    previous = staging.Framing;
                 }
 
-                peaks.Add(peak);
+                openings.Add(peak);
                 if (peak > worst)
                 {
                     worst = peak;
                     worstSeed = graph.Seed;
+                    worstLeg = "opening";
+                }
+
+                var chased = 0f;
+                foreach (var node in graph.Decisions.Nodes)
+                {
+                    staging = staging.Follows(IsoProjection.Of(node.Position));
+
+                    for (var frame = 0; frame < FrameCap && !staging.IsSettled; frame++)
+                    {
+                        staging = staging.Advanced(Frame);
+                        chased = Math.Max(chased, ScreenFrame.PanPixels(previous, staging.Framing) / Frame);
+                        previous = staging.Framing;
+                    }
+                }
+
+                follows.Add(chased);
+                if (chased > worst)
+                {
+                    worst = chased;
+                    worstSeed = graph.Seed;
+                    worstLeg = "follow";
                 }
             }
 
-            peaks.Sort();
+            openings.Sort();
+            follows.Sort();
 
-            Console.WriteLine("ship, " + Seeds + " seeds, flight over " + CameraFlight.Seconds + " s");
-            Console.WriteLine("  peak pan median  " + peaks[peaks.Count / 2].ToString("0") + " px/s");
-            Console.WriteLine("  peak pan worst   " + worst.ToString("0") + " px/s on seed " + worstSeed);
-            Console.WriteLine("  ceiling          " + ScreenFrame.PanCeiling.ToString("0") + " px/s");
+            Console.WriteLine(
+                "ship, " + Seeds + " seeds, opening over " + CameraFlight.Duration
+                + " s (" + CameraFlight.Seconds + " reveal, " + CameraFlight.HoldSeconds
+                + " hold) and then a follow settling onto the player");
+            Console.WriteLine("  opening peak pan median  " + openings[openings.Count / 2].ToString("0") + " px/s");
+            Console.WriteLine("  follow peak pan median   " + follows[follows.Count / 2].ToString("0") + " px/s");
+            Console.WriteLine(
+                "  worst anywhere           " + worst.ToString("0") + " px/s on the " + worstLeg
+                + " of seed " + worstSeed);
+            Console.WriteLine("  ceiling                  " + ScreenFrame.PanCeiling.ToString("0") + " px/s");
 
             Assert.That(
                 worst,
                 Is.LessThan(ScreenFrame.PanCeiling),
-                "Seed " + worstSeed + " pans at " + worst + " px/s, over the "
+                "Seed " + worstSeed + " pans at " + worst + " px/s on its " + worstLeg + ", over the "
                 + ScreenFrame.PanCeiling + " px/s ceiling for a " + ScreenFrame.Width + "-wide portrait frame.");
         }
 
@@ -87,11 +115,12 @@ namespace Game.Domain.Tests
             foreach (var graph in Sweep())
             {
                 var blueprint = LevelBlueprintBuilder.Build(graph);
-                var framings = new List<CameraFraming> { LevelFraming.Play(graph), LevelFraming.Opening(graph) };
+                var framings = new List<CameraFraming> { LevelFraming.Whole(graph), LevelFraming.Opening(graph) };
 
                 foreach (var node in graph.Decisions.Nodes)
                 {
                     framings.Add(LevelFraming.CloseUp(node.Position));
+                    framings.Add(LevelFraming.Play(IsoProjection.Of(node.Position)));
                 }
 
                 foreach (var framing in framings)
@@ -148,21 +177,72 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheConstantIsAPerPresetConstantRatherThanAPerSeedFit()
+        public void TheRevealFitsTheLevelItRevealsAndReadsTheSameEveryTime()
         {
-            CameraFraming? constant = null;
+            var widest = 0f;
+            var tightest = float.MaxValue;
 
             foreach (var graph in Sweep())
             {
-                var play = LevelFraming.Play(graph);
-                if (constant == null)
-                {
-                    constant = play;
-                    continue;
-                }
+                var whole = LevelFraming.Whole(graph);
 
-                Assert.That(play, Is.EqualTo(constant.Value), "Seed " + graph.Seed + " reframed the level.");
+                Assert.That(
+                    whole,
+                    Is.EqualTo(LevelFraming.Whole(graph)),
+                    "Seed " + graph.Seed + " reveals itself differently on a second reading.");
+
+                widest = Math.Max(widest, whole.OrthographicSize);
+                tightest = Math.Min(tightest, whole.OrthographicSize);
             }
+
+            Console.WriteLine(
+                "  reveal size      " + tightest.ToString("0.##") + " to " + widest.ToString("0.##")
+                + " over " + Seeds + " seeds, a tile "
+                + (ScreenFrame.PixelsPerMetre(widest) * IsoProjection.TileEdge).ToString("0")
+                + " px across at its widest against "
+                + (ScreenFrame.PixelsPerMetre(IsoProjection.OrthographicSize) * IsoProjection.TileEdge).ToString("0")
+                + " px in play");
+        }
+
+        [Test]
+        public void TheWholeLevelIsOnScreenOnlyAtTheReveal()
+        {
+            var offAtPlay = 0;
+
+            foreach (var graph in Sweep())
+            {
+                Assert.That(Spills(graph, LevelFraming.Whole(graph)), Is.False,
+                    "Seed " + graph.Seed + " does not fit the frame the opening reveals it on.");
+
+                if (Spills(graph, LevelFraming.Play(LevelFraming.Centre(graph))))
+                {
+                    offAtPlay++;
+                }
+            }
+
+            Console.WriteLine(
+                "  " + offAtPlay + " of " + Seeds
+                + " seeds run off a play-sized frame, which is why the camera follows rather than holds");
+        }
+
+        static bool Spills(LevelGraph graph, CameraFraming framing)
+        {
+            var acrossHalf = framing.OrthographicSize * ScreenFrame.Width / ScreenFrame.Height;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                var point = IsoProjection.Of(tile.Position);
+                var apart = new WorldPoint(
+                    point.X - framing.Target.X, point.Y - framing.Target.Y, point.Z - framing.Target.Z);
+
+                if (Math.Abs(WorldPoint.Dot(apart, IsoProjection.CameraRight)) > acrossHalf
+                    || Math.Abs(WorldPoint.Dot(apart, IsoProjection.CameraUp)) > framing.OrthographicSize)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

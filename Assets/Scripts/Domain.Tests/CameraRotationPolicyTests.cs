@@ -12,6 +12,7 @@ namespace Game.Domain.Tests
         {
             typeof(CameraFraming),
             typeof(CameraFlight),
+            typeof(CameraFollow),
             typeof(ZoomBeat),
             typeof(CameraStaging),
             typeof(LevelFraming)

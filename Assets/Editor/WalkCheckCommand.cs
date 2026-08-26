@@ -22,6 +22,8 @@ namespace Game.EditorTooling
 
         const int FrameCap = 4000;
 
+        const int SettleCap = 400;
+
         const string TrailPath = "dev/scratch/t-14-walk-trail.png";
 
         const string BeatPath = "dev/scratch/t-14-walk-beat.png";
@@ -223,7 +225,6 @@ namespace Game.EditorTooling
             var frames = 0;
             var cutAway = false;
             var holding = false;
-            var constant = LevelFraming.Play(walker.Run.Level);
 
             for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
             {
@@ -245,7 +246,7 @@ namespace Game.EditorTooling
                     }
 
                     frames++;
-                    cutAway |= !rig.Framing.Equals(constant);
+                    cutAway |= !rig.Framing.Equals(rig.Following);
                     continue;
                 }
 
@@ -266,11 +267,19 @@ namespace Game.EditorTooling
                 Debug.LogError("A walk was still going after " + FrameCap + " frames.");
             }
 
-            if (!rig.Framing.Equals(constant))
+            var standing = LevelFraming.Play(
+                IsoProjection.Of(walker.Run.Level.Decisions.Node(walker.Run.PositionNodeId).Position));
+
+            for (var frame = 0; frame < SettleCap && !rig.Framing.Equals(standing); frame++)
+            {
+                Step(rig, builder, walker);
+            }
+
+            if (!rig.Framing.Equals(standing))
             {
                 Debug.LogError(
                     "The camera came out of the walk framing " + rig.Framing
-                    + " rather than back at the constant " + constant + ".");
+                    + " rather than following the player at " + standing + ".");
             }
 
             return beats;
@@ -287,7 +296,7 @@ namespace Game.EditorTooling
             {
                 Debug.LogError(
                     "A beat held for " + (frames * Frame) + "s, under the " + ZoomBeat.FloorSeconds
-                    + "s floor a cut away from the constant is worth.");
+                    + "s floor a cut away from the follow is worth.");
             }
         }
 

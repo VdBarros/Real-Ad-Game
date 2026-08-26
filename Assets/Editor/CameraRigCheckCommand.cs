@@ -16,11 +16,17 @@ namespace Game.EditorTooling
 
         const int Ceiling = 400;
 
+        const float ReadableReveal = 0.3f;
+
         const string OpeningPath = "dev/scratch/t-11-camera-opening.png";
 
         const string MidflightPath = "dev/scratch/t-11-camera-midflight.png";
 
+        const string RevealPath = "dev/scratch/t-11-camera-reveal.png";
+
         const string LandedPath = "dev/scratch/t-11-camera-landed.png";
+
+        const string FollowedPath = "dev/scratch/t-11-camera-followed.png";
 
         const string BeatPath = "dev/scratch/t-11-camera-beat.png";
 
@@ -45,23 +51,31 @@ namespace Game.EditorTooling
                 .Append(Seed.ToString(CultureInfo.InvariantCulture))
                 .Append(':');
 
+            var reveal = LevelFraming.Whole(graph);
             var peak = 0f;
             var previous = rig.Framing;
             var frames = 0;
             var midflight = false;
+            var revealed = false;
+            var heldFrames = 0;
 
             while (rig.IsBusy && frames < Ceiling)
             {
                 rig.Advance(Frame);
                 frames++;
 
-                var speed = ScreenFrame.PanPixels(previous, rig.Framing) / Frame;
-                if (speed > peak)
-                {
-                    peak = speed;
-                }
-
+                peak = Peak(peak, previous, rig.Framing);
                 previous = rig.Framing;
+
+                if (rig.Framing.Equals(reveal))
+                {
+                    heldFrames++;
+                    if (!revealed)
+                    {
+                        revealed = true;
+                        PreviewFilm.Shoot(lens, RevealPath);
+                    }
+                }
 
                 if (!midflight && frames * Frame >= CameraFlight.Seconds * 0.5f)
                 {
@@ -70,10 +84,85 @@ namespace Game.EditorTooling
                 }
             }
 
-            PreviewFilm.Shoot(lens, LandedPath);
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  reveal held for {0:0.###} s of the {1} s hold on {2}",
+                heldFrames * Frame,
+                CameraFlight.HoldSeconds,
+                reveal);
 
-            var constant = LevelFraming.Play(graph);
-            report.Append(Landing("flight", lens, constant, frames, peak));
+            if (heldFrames * Frame < ReadableReveal)
+            {
+                Debug.LogError(
+                    "The opening held the whole level for " + (heldFrames * Frame)
+                    + "s, under the " + ReadableReveal + "s it takes to read a level off one frame.");
+            }
+
+            if (!rig.Framing.Equals(reveal))
+            {
+                Debug.LogError(
+                    "The opening let go of input at " + rig.Framing + " rather than on the whole level "
+                    + reveal + ".");
+            }
+
+            EveryTileIsOnScreen(graph, lens, reveal);
+
+            var player = LevelFraming.Play(LevelFraming.StartPoint(graph));
+            var settled = 0;
+            while (!rig.Framing.Equals(player) && settled < Ceiling)
+            {
+                rig.Advance(Frame);
+                settled++;
+
+                peak = Peak(peak, previous, rig.Framing);
+                previous = rig.Framing;
+            }
+
+            PreviewFilm.Shoot(lens, LandedPath);
+            report.Append(Landing("settle onto the player", lens, player, settled, peak));
+
+            if (settled <= 1)
+            {
+                Debug.LogError("The camera cut from the reveal to the player rather than easing onto them.");
+            }
+
+            var walked = FarFrom(graph);
+            var chased = 0;
+            var followPeak = 0f;
+            previous = rig.Framing;
+            rig.Follow(walked);
+
+            while (!rig.Framing.Target.Equals(walked) && chased < Ceiling)
+            {
+                rig.Advance(Frame);
+                chased++;
+
+                followPeak = Peak(followPeak, previous, rig.Framing);
+                previous = rig.Framing;
+            }
+
+            PreviewFilm.Shoot(lens, FollowedPath);
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  follow reached the player at {0} in {1} frames, peak pan {2:0} px/s of {3} allowed",
+                walked,
+                chased,
+                followPeak,
+                ScreenFrame.PanCeiling);
+
+            if (!rig.Framing.Target.Equals(walked))
+            {
+                Debug.LogError(
+                    "The camera never reached a player standing at " + walked
+                    + ", stopping at " + rig.Framing + ".");
+            }
+
+            if (followPeak > ScreenFrame.PanCeiling)
+            {
+                Debug.LogError(
+                    "The follow panned at " + followPeak + " px/s, over the "
+                    + ScreenFrame.PanCeiling + " px/s ceiling.");
+            }
 
             var subject = Multiplier(graph);
             rig.CutTo(subject);
@@ -93,7 +182,14 @@ namespace Game.EditorTooling
                 frames++;
             }
 
-            report.Append(Landing("beat exit", lens, constant, frames, 0f));
+            report.Append(Landing("beat exit", lens, rig.Following, frames, 0f));
+
+            if (!rig.Framing.Target.Equals(walked))
+            {
+                Debug.LogError(
+                    "A beat handed the camera back at " + rig.Framing
+                    + " rather than to the player it was following at " + walked + ".");
+            }
 
             rig.Skip();
             report.Append("\n  a tap leaves the rig ").Append(rig.IsBusy ? "busy" : "free");
@@ -102,6 +198,56 @@ namespace Game.EditorTooling
 
             WorldObjects.Destroy(root);
             builder.Dispose();
+        }
+
+        static float Peak(float peak, CameraFraming from, CameraFraming to)
+        {
+            var speed = ScreenFrame.PanPixels(from, to) / Frame;
+            return speed > peak ? speed : peak;
+        }
+
+        static void EveryTileIsOnScreen(LevelGraph graph, Camera lens, CameraFraming reveal)
+        {
+            var offScreen = 0;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                var point = IsoProjection.Of(tile.Position);
+                var drawn = lens.WorldToViewportPoint(new Vector3(point.X, point.Y, point.Z));
+
+                if (drawn.x < 0f || drawn.x > 1f || drawn.y < 0f || drawn.y > 1f)
+                {
+                    offScreen++;
+                }
+            }
+
+            if (offScreen > 0)
+            {
+                Debug.LogError(
+                    offScreen + " of " + graph.Tiles.Tiles.Count
+                    + " tiles sit off screen at the frame the opening reveals the level on, " + reveal + ".");
+            }
+        }
+
+        static WorldPoint FarFrom(LevelGraph graph)
+        {
+            var start = LevelFraming.StartPoint(graph);
+            var furthest = start;
+            var apart = 0f;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                var point = IsoProjection.Of(tile.Position);
+                var span = ScreenFrame.PanPixels(LevelFraming.Play(start), LevelFraming.Play(point));
+
+                if (span > apart)
+                {
+                    apart = span;
+                    furthest = point;
+                }
+            }
+
+            return furthest;
         }
 
         static string Landing(string leg, Camera lens, CameraFraming constant, int frames, float peak)
