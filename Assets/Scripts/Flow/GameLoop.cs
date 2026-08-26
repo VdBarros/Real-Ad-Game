@@ -173,7 +173,7 @@ namespace Game.Flow
                 return;
             }
 
-            if (cycle.Phase == GamePhase.Preview && rig != null)
+            if ((cycle.Phase == GamePhase.Preview || cycle.Phase == GamePhase.Play) && rig != null)
             {
                 rig.Skip();
             }
