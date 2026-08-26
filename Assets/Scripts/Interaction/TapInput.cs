@@ -222,7 +222,8 @@ namespace Game.Interaction
                 pointer.press.wasPressedThisFrame,
                 pointer.press.wasReleasedThisFrame,
                 pointer.press.isPressed,
-                pointer is Mouse);
+                pointer is Mouse,
+                IsLocked || rig.IsBusy);
 
             if (hold.Gesture == TapGesture.Ignore)
             {

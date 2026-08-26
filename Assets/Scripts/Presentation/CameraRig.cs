@@ -49,6 +49,15 @@ namespace Game.Presentation
             Apply();
         }
 
+        public void Hold(CameraFraming framing)
+        {
+            staged = false;
+            applied = framing;
+            transform.position = new Vector3(framing.Position.X, framing.Position.Y, framing.Position.Z);
+            Lens().orthographicSize = framing.OrthographicSize;
+            enabled = false;
+        }
+
         public void CutTo(TilePosition position)
         {
             RequireALevel();

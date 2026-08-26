@@ -21,7 +21,7 @@ namespace Game.Flow
             }
 
             RaiseTheSun();
-            GameLoop.Raise(SeedOfThisSession(), MazePreset.Ship, null);
+            GameLoop.Raise(SeedOfThisSession(), MazePreset.Ship, new PillarCutscene());
         }
 
         public static long SeedOfThisSession()

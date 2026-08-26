@@ -33,6 +33,8 @@ namespace Game.Flow
 
         bool bossHasFallen;
 
+        bool closed;
+
         public event Action<GameCycle> Turned;
 
         public static GameLoop Raise(long openingSeed, MazePreset preset, ICutscene scene)
@@ -301,7 +303,7 @@ namespace Game.Flow
 
         void Update()
         {
-            if (supply == null)
+            if (closed || supply == null)
             {
                 return;
             }
@@ -309,8 +311,20 @@ namespace Game.Flow
             Advance(Time.deltaTime);
         }
 
-        void OnDestroy()
+        public void Close()
         {
+            if (closed)
+            {
+                return;
+            }
+
+            closed = true;
+
+            if (cutscene != null && cutscene.IsPlaying)
+            {
+                cutscene.Skip();
+            }
+
             Tear();
 
             if (screen != null)
@@ -332,8 +346,18 @@ namespace Game.Flow
             }
         }
 
+        void OnDestroy()
+        {
+            Close();
+        }
+
         void RequireARun()
         {
+            if (closed)
+            {
+                throw new InvalidOperationException("The loop has been closed, and a closed loop does not turn again.");
+            }
+
             if (supply == null)
             {
                 throw new InvalidOperationException(
