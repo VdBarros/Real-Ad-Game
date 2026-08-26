@@ -4,6 +4,7 @@ namespace Game.Presentation.Pure
     {
         Ignore,
         Aim,
+        Pan,
         Release
     }
 }

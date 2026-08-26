@@ -21,6 +21,20 @@ namespace Game.Presentation.Pure
             return screenHeight * 0.5f / orthographicSize;
         }
 
+        public static WorldPoint Drag(float orthographicSize, ScreenPoint from, ScreenPoint to, int screenHeight)
+        {
+            var metres = 1f / PixelsPerMetre(orthographicSize, screenHeight);
+            var across = (from.X - to.X) * metres;
+            var along = (from.Y - to.Y) * metres;
+            var right = IsoProjection.CameraRight;
+            var up = IsoProjection.CameraUp;
+
+            return new WorldPoint(
+                right.X * across + up.X * along,
+                right.Y * across + up.Y * along,
+                right.Z * across + up.Z * along);
+        }
+
         public static ScreenPoint Of(CameraFraming framing, WorldPoint point, int screenWidth, int screenHeight)
         {
             if (screenWidth <= 0)

@@ -146,18 +146,19 @@ namespace Game.EditorTooling
                 }
 
                 var before = tapped.Count;
-                input.AimAt(FingerOn(input, state, stepped));
-                input.ReleaseAt(FingerOn(input, state, stepped));
+                report.Append(SlidOnto(input, rig, state, stepped));
 
                 if (tapped.Count != before + 1 || tapped[tapped.Count - 1].NodeId != stepped)
                 {
-                    Debug.LogError("Releasing over node " + stepped + " did not commit that node.");
+                    Debug.LogError("Sliding onto node " + stepped + " and letting go did not commit that node.");
                 }
 
                 state = ActionResolver.Resolve(state, stepped).State;
                 builder.Floor.Show(state);
                 builder.PlayerBadge.Show(state.Power);
             }
+
+            report.Append(PannedAway(input, rig));
 
             report.Append("\n  ")
                 .Append(previewed.ToString(CultureInfo.InvariantCulture))
@@ -184,6 +185,120 @@ namespace Game.EditorTooling
             WorldObjects.Destroy(root);
             WorldObjects.Destroy(rig.gameObject);
             builder.Dispose();
+        }
+
+        static string SlidOnto(TapInput input, CameraRig rig, RunState state, int nodeId)
+        {
+            var anchor = FingerOn(input, state, nodeId);
+            var from = Nudged(anchor, -input.Reach * 0.9f);
+            var framing = rig.Framing;
+
+            input.Reading(pressedNow: true, releasedNow: false, isPressed: true, hovers: false, finger: from);
+            input.Reading(pressedNow: false, releasedNow: false, isPressed: true, hovers: false, finger: anchor);
+
+            var aimed = input.Preview.NodeId;
+            if (aimed != nodeId)
+            {
+                Debug.LogError(
+                    "A press that began " + ScreenPoint.Distance(from, anchor)
+                    + " px off node " + nodeId + " slid onto it and aimed at " + aimed + " instead.");
+            }
+
+            if (!rig.Framing.Equals(framing))
+            {
+                Debug.LogError(
+                    "A slide shorter than the " + input.Reach + " px reach panned the camera from "
+                    + framing + " to " + rig.Framing + ".");
+            }
+
+            input.Reading(pressedNow: false, releasedNow: true, isPressed: false, hovers: false, finger: anchor);
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "\n  a press {0:0.#} px off node {1} slid onto it, re-aimed and committed without panning",
+                ScreenPoint.Distance(from, anchor),
+                nodeId);
+        }
+
+        static string PannedAway(TapInput input, CameraRig rig)
+        {
+            var resting = rig.Framing;
+            for (var frame = 0; frame < 400; frame++)
+            {
+                rig.Advance(1f / 60f);
+                if (rig.Framing.Equals(resting))
+                {
+                    break;
+                }
+
+                resting = rig.Framing;
+            }
+
+            var anchor = new ScreenPoint(input.FrameWidth * 0.5f, input.FrameHeight * 0.5f);
+            var away = Nudged(anchor, input.Reach * 4f);
+            var player = rig.Framing;
+            var committed = 0;
+
+            Action<TargetPreview> count = preview => committed++;
+            input.Tapped += count;
+
+            input.Reading(pressedNow: true, releasedNow: false, isPressed: true, hovers: false, finger: anchor);
+            input.Reading(pressedNow: false, releasedNow: false, isPressed: true, hovers: false, finger: away);
+
+            var panned = rig.Framing;
+
+            if (panned.Equals(player))
+            {
+                Debug.LogError(
+                    "A drag of " + ScreenPoint.Distance(anchor, away) + " px, past the " + input.Reach
+                    + " px reach, left the camera on the player at " + player + ".");
+            }
+
+            if (input.Preview.IsAimed)
+            {
+                Debug.LogError("A drag past the reach still holds an aim on node " + input.Preview.NodeId + ".");
+            }
+
+            input.Reading(pressedNow: false, releasedNow: true, isPressed: false, hovers: false, finger: away);
+            input.Tapped -= count;
+
+            if (committed != 0)
+            {
+                Debug.LogError("A drag past the reach committed " + committed + " taps and should commit none.");
+            }
+
+            var came = 0;
+            while (!rig.Framing.Equals(player) && came < 400)
+            {
+                rig.Advance(1f / 60f);
+                came++;
+            }
+
+            if (came <= 1)
+            {
+                Debug.LogError("Letting go of a drag cut back to the player rather than easing back.");
+            }
+
+            if (!rig.Framing.Equals(player))
+            {
+                Debug.LogError(
+                    "Letting go of a drag left the camera at " + rig.Framing + " rather than back on the player at "
+                    + player + ".");
+            }
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "\n  a drag of {0:0.#} px past the {1:0.#} px reach panned to {2}, committed nothing, "
+                + "and eased back onto the player in {3} frames",
+                ScreenPoint.Distance(anchor, away),
+                input.Reach,
+                panned.Target,
+                came);
+        }
+
+        static ScreenPoint Nudged(ScreenPoint point, float pixels)
+        {
+            return new ScreenPoint(point.X + pixels, point.Y);
         }
 
         static void Settle(FloorState floor)

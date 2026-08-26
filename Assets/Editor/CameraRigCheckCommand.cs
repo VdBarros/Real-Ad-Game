@@ -28,6 +28,8 @@ namespace Game.EditorTooling
 
         const string FollowedPath = "dev/scratch/t-11-camera-followed.png";
 
+        const string DraggedPath = "dev/scratch/t-11-camera-dragged.png";
+
         const string BeatPath = "dev/scratch/t-11-camera-beat.png";
 
         public static void Check()
@@ -164,6 +166,77 @@ namespace Game.EditorTooling
                     + ScreenFrame.PanCeiling + " px/s ceiling.");
             }
 
+            var held = rig.Framing;
+            rig.Look(Horizon(IsoProjection.CameraUp));
+            PreviewFilm.Shoot(lens, DraggedPath);
+
+            var showing = OnScreen(graph, lens);
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  a drag to the horizon looks at {0}, {1} of {2} tiles still on screen",
+                rig.Framing.Target,
+                showing,
+                graph.Tiles.Tiles.Count);
+
+            if (rig.Framing.Equals(held))
+            {
+                Debug.LogError("A drag left the camera on the player rather than panning away from them.");
+            }
+
+            if (showing == 0)
+            {
+                Debug.LogError(
+                    "A drag to the horizon left no tile of the level on screen, at " + rig.Framing + ".");
+            }
+
+            var dragged = rig.Framing;
+            for (var frame = 0; frame < 60; frame++)
+            {
+                rig.Advance(Frame);
+            }
+
+            if (!rig.Framing.Equals(dragged))
+            {
+                Debug.LogError(
+                    "The camera crept from " + dragged + " to " + rig.Framing
+                    + " while the finger was still holding the drag.");
+            }
+
+            rig.LookBack();
+            var came = 0;
+            var returnPeak = 0f;
+            previous = rig.Framing;
+
+            while (!rig.Framing.Equals(held) && came < Ceiling)
+            {
+                rig.Advance(Frame);
+                came++;
+
+                returnPeak = Peak(returnPeak, previous, rig.Framing);
+                previous = rig.Framing;
+            }
+
+            report.Append(Landing("return from a drag", lens, held, came, returnPeak));
+
+            if (came <= 1)
+            {
+                Debug.LogError("Letting go of a drag cut back to the player rather than easing back.");
+            }
+
+            if (!rig.Framing.Equals(held))
+            {
+                Debug.LogError(
+                    "Letting go of a drag left the camera at " + rig.Framing
+                    + " rather than back on the player at " + held + ".");
+            }
+
+            if (returnPeak > ScreenFrame.PanCeiling)
+            {
+                Debug.LogError(
+                    "The return from a drag panned at " + returnPeak + " px/s, over the "
+                    + ScreenFrame.PanCeiling + " px/s ceiling.");
+            }
+
             var subject = Multiplier(graph);
             rig.CutTo(subject);
             PreviewFilm.Shoot(lens, BeatPath);
@@ -206,20 +279,34 @@ namespace Game.EditorTooling
             return speed > peak ? speed : peak;
         }
 
-        static void EveryTileIsOnScreen(LevelGraph graph, Camera lens, CameraFraming reveal)
+        static WorldPoint Horizon(WorldPoint direction)
         {
-            var offScreen = 0;
+            const float Pull = 1000f;
+
+            return new WorldPoint(direction.X * Pull, direction.Y * Pull, direction.Z * Pull);
+        }
+
+        static int OnScreen(LevelGraph graph, Camera lens)
+        {
+            var showing = 0;
 
             foreach (var tile in graph.Tiles.Tiles)
             {
                 var point = IsoProjection.Of(tile.Position);
                 var drawn = lens.WorldToViewportPoint(new Vector3(point.X, point.Y, point.Z));
 
-                if (drawn.x < 0f || drawn.x > 1f || drawn.y < 0f || drawn.y > 1f)
+                if (drawn.x >= 0f && drawn.x <= 1f && drawn.y >= 0f && drawn.y <= 1f)
                 {
-                    offScreen++;
+                    showing++;
                 }
             }
+
+            return showing;
+        }
+
+        static void EveryTileIsOnScreen(LevelGraph graph, Camera lens, CameraFraming reveal)
+        {
+            var offScreen = graph.Tiles.Tiles.Count - OnScreen(graph, lens);
 
             if (offScreen > 0)
             {

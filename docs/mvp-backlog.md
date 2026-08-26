@@ -457,16 +457,31 @@ stops being true.
 Play framing then **follows the player**: the camera eases toward wherever the
 player stands, rate-limited so automatic motion never crosses the **1000 px/s**
 legibility ceiling — measured worst is 815 px/s on the opening and 750 px/s on
-the follow. The settle off the reveal and the tracking during a walk are the
-same mechanism, which is also what [#61]'s release-eases-back will use. A drag
-pans away from it, and release eases back over ~0.35 s clamped to the level's
-bounding box plus a tile. `ZoomBeat` outranks the follow exactly as it outranked
-the held frame, and hands back to the player rather than to a constant. See
+the follow. The settle off the reveal, the tracking during a walk and the return
+from a drag are **one mechanism**: a drag suspends the follow and places the
+camera directly, and letting go simply resumes it, so the return is the same
+eased, rate-limited step the follow already takes and cannot cross the ceiling by
+construction — worst measured 750 px/s over 56 `ship` seeds pulled to each of
+eight horizons. Nominally the return is the follow's ~0.35 s; a drag long enough
+that 0.35 s would outrun the ceiling takes as long as legibility needs instead.
+The clamp is the level's bounding box plus one tile **measured in the camera's
+own plane**, across and up rather than in world axes, because up the screen is
+mostly world `y` and a world box would crush a vertical drag to nothing.
+`ZoomBeat` outranks the follow exactly as it outranked the held frame, and hands
+back to the player rather than to a constant. See
 [ADR-0001](adr/0001-terraces-instead-of-stacked-floors.md) for why.
 
+The follow's profile starts at the rate limit rather than easing in, because it
+is a position filter whose speed peaks on its first frame and is clipped there.
+[#61] left it alone: an ease-in would need the filter to carry elapsed time or
+velocity, and a camera that starts slowly is worse on the one leg that matters
+most — a release should feel like letting go, not like being let go of.
+
 `TapHold` grows a position to make this possible: a press that travels more than
-the 4.5 mm touch reach becomes a pan and forfeits its tap, and below that
-threshold sliding still re-aims. **The rig still exposes no rotation field**,
+the 4.5 mm touch reach becomes a pan and forfeits its tap — for the whole of that
+press, so straying and coming back does not buy the tap back — and below that
+threshold sliding still re-aims. The threshold is that reach and no other number.
+**The rig still exposes no rotation field**,
 which is what lets #11 copy each badge's rotation once at construction instead
 of billboarding every frame.
 

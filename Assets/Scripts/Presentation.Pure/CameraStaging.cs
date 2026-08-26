@@ -8,12 +8,14 @@ namespace Game.Presentation.Pure
         readonly CameraFlight flight;
         readonly CameraFollow follow;
         readonly ZoomBeat beat;
+        readonly CameraBounds bounds;
 
-        CameraStaging(CameraFlight flight, CameraFollow follow, ZoomBeat beat)
+        CameraStaging(CameraFlight flight, CameraFollow follow, ZoomBeat beat, CameraBounds bounds)
         {
             this.flight = flight;
             this.follow = follow;
             this.beat = beat;
+            this.bounds = bounds;
         }
 
         public static CameraStaging Over(LevelGraph graph)
@@ -23,7 +25,8 @@ namespace Game.Presentation.Pure
             return new CameraStaging(
                 flight,
                 CameraFollow.From(flight.Destination, LevelFraming.StartPoint(graph)),
-                ZoomBeat.None);
+                ZoomBeat.None,
+                CameraBounds.Around(graph));
         }
 
         public CameraFraming Reveal
@@ -69,12 +72,27 @@ namespace Game.Presentation.Pure
             return new CameraStaging(
                 flight.Advanced(deltaSeconds),
                 flight.IsSettled ? follow.Advanced(deltaSeconds) : follow,
-                beat.Advanced(deltaSeconds));
+                beat.Advanced(deltaSeconds),
+                bounds);
         }
 
         public CameraStaging Follows(WorldPoint subject)
         {
-            return new CameraStaging(flight, follow.Toward(subject), beat);
+            return new CameraStaging(flight, follow.Toward(subject), beat, bounds);
+        }
+
+        public CameraStaging Looks(WorldPoint offset)
+        {
+            var subject = follow.Subject;
+            var elsewhere = bounds.Clamp(
+                new WorldPoint(subject.X + offset.X, subject.Y + offset.Y, subject.Z + offset.Z));
+
+            return new CameraStaging(flight, follow.LookingAt(elsewhere), beat, bounds);
+        }
+
+        public CameraStaging LooksBack()
+        {
+            return new CameraStaging(flight, follow.LookingBack(), beat, bounds);
         }
 
         public CameraStaging CutTo(TilePosition position)
@@ -86,22 +104,25 @@ namespace Game.Presentation.Pure
                     + "Skip the flight before cutting away from the follow.");
             }
 
-            return new CameraStaging(flight, follow, ZoomBeat.On(LevelFraming.CloseUp(position)));
+            return new CameraStaging(flight, follow, ZoomBeat.On(LevelFraming.CloseUp(position)), bounds);
         }
 
         public CameraStaging Released()
         {
-            return new CameraStaging(flight, follow, beat.Released());
+            return new CameraStaging(flight, follow, beat.Released(), bounds);
         }
 
         public CameraStaging Skipped()
         {
-            return new CameraStaging(flight.Skipped(), follow, ZoomBeat.None);
+            return new CameraStaging(flight.Skipped(), follow, ZoomBeat.None, bounds);
         }
 
         public bool Equals(CameraStaging other)
         {
-            return flight.Equals(other.flight) && follow.Equals(other.follow) && beat.Equals(other.beat);
+            return flight.Equals(other.flight)
+                && follow.Equals(other.follow)
+                && beat.Equals(other.beat)
+                && bounds.Equals(other.bounds);
         }
 
         public override bool Equals(object obj)
@@ -116,6 +137,7 @@ namespace Game.Presentation.Pure
                 var hash = flight.GetHashCode();
                 hash = (hash * 397) ^ follow.GetHashCode();
                 hash = (hash * 397) ^ beat.GetHashCode();
+                hash = (hash * 397) ^ bounds.GetHashCode();
                 return hash;
             }
         }
