@@ -39,6 +39,7 @@ namespace Game.EditorTooling
             public int Attempts;
             public int FinalPower;
             public int Moves;
+            public int BeatsSkipped;
             public int Carriers;
             public int BadgeTextures;
             public int BadgeMaterials;
@@ -294,6 +295,11 @@ namespace Game.EditorTooling
                 {
                     Step(loop);
                     frames++;
+
+                    if (loop.Rig.IsBusy && turn.BeatsSkipped == 0)
+                    {
+                        ATapDuringABeatReturnsControlImmediately(loop, turn);
+                    }
                 }
 
                 if (frames >= WalkCap)
@@ -313,6 +319,27 @@ namespace Game.EditorTooling
             if (loop.Phase != GamePhase.Result)
             {
                 Fail("Turn " + turn.Number + " ran " + turn.Moves + " moves without a result.");
+            }
+        }
+
+        static void ATapDuringABeatReturnsControlImmediately(GameLoop loop, Turn turn)
+        {
+            var constant = LevelFraming.Play(loop.Level.Graph);
+
+            turn.BeatsSkipped++;
+            loop.Input.ReleaseAt(new ScreenPoint(0f, 0f));
+
+            if (loop.Rig.IsBusy)
+            {
+                Fail("Turn " + turn.Number + " held its beat through a tap that should have ended it.");
+                return;
+            }
+
+            if (!loop.Rig.Framing.Equals(constant))
+            {
+                Fail(
+                    "Turn " + turn.Number + " left a skipped beat framed at " + loop.Rig.Framing
+                    + " rather than the constant " + constant + ".");
             }
         }
 
