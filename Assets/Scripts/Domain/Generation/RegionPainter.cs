@@ -48,6 +48,40 @@ namespace Game.Domain
                     }
                 }
             }
+
+            PaintTheClimbsWithTheTerraceTheyLeave(plan);
+        }
+
+        static void PaintTheClimbsWithTheTerraceTheyLeave(LayoutPlan plan)
+        {
+            var topology = plan.Topology;
+            var painted = true;
+
+            while (painted)
+            {
+                painted = false;
+
+                for (var tile = 0; tile < topology.Count; tile++)
+                {
+                    if (plan.RegionOf(tile) >= 0)
+                    {
+                        continue;
+                    }
+
+                    foreach (var neighbour in topology.Neighbours[tile])
+                    {
+                        if (topology.ElevationOf(neighbour) > topology.ElevationOf(tile)
+                            || plan.RegionOf(neighbour) < 0)
+                        {
+                            continue;
+                        }
+
+                        plan.PaintRegion(tile, plan.RegionOf(neighbour));
+                        painted = true;
+                        break;
+                    }
+                }
+            }
         }
 
         static List<int> FarthestApart(

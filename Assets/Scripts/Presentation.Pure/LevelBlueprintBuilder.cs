@@ -31,13 +31,14 @@ namespace Game.Presentation.Pure
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                var slot = TerraceSlot(elevations, tilesByTerrace, nodesByTerrace, tile.Position.Elevation);
+                var slot = TerraceSlot(elevations, tilesByTerrace, nodesByTerrace, TerraceUnder(tile.Position));
                 var target = tilesByTerrace[slot];
                 target.Add(FloorQuad(tile.Position));
 
                 foreach (var side in TileSides.All)
                 {
-                    if (!graph.Tiles.Contains(TileSides.Step(tile.Position, side)))
+                    var beyond = TileSides.Step(tile.Position, side);
+                    if (!graph.Tiles.ContainsPlace(beyond.X, beyond.Y))
                     {
                         target.Add(Wall(tile.Position, side));
                     }
@@ -57,7 +58,7 @@ namespace Game.Presentation.Pure
                     continue;
                 }
 
-                var slot = TerraceSlot(elevations, tilesByTerrace, nodesByTerrace, node.Position.Elevation);
+                var slot = TerraceSlot(elevations, tilesByTerrace, nodesByTerrace, TerraceUnder(node.Position));
                 nodesByTerrace[slot].Add(prop);
             }
 
@@ -88,6 +89,11 @@ namespace Game.Presentation.Pure
             tilesByTerrace.Add(new List<WorldPart>());
             nodesByTerrace.Add(new List<WorldPart>());
             return elevations.Count - 1;
+        }
+
+        static int TerraceUnder(TilePosition position)
+        {
+            return Terraces.ElevationOf(Terraces.TerraceUnder(position.Elevation));
         }
 
         static bool CarriesRamp(TileGrid tiles, TilePosition position)

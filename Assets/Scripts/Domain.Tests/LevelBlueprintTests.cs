@@ -80,9 +80,9 @@ namespace Game.Domain.Tests
         {
             var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
-            var quad = PartsStyled(blueprint, PartStyle.Floor).First(part => part.Name == PartNames.Tile(new TilePosition(2, 6, 1)));
+            var quad = PartsStyled(blueprint, PartStyle.Floor).First(part => part.Name == PartNames.Tile(new TilePosition(2, 6, 5)));
 
-            Assert.That(quad.Position, Is.EqualTo(new WorldPoint(6f, 2f, 1f)));
+            Assert.That(quad.Position, Is.EqualTo(new WorldPoint(6f, 2f, 5f)));
             Assert.That(quad.Rotation, Is.EqualTo(new WorldPoint(90f, 0f, 0f)));
             Assert.That(quad.Scale, Is.EqualTo(new WorldPoint(1f, 1f, 1f)));
         }
@@ -96,7 +96,8 @@ namespace Game.Domain.Tests
             foreach (var terrace in blueprint.Terraces)
             {
                 var swept = graph.Tiles.Tiles
-                    .Where(tile => tile.Position.Elevation == terrace.Elevation)
+                    .Where(tile => Terraces.ElevationOf(
+                        Terraces.TerraceUnder(tile.Position.Elevation)) == terrace.Elevation)
                     .Select(tile => PartNames.Tile(tile.Position))
                     .ToList();
 
@@ -141,7 +142,7 @@ namespace Game.Domain.Tests
                     var neighbour = TileSides.Step(tile.Position, side);
                     var name = PartNames.Wall(tile.Position, side);
 
-                    if (graph.Tiles.Contains(neighbour))
+                    if (graph.Tiles.ContainsPlace(neighbour.X, neighbour.Y))
                     {
                         Assert.That(walls.Contains(name), Is.False, name + " walls off a tile that is there.");
                     }
@@ -179,7 +180,8 @@ namespace Game.Domain.Tests
             {
                 foreach (var side in TileSides.All)
                 {
-                    if (graph.Tiles.Contains(TileSides.Step(tile.Position, side)))
+                    var beyond = TileSides.Step(tile.Position, side);
+                    if (graph.Tiles.ContainsPlace(beyond.X, beyond.Y))
                     {
                         continue;
                     }
@@ -206,35 +208,6 @@ namespace Game.Domain.Tests
             {
                 Assert.That(QuadNormal(quad.Rotation).Y, Is.EqualTo(1f).Within(Tolerance), quad.Name);
             }
-        }
-
-        [Test]
-        public void AStairGetsARampSpanningBothTerraces()
-        {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
-
-            var ramps = PartsStyled(blueprint, PartStyle.Ramp);
-
-            Assert.That(ramps.Count, Is.EqualTo(1));
-            Assert.That(ramps[0].Name, Is.EqualTo(PartNames.Ramp(new TilePosition(0, 5, 0))));
-            Assert.That(ramps[0].Shape, Is.EqualTo(PartShape.Cube));
-            Assert.That(ramps[0].Position.X, Is.EqualTo(5f));
-            Assert.That(ramps[0].Position.Z, Is.EqualTo(0f));
-            Assert.That(
-                ramps[0].Scale.Y,
-                Is.EqualTo(IsoProjection.StepHeight * Terraces.Rise).Within(LevelBlueprintBuilder.RampClearance));
-        }
-
-        [Test]
-        public void TheRampHangsUnderTheLowerTerrace()
-        {
-            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
-
-            var lower = blueprint.Terraces.First(terrace => terrace.Elevation == 0);
-            var upper = blueprint.Terraces.First(terrace => terrace.Elevation == Terraces.Rise);
-
-            Assert.That(lower.Tiles.Any(part => part.Style == PartStyle.Ramp), Is.True);
-            Assert.That(upper.Tiles.Any(part => part.Style == PartStyle.Ramp), Is.False);
         }
 
         [Test]
@@ -343,6 +316,55 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void NoTerraceCrowdsTheHeadroomAProfileAndItsBadgeNeedOnTheTerraceBelow()
+        {
+            var needed = HeadroomATallPropAndItsBadgeNeed();
+            var tightest = double.MaxValue;
+            var tightestWhere = string.Empty;
+
+            foreach (var preset in new[] { MazePreset.Tiny, MazePreset.Ship, MazePreset.Stress })
+            {
+                for (var seed = 1L; seed <= 40L; seed++)
+                {
+                    var tiles = LevelGenerator.Generate(seed, preset).Graph.Tiles.Tiles;
+
+                    foreach (var below in tiles)
+                    {
+                        foreach (var above in tiles)
+                        {
+                            if (!SharesAScreenColumn(below.Position, above.Position)
+                                || !StandsOnAHigherTerrace(below.Position, above.Position))
+                            {
+                                continue;
+                            }
+
+                            var separation = ScreenUp(above.Position) - ScreenUp(below.Position);
+
+                            Assert.That(
+                                separation,
+                                Is.GreaterThan(needed),
+                                "On " + preset + " seed " + seed + ", the tile at " + above.Position
+                                + " sits only " + separation + " above " + below.Position
+                                + " on screen, which is inside the " + needed
+                                + " a boss and its badge stand in.");
+
+                            if (separation < tightest)
+                            {
+                                tightest = separation;
+                                tightestWhere = preset + " seed " + seed + " " + below.Position
+                                    + " under " + above.Position;
+                            }
+                        }
+                    }
+                }
+            }
+
+            Console.WriteLine(
+                "terrace headroom: a boss and its badge stand " + needed
+                + " up the screen; the tightest column anywhere leaves " + tightest + " at " + tightestWhere);
+        }
+
+        [Test]
         public void AShipLevelRebuildsIdentically()
         {
             var level = LevelGenerator.Generate(20250824L, MazePreset.Ship);
@@ -350,6 +372,40 @@ namespace Game.Domain.Tests
             Assert.That(
                 LevelBlueprintBuilder.Build(level.Graph).AllParts,
                 Is.EqualTo(LevelBlueprintBuilder.Build(level.Graph).AllParts));
+        }
+
+        static double HeadroomATallPropAndItsBadgeNeed()
+        {
+            WorldPart tallest;
+            LevelBlueprintBuilder.TryProp(
+                new DecisionNode(0, new TilePosition(0, 0, 0), NodeType.Boss, 1), out tallest);
+
+            var badgeAnchor = BadgeMetrics.AnchorAbove(WorldParts.TopOf(tallest));
+
+            return badgeAnchor * IsoProjection.CameraUp.Y
+                + BadgeMetrics.Height * 0.5
+                + IsoProjection.TileEdge * IsoProjection.CameraUp.X;
+        }
+
+        static bool SharesAScreenColumn(TilePosition below, TilePosition above)
+        {
+            return below.X - below.Y == above.X - above.Y;
+        }
+
+        static bool StandsOnAHigherTerrace(TilePosition below, TilePosition above)
+        {
+            return Terraces.IsTerrace(below.Elevation)
+                && Terraces.IsTerrace(above.Elevation)
+                && above.Elevation > below.Elevation;
+        }
+
+        static double ScreenUp(TilePosition position)
+        {
+            var point = IsoProjection.Of(position);
+
+            return point.X * IsoProjection.CameraUp.X
+                + point.Y * IsoProjection.CameraUp.Y
+                + point.Z * IsoProjection.CameraUp.Z;
         }
 
         static void AssertProp(LevelGraph graph, LevelBlueprint blueprint, NodeType type, PartShape shape, PartStyle style)

@@ -38,6 +38,11 @@ namespace Game.Domain
             {
                 for (var step = 0; step < run.Path.Count; step += 2)
                 {
+                    if (plan.IsStaircase(run.Path[step]))
+                    {
+                        continue;
+                    }
+
                     candidates.Add(run.Path[step]);
                 }
             }

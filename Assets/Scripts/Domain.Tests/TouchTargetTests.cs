@@ -52,39 +52,30 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EveryNodeWithRoomForANineMillimetreTargetGetsOne()
+        public void NoNodeIsEverCrowdedByANodeOnAnotherTerrace()
         {
             var reach = TouchTargets.Reach;
             var full = 0;
             var crowded = 0;
-            var narrowest = float.MaxValue;
-            var narrowestWhere = string.Empty;
+            var tightestAcross = float.MaxValue;
+            var tightestAcrossWhere = string.Empty;
             var byPreset = new List<string>();
 
             foreach (var preset in new[] { MazePreset.Tiny, MazePreset.Ship, MazePreset.Stress })
             {
-                var presetNarrowest = float.MaxValue;
                 var presetFull = 0;
                 var presetCrowded = 0;
+                var presetTightestAcross = float.MaxValue;
 
                 for (var seed = 1L; seed <= Seeds; seed++)
                 {
                     var graph = LevelGenerator.Generate(seed, preset).Graph;
-                    var points = Drawn(graph);
+                    var drawn = Drawn(graph);
 
-                    for (var index = 0; index < points.Count; index++)
+                    for (var index = 0; index < drawn.Count; index++)
                     {
-                        var separation = NearestOther(points, index);
-                        var target = TouchTargets.Millimetres(
-                            2f * Math.Min(reach, separation * 0.5f), TouchTargets.ReferenceDotsPerInch);
-
-                        if (separation * 0.5f >= reach)
+                        if (NearestOther(drawn, index) * 0.5f >= reach)
                         {
-                            Assert.That(
-                                target,
-                                Is.EqualTo(TouchTargets.MinimumMillimetres).Within(Tolerance),
-                                "Node " + index + " of " + preset + " seed " + seed
-                                + " has room for a full target and did not get one.");
                             presetFull++;
                         }
                         else
@@ -92,15 +83,28 @@ namespace Game.Domain.Tests
                             presetCrowded++;
                         }
 
-                        if (target < presetNarrowest)
+                        var across = NearestOnAnotherTerrace(drawn, index);
+                        if (across == float.MaxValue)
                         {
-                            presetNarrowest = target;
+                            continue;
                         }
 
-                        if (target < narrowest)
+                        Assert.That(
+                            across * 0.5f,
+                            Is.GreaterThanOrEqualTo(reach),
+                            "Node " + index + " of " + preset + " seed " + seed + " at " + drawn[index].Where
+                            + " is crowded by a node on another terrace " + across.ToString("0.#", CultureInfo.InvariantCulture)
+                            + " px away, so a finger meant for one of them can land on the other.");
+
+                        if (across < presetTightestAcross)
                         {
-                            narrowest = target;
-                            narrowestWhere = preset + " seed " + seed + " node " + index;
+                            presetTightestAcross = across;
+                        }
+
+                        if (across < tightestAcross)
+                        {
+                            tightestAcross = across;
+                            tightestAcrossWhere = preset + " seed " + seed + " node " + index;
                         }
                     }
                 }
@@ -109,21 +113,22 @@ namespace Game.Domain.Tests
                 crowded += presetCrowded;
                 byPreset.Add(string.Format(
                     CultureInfo.InvariantCulture,
-                    "{0}: {1} of {2} nodes get the full {3:0.#} mm, narrowest {4:0.##} mm",
+                    "{0}: {1} of {2} nodes have a full {3:0.#} mm target, tightest pair across terraces {4}",
                     preset,
                     presetFull,
                     presetFull + presetCrowded,
                     TouchTargets.MinimumMillimetres,
-                    presetNarrowest));
+                    Pixels(presetTightestAcross)));
             }
 
             Console.WriteLine(
                 "touch targets over " + Seeds + " seeds a preset, at the play framing on a "
                 + TouchTargets.ReferenceDotsPerInch.ToString("0", CultureInfo.InvariantCulture)
-                + " dpi reference device:\n  " + string.Join("\n  ", byPreset.ToArray())
-                + "\n  narrowest overall " + narrowest.ToString("0.##", CultureInfo.InvariantCulture)
-                + " mm at " + narrowestWhere
-                + "\n  " + full + " full, " + crowded + " crowded by a nearer node");
+                + " dpi reference device, reach " + reach.ToString("0.#", CultureInfo.InvariantCulture)
+                + " px:\n  " + string.Join("\n  ", byPreset.ToArray())
+                + "\n  " + full + " full, " + crowded + " crowded by a nearer node on their own terrace"
+                + "\n  tightest pair across terraces " + tightestAcross.ToString("0.#", CultureInfo.InvariantCulture)
+                + " px at " + tightestAcrossWhere);
 
             Assert.That(full, Is.GreaterThan(0), "No node anywhere had room for a full target.");
         }
@@ -194,23 +199,40 @@ namespace Game.Domain.Tests
 
         static float NearestOtherCandidate(IReadOnlyList<TapCandidate> candidates, int index)
         {
-            var points = new List<ScreenPoint>(candidates.Count);
-            foreach (var candidate in candidates)
+            var nearest = float.MaxValue;
+
+            for (var other = 0; other < candidates.Count; other++)
             {
-                points.Add(candidate.Point);
+                if (other == index)
+                {
+                    continue;
+                }
+
+                var distance = ScreenPoint.Distance(candidates[index].Point, candidates[other].Point);
+                if (distance < nearest)
+                {
+                    nearest = distance;
+                }
             }
 
-            return NearestOther(points, index);
+            return nearest;
         }
 
-        static List<ScreenPoint> Drawn(LevelGraph graph)
+        static string Pixels(float separation)
+        {
+            return separation == float.MaxValue
+                ? "none, the preset has one terrace"
+                : separation.ToString("0.#", CultureInfo.InvariantCulture) + " px";
+        }
+
+        static List<DrawnNode> Drawn(LevelGraph graph)
         {
             return Drawn(graph, LevelFraming.Play(graph));
         }
 
-        static List<ScreenPoint> Drawn(LevelGraph graph, CameraFraming framing)
+        static List<DrawnNode> Drawn(LevelGraph graph, CameraFraming framing)
         {
-            var points = new List<ScreenPoint>();
+            var drawn = new List<DrawnNode>();
 
             foreach (var node in graph.Decisions.Nodes)
             {
@@ -220,25 +242,41 @@ namespace Game.Domain.Tests
                     continue;
                 }
 
-                points.Add(ScreenProjection.Of(
-                    framing, TapAim.AnchorOf(node), ScreenFrame.Width, ScreenFrame.Height));
+                drawn.Add(new DrawnNode(
+                    ScreenProjection.Of(framing, TapAim.AnchorOf(node), ScreenFrame.Width, ScreenFrame.Height),
+                    node.Position));
             }
 
-            return points;
+            return drawn;
         }
 
-        static float NearestOther(IReadOnlyList<ScreenPoint> points, int index)
+        static float NearestOther(IReadOnlyList<DrawnNode> drawn, int index)
+        {
+            return Nearest(drawn, index, acrossTerracesOnly: false);
+        }
+
+        static float NearestOnAnotherTerrace(IReadOnlyList<DrawnNode> drawn, int index)
+        {
+            return Nearest(drawn, index, acrossTerracesOnly: true);
+        }
+
+        static float Nearest(IReadOnlyList<DrawnNode> drawn, int index, bool acrossTerracesOnly)
         {
             var nearest = float.MaxValue;
 
-            for (var other = 0; other < points.Count; other++)
+            for (var other = 0; other < drawn.Count; other++)
             {
                 if (other == index)
                 {
                     continue;
                 }
 
-                var distance = ScreenPoint.Distance(points[index], points[other]);
+                if (acrossTerracesOnly && drawn[other].Elevation == drawn[index].Elevation)
+                {
+                    continue;
+                }
+
+                var distance = ScreenPoint.Distance(drawn[index].Point, drawn[other].Point);
                 if (distance < nearest)
                 {
                     nearest = distance;
@@ -246,6 +284,29 @@ namespace Game.Domain.Tests
             }
 
             return nearest;
+        }
+
+        readonly struct DrawnNode
+        {
+            public DrawnNode(ScreenPoint point, TilePosition position)
+            {
+                Point = point;
+                Position = position;
+            }
+
+            public ScreenPoint Point { get; }
+
+            public TilePosition Position { get; }
+
+            public int Elevation
+            {
+                get { return Position.Elevation; }
+            }
+
+            public string Where
+            {
+                get { return Position.ToString(); }
+            }
         }
     }
 }

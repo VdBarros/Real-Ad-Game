@@ -45,7 +45,7 @@ namespace Game.Domain.Tests
             var graph = LevelGraphFixture.TwoTerraces();
 
             Assert.That(
-                graph.Decisions.NodeAt(new TilePosition(elevation: 2, x: 6, y: 1)).Type,
+                graph.Decisions.NodeAt(new TilePosition(elevation: 2, x: 6, y: 5)).Type,
                 Is.EqualTo(NodeType.Boss));
             Assert.That(graph.Decisions.NodeAt(new TilePosition(elevation: 0, x: 3, y: 0)), Is.Null);
         }

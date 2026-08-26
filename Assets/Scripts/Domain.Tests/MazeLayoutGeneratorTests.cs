@@ -120,14 +120,17 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AStressLevelStitchesThreeTerracesWithoutStackingTwoStairsOnOneTile()
+        public void AStressLevelStitchesThreeTerracesWithStaircasesAndNothingUnderneath()
         {
             var layout = MazeLayoutGenerator.Generate(Seed, MazePreset.Stress);
 
             var elevations = new HashSet<int>();
             foreach (var tile in layout.Graph.Tiles.Tiles)
             {
-                elevations.Add(tile.Position.Elevation);
+                if (Terraces.IsTerrace(tile.Position.Elevation))
+                {
+                    elevations.Add(tile.Position.Elevation);
+                }
             }
 
             Assert.That(elevations.Count, Is.EqualTo(3));

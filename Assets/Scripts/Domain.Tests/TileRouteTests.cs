@@ -83,12 +83,19 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ARouteClimbsAStairTheSameWayItWalksACorridor()
+        public void ARouteClimbsAStaircaseTheSameWayItWalksACorridor()
         {
             var level = LevelGraphFixture.TwoTerraces();
-            var route = TileRoute.Of(level, new[] { 1, 4 });
+            var route = TileRoute.Of(level, new[] { 3, 4 });
 
-            Assert.That(route.Tiles, Is.EqualTo(new[] { new TilePosition(0, 5, 0), new TilePosition(2, 5, 0) }));
+            Assert.That(
+                route.Tiles,
+                Is.EqualTo(new[]
+                {
+                    new TilePosition(0, 5, 2),
+                    new TilePosition(1, 5, 3),
+                    new TilePosition(2, 5, 4)
+                }));
             AssertNoWallIsCrossed(level, route);
         }
 

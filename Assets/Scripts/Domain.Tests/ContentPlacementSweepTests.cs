@@ -214,6 +214,22 @@ namespace Game.Domain.Tests
         }
 
         [TestCaseSource(nameof(EveryPreset))]
+        public void NothingIsEverMintedHalfwayUpAFlightOfSteps(MazePreset preset)
+        {
+            foreach (var level in Sweep(preset))
+            {
+                foreach (var node in level.Graph.Decisions.Nodes)
+                {
+                    Assert.That(
+                        Terraces.IsTerrace(node.Position.Elevation),
+                        Is.True,
+                        "Seed " + level.AttemptSeed + " minted " + node.Type + " at " + node.Position
+                        + ", which is a staircase tile rather than ground a player would call a room.");
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPreset))]
         public void InvariantsBAndCHoldOnEveryAcceptedLevel(MazePreset preset)
         {
             foreach (var level in Sweep(preset))
@@ -250,7 +266,7 @@ namespace Game.Domain.Tests
                 "p10 spread was " + Quantile(spreads, 0.1) + ", where the start region pins it at one.");
             Assert.That(
                 Quantile(spreads, 0.5),
-                Is.EqualTo(46.1).Within(12.0),
+                Is.EqualTo(23.3).Within(8.0),
                 "Median spread was " + Quantile(spreads, 0.5) + ".");
             Assert.That(
                 Quantile(spreads, 0.9),

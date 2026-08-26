@@ -30,11 +30,6 @@ namespace Game.Domain.Tests
                 builder.AddTile(tile.Position, tile.RegionId);
             }
 
-            foreach (var stair in Order(Stairs(), backwards))
-            {
-                builder.AddStair(stair.Lower, stair.Upper);
-            }
-
             foreach (var node in Order(Nodes(), backwards))
             {
                 builder.AddNode(node.Item1, node.Item2, node.Item3);
@@ -76,15 +71,11 @@ namespace Game.Domain.Tests
 
             tiles.Add(new Tile(At(0, 1, 1), regionId: 0));
             tiles.Add(new Tile(At(0, 5, 1), regionId: 0));
-            tiles.Add(new Tile(At(2, 5, 0), regionId: 2));
-            tiles.Add(new Tile(At(2, 6, 0), regionId: 2));
-            tiles.Add(new Tile(At(2, 6, 1), regionId: 2));
+            tiles.Add(new Tile(At(1, 5, 3), regionId: 1));
+            tiles.Add(new Tile(At(2, 5, 4), regionId: 2));
+            tiles.Add(new Tile(At(2, 6, 4), regionId: 2));
+            tiles.Add(new Tile(At(2, 6, 5), regionId: 2));
             return tiles;
-        }
-
-        static IReadOnlyList<StairLink> Stairs()
-        {
-            return new[] { new StairLink(At(0, 5, 0)) };
         }
 
         static IReadOnlyList<PlacedNode> Nodes()
@@ -95,9 +86,9 @@ namespace Game.Domain.Tests
                 Node(At(0, 5, 0), NodeType.Empty, 0),
                 Node(At(0, 1, 2), NodeType.Enemy, 4),
                 Node(At(0, 5, 2), NodeType.Additive, 12),
-                Node(At(2, 5, 0), NodeType.Empty, 0),
-                Node(At(2, 6, 0), NodeType.Multiplier, 3),
-                Node(At(2, 6, 1), NodeType.Boss, 30)
+                Node(At(2, 5, 4), NodeType.Empty, 0),
+                Node(At(2, 6, 4), NodeType.Multiplier, 3),
+                Node(At(2, 6, 5), NodeType.Boss, 30)
             };
         }
 
@@ -109,9 +100,9 @@ namespace Game.Domain.Tests
                 Joined(At(0, 1, 0), At(0, 1, 2), At(0, 1, 1)),
                 Joined(At(0, 5, 0), At(0, 5, 2), At(0, 5, 1)),
                 Joined(At(0, 1, 2), At(0, 5, 2), At(0, 2, 2), At(0, 3, 2), At(0, 4, 2)),
-                Joined(At(0, 5, 0), At(2, 5, 0)),
-                Joined(At(2, 5, 0), At(2, 6, 0)),
-                Joined(At(2, 6, 0), At(2, 6, 1))
+                Joined(At(0, 5, 2), At(2, 5, 4), At(1, 5, 3)),
+                Joined(At(2, 5, 4), At(2, 6, 4)),
+                Joined(At(2, 6, 4), At(2, 6, 5))
             };
         }
 
