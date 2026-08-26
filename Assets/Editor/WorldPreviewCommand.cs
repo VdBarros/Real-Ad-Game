@@ -174,7 +174,6 @@ namespace Game.EditorTooling
         {
             var quads = 0;
             var walls = 0;
-            var ramps = 0;
             var props = 0;
 
             foreach (var part in blueprint.AllParts)
@@ -187,9 +186,6 @@ namespace Game.EditorTooling
                     case PartStyle.Wall:
                         walls++;
                         break;
-                    case PartStyle.Ramp:
-                        ramps++;
-                        break;
                     default:
                         props++;
                         break;
@@ -198,13 +194,12 @@ namespace Game.EditorTooling
 
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
-                "preview: {0} terraces, {1} floor quads, {2} walls, {3} ramps, {4} props, {5} badges at "
-                + "{6} glyph cells ({7:0.###} x {8:0.###} units, font {9:0.###}, ceiling {10}), "
-                + "{11} transforms under {12}, written to {13}",
+                "preview: {0} terraces, {1} floor quads, {2} walls, {3} props, {4} badges at "
+                + "{5} glyph cells ({6:0.###} x {7:0.###} units, font {8:0.###}, ceiling {9}), "
+                + "{10} transforms under {11}, written to {12}",
                 blueprint.Terraces.Count,
                 quads,
                 walls,
-                ramps,
                 props,
                 badges.Badges.Count,
                 badges.Plan.Capacity,

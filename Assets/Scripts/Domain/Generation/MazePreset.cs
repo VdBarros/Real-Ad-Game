@@ -43,13 +43,13 @@ namespace Game.Domain
 
             if (stairs < 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(stairs), stairs, "A preset cannot ask for fewer than no stairs.");
+                throw new ArgumentOutOfRangeException(nameof(stairs), stairs, "A preset cannot ask for fewer than no staircases.");
             }
 
             if (terraces > 1 && stairs < 1)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(stairs), stairs, "A terrace above the ground is reachable only by stair.");
+                    nameof(stairs), stairs, "A terrace above the ground is reachable only by a staircase.");
             }
 
             if (minimumBossDepth < 0)

@@ -49,15 +49,6 @@ namespace Game.Domain
             });
             scanner.Expect(',');
 
-            ReadArray(scanner, "stairs", () =>
-            {
-                scanner.Expect('{');
-                var stair = new StairLink(ReadPosition(scanner));
-                scanner.Expect('}');
-                builder.AddStair(stair.Lower, stair.Upper);
-            });
-            scanner.Expect(',');
-
             var positionById = new List<TilePosition>();
             ReadArray(scanner, "nodes", () =>
             {

@@ -11,11 +11,6 @@ namespace Game.Domain.Tests
                 builder.AddTile(tile.Position, tile.RegionId);
             }
 
-            foreach (var stair in level.Tiles.Stairs)
-            {
-                builder.AddStair(stair.Lower, stair.Upper);
-            }
-
             foreach (var node in level.Decisions.Nodes)
             {
                 builder.AddNode(node.Position, node.Type, node.Id == nodeId ? node.Value * factor : node.Value);

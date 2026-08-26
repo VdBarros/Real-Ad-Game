@@ -360,9 +360,9 @@ forced order; at 1.0 it is 3% gates and no puzzle. **0.25 gives ~30% gates and
 ~2.3 pockets per level**, and the placement policy has to fit that supply.
 
 A tile becomes a decision node when its corridor-degree is not 2, or it is the
-start. Junctions promote to never-consumed `Empty` nodes. **There is no
-exemption from the empty-path assertion**, because there is no longer a
-zero-length corridor: a staircase is a run of ordinary walkable tiles from a
+start. Junctions promote to never-consumed `Empty` nodes. **The empty-path
+assertion and the exemption it needed are both gone**, because there is no longer
+a zero-length corridor: a staircase is a run of ordinary walkable tiles from a
 lower terrace's far edge to the next terrace's near edge, and its tiles have
 corridor-degree 2 like any other corridor tile. The tile at the foot gains a
 neighbour and so promotes to a junction on its own.

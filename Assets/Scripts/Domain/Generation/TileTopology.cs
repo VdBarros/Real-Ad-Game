@@ -25,7 +25,6 @@ namespace Game.Domain
             }
 
             neighbours = new int[ordered.Count][];
-            Stairs = new bool[ordered.Count];
             for (var tile = 0; tile < ordered.Count; tile++)
             {
                 var adjacent = geometry.Neighbours(ordered[tile]);
@@ -36,7 +35,6 @@ namespace Game.Domain
                 }
 
                 neighbours[tile] = mapped;
-                Stairs[tile] = geometry.CarriesStair(ordered[tile]);
             }
         }
 
@@ -49,8 +47,6 @@ namespace Game.Domain
         {
             get { return neighbours; }
         }
-
-        public bool[] Stairs { get; }
 
         public TilePosition this[int tile]
         {

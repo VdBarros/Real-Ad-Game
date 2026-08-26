@@ -29,7 +29,6 @@ namespace Game.Domain.Tests
             "    { \"elevation\": 2, \"x\": 6, \"y\": 4, \"region\": 2 },",
             "    { \"elevation\": 2, \"x\": 6, \"y\": 5, \"region\": 2 }",
             "  ],",
-            "  \"stairs\": [],",
             "  \"nodes\": [",
             "    { \"id\": 0, \"elevation\": 0, \"x\": 1, \"y\": 0, \"type\": \"Start\", \"value\": 0 },",
             "    { \"id\": 1, \"elevation\": 0, \"x\": 5, \"y\": 0, \"type\": \"Empty\", \"value\": 0 },",

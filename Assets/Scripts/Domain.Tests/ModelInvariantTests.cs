@@ -34,8 +34,7 @@ namespace Game.Domain.Tests
         public void ALevelGraphBuiltDirectlyStillDemandsNodesStandOnTiles()
         {
             var grid = new TileGrid(
-                new[] { new Tile(new TilePosition(elevation: 0, x: 1, y: 0), regionId: 0) },
-                Array.Empty<StairLink>());
+                new[] { new Tile(new TilePosition(elevation: 0, x: 1, y: 0), regionId: 0) });
             var adrift = new DecisionGraph(
                 new[] { new DecisionNode(0, new TilePosition(elevation: 0, x: 9, y: 9), NodeType.Start, 0) },
                 Array.Empty<Corridor>());

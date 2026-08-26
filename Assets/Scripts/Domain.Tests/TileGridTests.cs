@@ -1,4 +1,3 @@
-using System;
 using NUnit.Framework;
 
 namespace Game.Domain.Tests
@@ -13,8 +12,7 @@ namespace Game.Domain.Tests
                 {
                     new Tile(new TilePosition(elevation: 0, x: 1, y: 1), regionId: 0),
                     new Tile(new TilePosition(elevation: 0, x: 2, y: 1), regionId: 3)
-                },
-                Array.Empty<StairLink>());
+                });
 
             Assert.That(grid.Contains(new TilePosition(elevation: 0, x: 1, y: 1)), Is.True);
             Assert.That(grid.Contains(new TilePosition(elevation: 0, x: 9, y: 9)), Is.False);
@@ -31,8 +29,7 @@ namespace Game.Domain.Tests
                     new Tile(new TilePosition(elevation: 0, x: 2, y: 1), regionId: 0),
                     new Tile(new TilePosition(elevation: 0, x: 3, y: 1), regionId: 0),
                     new Tile(new TilePosition(elevation: 0, x: 2, y: 2), regionId: 0)
-                },
-                Array.Empty<StairLink>());
+                });
 
             Assert.That(
                 grid.Neighbours(new TilePosition(elevation: 0, x: 2, y: 1)),
@@ -62,8 +59,7 @@ namespace Game.Domain.Tests
                     new Tile(step, regionId: 0),
                     new Tile(head, regionId: 1),
                     new Tile(new TilePosition(elevation: 2, x: 4, y: 7), regionId: 1)
-                },
-                Array.Empty<StairLink>());
+                });
 
             Assert.That(
                 grid.Neighbours(foot),
@@ -85,20 +81,7 @@ namespace Game.Domain.Tests
                     {
                         new Tile(new TilePosition(elevation: 0, x: 3, y: 5), regionId: 0),
                         new Tile(new TilePosition(elevation: 2, x: 3, y: 5), regionId: 1)
-                    },
-                    Array.Empty<StairLink>()),
-                Throws.ArgumentException);
-        }
-
-        [Test]
-        public void AStairMustJoinTwoTilesThatExist()
-        {
-            var lower = new TilePosition(elevation: 0, x: 3, y: 5);
-
-            Assert.That(
-                () => new TileGrid(
-                    new[] { new Tile(lower, regionId: 0) },
-                    new[] { new StairLink(lower) }),
+                    }),
                 Throws.ArgumentException);
         }
 
@@ -114,8 +97,7 @@ namespace Game.Domain.Tests
                     new Tile(new TilePosition(elevation: 0, x: 2, y: 0), regionId: 7),
                     new Tile(new TilePosition(elevation: 2, x: 1, y: 8), regionId: 9),
                     new Tile(new TilePosition(elevation: 0, x: 1, y: 1), regionId: 7)
-                },
-                Array.Empty<StairLink>());
+                });
 
             Assert.That(
                 grid.Tiles,

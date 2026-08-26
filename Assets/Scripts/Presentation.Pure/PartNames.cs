@@ -36,11 +36,6 @@ namespace Game.Presentation.Pure
             return "Wall" + Key(position) + "_" + side;
         }
 
-        public static string Ramp(TilePosition position)
-        {
-            return "Ramp" + Key(position);
-        }
-
         public static string Node(int nodeId)
         {
             return "Node_" + nodeId.ToString(CultureInfo.InvariantCulture);

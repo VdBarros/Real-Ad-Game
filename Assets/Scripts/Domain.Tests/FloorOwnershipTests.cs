@@ -14,8 +14,7 @@ namespace Game.Domain.Tests
             typeof(DecisionGraph),
             typeof(DecisionNode),
             typeof(Tile),
-            typeof(TileGrid),
-            typeof(StairLink)
+            typeof(TileGrid)
         };
 
         static readonly string[] OwningWords = { "owner", "owned", "owns", "guard", "cleared", "cursed" };

@@ -181,7 +181,7 @@ namespace Game.Flow
             var group = new GameObject(name);
             group.transform.SetParent(root.transform, worldPositionStays: false);
 
-            var pillar = Raise(PrimitiveType.Cylinder, name + PillarSuffix, group.transform, PartStyle.Ramp);
+            var pillar = Raise(PrimitiveType.Cylinder, name + PillarSuffix, group.transform, PartStyle.Pillar);
             var figure = Raise(PrimitiveType.Capsule, name + FigureSuffix, group.transform, PartStyle.Start);
 
             var part = new BadgePart(
