@@ -352,20 +352,31 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AStaircaseFootsOnTheGroundItRisesFromAtTheEdgeTheClimbStartsAt()
+        public void AStaircaseSetsItsCrestDownOnTheEdgeTheClimbEndsAt()
         {
+            var graph = LevelGraphFixture.TwoTerraces();
             var stair = FirstStaircase();
-            var footed = ModelPose.PositionOf(stair);
-            var ascent = TileSides.OfInwardYaw(stair.Rotation.Y);
-            var back = TileSides.Toward(TileSides.Opposite(ascent));
+            var head = TileSides.Toward(
+                StaircaseClimb.AscentOf(graph.Tiles, StairFixture.TileUnder(graph, stair)));
+            var crest = StaircaseFlight.CrestOf(stair);
+            var sunk = StaircaseFlight.SinkOf(stair);
+            var ground = stair.Position.Y - IsoProjection.StepHeight * 0.5f;
 
-            Assert.That(footed.Y, Is.EqualTo(stair.Position.Y - IsoProjection.StepHeight * 0.5f).Within(Tolerance));
+            Assert.That(crest, Is.EqualTo(ModelPose.PositionOf(stair)));
+            Assert.That(crest.Y, Is.EqualTo(ground).Within(Tolerance));
+            Assert.That(sunk.Y, Is.EqualTo(ground).Within(Tolerance));
             Assert.That(
-                footed.X,
-                Is.EqualTo(stair.Position.X + back.X * IsoProjection.TileEdge * 0.5f).Within(Tolerance));
+                crest.X,
+                Is.EqualTo(stair.Position.X + head.X * IsoProjection.TileEdge * 0.5f).Within(Tolerance));
             Assert.That(
-                footed.Z,
-                Is.EqualTo(stair.Position.Z + back.Z * IsoProjection.TileEdge * 0.5f).Within(Tolerance));
+                crest.Z,
+                Is.EqualTo(stair.Position.Z + head.Z * IsoProjection.TileEdge * 0.5f).Within(Tolerance));
+            Assert.That(
+                sunk.X,
+                Is.EqualTo(stair.Position.X - head.X * IsoProjection.TileEdge * 0.5f).Within(Tolerance));
+            Assert.That(
+                sunk.Z,
+                Is.EqualTo(stair.Position.Z - head.Z * IsoProjection.TileEdge * 0.5f).Within(Tolerance));
         }
 
         [Test]
@@ -380,11 +391,32 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AStaircaseKeepsTheYawItsClimbAsksFor()
+        public void AStaircaseIsLaidSoThePacksFlightDescendsTheWayItsOwnClimbFalls()
         {
+            var graph = LevelGraphFixture.TwoTerraces();
             var stair = FirstStaircase();
+            var ascent = StaircaseClimb.AscentOf(graph.Tiles, StairFixture.TileUnder(graph, stair));
 
+            Assert.That(StaircaseFlight.PackCrestAtItsOrigin, Is.GreaterThan(StaircaseFlight.PackCrestAtItsFarEnd));
+            Assert.That(StaircaseFlight.LaidAgainst(ascent), Is.EqualTo(TileSides.Opposite(ascent)));
+            Assert.That(TileSides.OfInwardYaw(stair.Rotation.Y), Is.EqualTo(StaircaseFlight.LaidAgainst(ascent)));
             Assert.That(ModelPose.RotationOf(stair), Is.EqualTo(stair.Rotation));
+        }
+
+        [Test]
+        public void ThePinnedFlightProfileIsThePackMeshTheCheckMeasures()
+        {
+            Assert.That(StaircaseFlight.PackCrestFromItsOriginOnward, Is.Not.Empty);
+            Assert.That(
+                StaircaseFlight.PackCrestAtItsOrigin,
+                Is.EqualTo(DungeonPack.StaircasePackHeight).Within(Tolerance));
+            Assert.That(StaircaseFlight.PackCrestAtItsFarEnd, Is.LessThan(StaircaseFlight.PackCrestAtItsOrigin));
+
+            foreach (var slice in StaircaseFlight.PackCrestFromItsOriginOnward)
+            {
+                Assert.That(slice, Is.GreaterThan(0f));
+                Assert.That(slice, Is.LessThanOrEqualTo(DungeonPack.StaircasePackHeight));
+            }
         }
 
         static WorldPart FirstStaircase()

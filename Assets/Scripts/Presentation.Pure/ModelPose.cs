@@ -16,7 +16,7 @@ namespace Game.Presentation.Pure
                     return new WorldPoint(
                         part.Position.X, part.Position.Y - part.Scale.Y * 0.5f, part.Position.Z);
                 case PartModel.Staircase:
-                    return Footed(part);
+                    return Crested(part);
                 case PartModel.Knight:
                     return Standing(part);
                 case PartModel.None:
@@ -80,14 +80,14 @@ namespace Game.Presentation.Pure
             return new WorldPoint(part.Scale.X * fit, part.Scale.Y * fit, part.Scale.Z * fit);
         }
 
-        static WorldPoint Footed(WorldPart part)
+        static WorldPoint Crested(WorldPart part)
         {
-            var back = TileSides.Toward(TileSides.Opposite(TileSides.OfInwardYaw(part.Rotation.Y)));
+            var behind = TileSides.Toward(TileSides.Opposite(TileSides.OfInwardYaw(part.Rotation.Y)));
 
             return new WorldPoint(
-                part.Position.X + back.X * part.Scale.Z * 0.5f,
+                part.Position.X + behind.X * part.Scale.Z * 0.5f,
                 part.Position.Y - part.Scale.Y * 0.5f,
-                part.Position.Z + back.Z * part.Scale.Z * 0.5f);
+                part.Position.Z + behind.Z * part.Scale.Z * 0.5f);
         }
 
         static WorldPoint Standing(WorldPart part)

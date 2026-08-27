@@ -110,6 +110,7 @@ namespace Game.EditorTooling
                 onTheStart ? Start(level.Graph) : Centre(blueprint), distance, orthographicSize);
             PreviewFilm.Sun();
 
+            PreviewFilm.Warm(camera);
             PreviewFilm.Shoot(camera, path);
 
             Report(blueprint, BadgeBlueprintBuilder.Build(level.Graph, PowerTuning.Ship.StartingPower), root, path);
