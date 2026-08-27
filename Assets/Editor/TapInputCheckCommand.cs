@@ -158,7 +158,7 @@ namespace Game.EditorTooling
                 builder.PlayerBadge.Show(state.Power);
             }
 
-            report.Append(PannedAway(input, rig));
+            report.Append(PanHeldAndGivenBack(input, rig, state));
 
             report.Append("\n  ")
                 .Append(previewed.ToString(CultureInfo.InvariantCulture))
@@ -220,8 +220,10 @@ namespace Game.EditorTooling
                 nodeId);
         }
 
-        static string PannedAway(TapInput input, CameraRig rig)
+        static string PanHeldAndGivenBack(TapInput input, CameraRig rig, RunState state)
         {
+            input.Show(state);
+
             var resting = rig.Framing;
             for (var frame = 0; frame < 400; frame++)
             {
@@ -242,6 +244,11 @@ namespace Game.EditorTooling
             Action<TargetPreview> count = preview => committed++;
             input.Tapped += count;
 
+            if (rig.IsAway)
+            {
+                Debug.LogError("A camera resting on the player at " + player + " already reads as away from it.");
+            }
+
             input.Reading(pressedNow: true, releasedNow: false, isPressed: true, hovers: false, finger: anchor);
             input.Reading(pressedNow: false, releasedNow: false, isPressed: true, hovers: false, finger: away);
 
@@ -260,40 +267,198 @@ namespace Game.EditorTooling
             }
 
             input.Reading(pressedNow: false, releasedNow: true, isPressed: false, hovers: false, finger: away);
-            input.Tapped -= count;
+
+            if (!rig.Framing.Equals(panned))
+            {
+                Debug.LogError(
+                    "Letting go of a drag moved the camera from " + panned + " to " + rig.Framing
+                    + " instead of leaving it where the finger left it.");
+            }
+
+            if (!rig.IsAway)
+            {
+                Debug.LogError("A camera held at " + rig.Framing + " off the player does not read as away from it.");
+            }
+
+            for (var frame = 0; frame < 180; frame++)
+            {
+                rig.Advance(1f / 60f);
+
+                if (!rig.Framing.Equals(panned))
+                {
+                    Debug.LogError(
+                        "A held pan crept from " + panned + " to " + rig.Framing + " after " + frame
+                        + " frames of nobody touching it.");
+                    break;
+                }
+            }
+
+            var bound = HeldAtTheBound(input, rig);
 
             if (committed != 0)
             {
-                Debug.LogError("A drag past the reach committed " + committed + " taps and should commit none.");
+                Debug.LogError("Dragging committed " + committed + " taps and should commit none.");
             }
 
-            var came = 0;
-            while (!rig.Framing.Equals(player) && came < 400)
+            input.LookBack();
+
+            var homed = 0;
+            while (rig.IsAway && homed < 400)
             {
                 rig.Advance(1f / 60f);
-                came++;
+                homed++;
             }
 
-            if (came <= 1)
+            if (homed <= 1)
             {
-                Debug.LogError("Letting go of a drag cut back to the player rather than easing back.");
+                Debug.LogError("Asking for the camera back cut to the player rather than easing.");
             }
 
             if (!rig.Framing.Equals(player))
             {
                 Debug.LogError(
-                    "Letting go of a drag left the camera at " + rig.Framing + " rather than back on the player at "
+                    "Asking for the camera back left it at " + rig.Framing + " rather than on the player at "
+                    + player + ".");
+            }
+
+            var aiming = Dragged(input, rig, away);
+            var target = LegalTarget(input);
+
+            if (!rig.IsAway)
+            {
+                Debug.LogError("A fresh drag to " + aiming + " does not read as away from the player.");
+            }
+
+            if (target == TapAim.Nothing)
+            {
+                Debug.LogError("The check needs one legal node to commit onto while panned, and found none.");
+                input.Tapped -= count;
+                return "\n  a pan held, and nothing legal was left to commit onto";
+            }
+
+            var finger = FingerOn(input, state, target);
+
+            input.Reading(pressedNow: true, releasedNow: false, isPressed: true, hovers: false, finger: finger);
+
+            if (!rig.Framing.Equals(aiming))
+            {
+                Debug.LogError(
+                    "Aiming node " + target + " while panned moved the camera from " + aiming + " to "
+                    + rig.Framing + ".");
+            }
+
+            if (!rig.IsAway)
+            {
+                Debug.LogError("Aiming node " + target + " while panned gave the camera back to the player.");
+            }
+
+            input.Reading(pressedNow: false, releasedNow: true, isPressed: false, hovers: false, finger: finger);
+
+            if (committed != 1)
+            {
+                Debug.LogError("A tap on legal node " + target + " committed " + committed + " taps, not one.");
+            }
+
+            if (!rig.Framing.Equals(aiming))
+            {
+                Debug.LogError("Committing node " + target + " cut the camera back rather than easing it.");
+            }
+
+            var came = 0;
+            while (rig.IsAway && came < 400)
+            {
+                rig.Advance(1f / 60f);
+                came++;
+            }
+
+            input.Tapped -= count;
+
+            if (came <= 1)
+            {
+                Debug.LogError("Committing a tap cut back to the player rather than easing back.");
+            }
+
+            if (!rig.Framing.Equals(player))
+            {
+                Debug.LogError(
+                    "Committing a tap left the camera at " + rig.Framing + " rather than back on the player at "
                     + player + ".");
             }
 
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "\n  a drag of {0:0.#} px past the {1:0.#} px reach panned to {2}, committed nothing, "
-                + "and eased back onto the player in {3} frames",
+                "\n  a drag of {0:0.#} px past the {1:0.#} px reach panned to {2} and held there untouched, "
+                + "{3}, came home on request in {4} frames, then aimed node {5} while panned without giving the "
+                + "camera back and eased home in {6} frames on the commit",
                 ScreenPoint.Distance(anchor, away),
                 input.Reach,
                 panned.Target,
+                bound,
+                homed,
+                target,
                 came);
+        }
+
+        static string HeldAtTheBound(TapInput input, CameraRig rig)
+        {
+            var anchor = new ScreenPoint(input.FrameWidth * 0.5f, input.FrameHeight * 0.5f);
+            var edge = Dragged(input, rig, Nudged(anchor, -input.FrameWidth * 20f));
+            var harder = Dragged(input, rig, Nudged(anchor, -input.FrameWidth * 400f));
+
+            if (ScreenFrame.PanPixels(edge, harder) >= 1f)
+            {
+                Debug.LogError(
+                    "Pulling twenty times harder at the level bound bought more of the world: " + edge + " became "
+                    + harder + ".");
+            }
+
+            for (var frame = 0; frame < 180; frame++)
+            {
+                rig.Advance(1f / 60f);
+
+                if (!rig.Framing.Equals(harder))
+                {
+                    Debug.LogError(
+                        "The camera sprang back off the level bound from " + harder + " to " + rig.Framing
+                        + " after " + frame + " frames.");
+                    break;
+                }
+            }
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "stopped dead at the level bound {0} however hard it was pulled",
+                harder.Target);
+        }
+
+        static CameraFraming Dragged(TapInput input, CameraRig rig, ScreenPoint to)
+        {
+            var anchor = new ScreenPoint(input.FrameWidth * 0.5f, input.FrameHeight * 0.5f);
+
+            input.Reading(pressedNow: true, releasedNow: false, isPressed: true, hovers: false, finger: anchor);
+            input.Reading(pressedNow: false, releasedNow: false, isPressed: true, hovers: false, finger: to);
+            input.Reading(pressedNow: false, releasedNow: true, isPressed: false, hovers: false, finger: to);
+
+            return rig.Framing;
+        }
+
+        static int LegalTarget(TapInput input)
+        {
+            var found = TapAim.Nothing;
+
+            foreach (var candidate in input.Candidates())
+            {
+                input.AimAt(candidate.Point);
+
+                if (input.Preview.IsLegal)
+                {
+                    found = candidate.NodeId;
+                    break;
+                }
+            }
+
+            input.Cancel();
+            return found;
         }
 
         static ScreenPoint Nudged(ScreenPoint point, float pixels)
