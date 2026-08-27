@@ -83,11 +83,20 @@ namespace Game.EditorTooling
             }
 
             var styles = Enum.GetValues(typeof(PartStyle)).Length;
+            var modelled = 0;
+
+            foreach (PartStyle style in Enum.GetValues(typeof(PartStyle)))
+            {
+                if (PartModels.Of(style) != PartModel.None)
+                {
+                    modelled++;
+                }
+            }
 
             failures += Assert(
                 report,
-                falling.Count == styles - 2,
-                "every part style but the two floor ones still falls back to its primitive",
+                falling.Count == styles - modelled,
+                "every part style the table names no mesh for still falls back to its primitive",
                 falling.Count + " of " + styles + " fall back: " + string.Join(", ", falling.ToArray()));
 
             return failures;
@@ -281,19 +290,42 @@ namespace Game.EditorTooling
                 world.Count + " distinct world materials");
 
             var atlassed = 0;
-            foreach (var material in world)
+            var dressed = 0;
+            var wrong = new List<string>();
+
+            foreach (PartStyle style in Enum.GetValues(typeof(PartStyle)))
             {
-                if (material.HasProperty(BaseMap) && material.GetTexture(BaseMap) != null)
+                var material = Named(world, style);
+                if (material == null)
+                {
+                    continue;
+                }
+
+                var wants = models.Dresses(style);
+                var wears = material.HasProperty(BaseMap) && material.GetTexture(BaseMap) != null;
+
+                if (wants)
+                {
+                    dressed++;
+                }
+
+                if (wears)
                 {
                     atlassed++;
+                }
+
+                if (wants != wears)
+                {
+                    wrong.Add(style.ToString());
                 }
             }
 
             failures += Assert(
                 report,
-                atlassed == 2,
-                "exactly the two floor materials bind the atlas as their base map",
-                atlassed + " of " + world.Count + " world materials do");
+                wrong.Count == 0,
+                "exactly the world materials whose part style has a mesh bind the atlas as their base map",
+                atlassed + " of " + world.Count + " world materials do against " + dressed
+                + " dressed styles" + (wrong.Count == 0 ? "" : ", wrong on " + string.Join(", ", wrong.ToArray())));
 
             var cursed = Named(world, PartStyle.Floor);
             var cleared = Named(world, PartStyle.Cleared);

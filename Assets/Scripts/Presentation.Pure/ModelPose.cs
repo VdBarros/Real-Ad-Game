@@ -4,15 +4,36 @@ namespace Game.Presentation.Pure
 {
     public static class ModelPose
     {
+        public const float ChestFacing = 180f;
+
+        public static WorldPoint PositionOf(WorldPart part)
+        {
+            switch (part.Model)
+            {
+                case PartModel.WallPanel:
+                case PartModel.Chest:
+                case PartModel.Candles:
+                    return new WorldPoint(
+                        part.Position.X, part.Position.Y - part.Scale.Y * 0.5f, part.Position.Z);
+                case PartModel.None:
+                case PartModel.FloorTile:
+                    return part.Position;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(part), part.Model, "No model position for that part model.");
+            }
+        }
+
         public static WorldPoint RotationOf(WorldPart part)
         {
             switch (part.Model)
             {
                 case PartModel.FloorTile:
                     return new WorldPoint(0f, part.Rotation.Y, 0f);
+                case PartModel.Chest:
+                    return new WorldPoint(part.Rotation.X, part.Rotation.Y + ChestFacing, part.Rotation.Z);
                 case PartModel.None:
                 case PartModel.WallPanel:
-                case PartModel.Chest:
                 case PartModel.Candles:
                     return part.Rotation;
                 default:
@@ -27,15 +48,31 @@ namespace Game.Presentation.Pure
             {
                 case PartModel.FloorTile:
                     return new WorldPoint(part.Scale.X, part.Scale.Z, part.Scale.Y);
-                case PartModel.None:
                 case PartModel.WallPanel:
+                    return Spanning(part);
                 case PartModel.Chest:
                 case PartModel.Candles:
+                    return Fitted(part);
+                case PartModel.None:
                     return part.Scale;
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(part), part.Model, "No model scale for that part model.");
             }
+        }
+
+        static WorldPoint Fitted(WorldPart part)
+        {
+            var fit = 1f / DungeonPack.HeightOf(part.Model);
+
+            return new WorldPoint(part.Scale.X * fit, part.Scale.Y * fit, part.Scale.Z * fit);
+        }
+
+        static WorldPoint Spanning(WorldPart part)
+        {
+            var fit = part.Scale.X / DungeonPack.WallPanelWidth;
+
+            return new WorldPoint(fit, fit, fit);
         }
     }
 }

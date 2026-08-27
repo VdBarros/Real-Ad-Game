@@ -265,14 +265,14 @@ namespace Game.EditorTooling
                         + "longer reads as a node.");
                 }
 
-                var scale = pickup.transform.localScale;
+                var stands = Stands(pickup);
 
-                if (Mathf.Abs(scale.y - Take.PedestalHeight) > Tolerance
-                    || Mathf.Abs(scale.x - Take.PedestalEdge) > Tolerance)
+                if (Mathf.Abs(stands.size.y - Take.PedestalHeight) > Tolerance
+                    || stands.size.x <= stands.size.y)
                 {
                     Debug.LogError(
-                        "Node " + nodeId + " stands " + scale + " where a pedestal is "
-                        + Take.PedestalEdge + " wide and " + Take.PedestalHeight + " tall.");
+                        "Node " + nodeId + " stands " + stands.size + " where a pedestal is "
+                        + Take.PedestalHeight + " tall and wider than it is tall.");
                 }
 
                 var target = builder.Targets.Of(nodeId);
@@ -284,6 +284,21 @@ namespace Game.EditorTooling
                         + "advertises a number the player cannot have.");
                 }
             }
+        }
+
+        static Bounds Stands(PickupProp pickup)
+        {
+            var skins = pickup.GetComponentsInChildren<Renderer>(true);
+            var stands = skins.Length == 0
+                ? new Bounds(pickup.transform.position, Vector3.zero)
+                : skins[0].bounds;
+
+            foreach (var skin in skins)
+            {
+                stands.Encapsulate(skin.bounds);
+            }
+
+            return stands;
         }
 
         static void ASpentPickupIsNoLongerATarget(RunState state, string leg)

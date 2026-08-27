@@ -10,8 +10,6 @@ namespace Game.Presentation
 
         public const string AtlasAsset = "dungeon_texture";
 
-        const string NoMeshIsCommittedYet = null;
-
         readonly GameObject[] byModel;
 
         readonly bool[] looked;
@@ -117,11 +115,11 @@ namespace Game.Presentation
                 case PartModel.FloorTile:
                     return "floor_tile_large";
                 case PartModel.WallPanel:
-                    return NoMeshIsCommittedYet;
+                    return "barrier";
                 case PartModel.Chest:
-                    return NoMeshIsCommittedYet;
+                    return "chest";
                 case PartModel.Candles:
-                    return NoMeshIsCommittedYet;
+                    return "candle_triple";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(model), model, "No asset name for that part model.");
             }
