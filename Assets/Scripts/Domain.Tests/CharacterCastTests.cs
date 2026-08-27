@@ -1,0 +1,306 @@
+using System;
+using System.Linq;
+using Game.Presentation.Pure;
+using NUnit.Framework;
+
+namespace Game.Domain.Tests
+{
+    public class CharacterCastTests
+    {
+        const float Tolerance = 1e-4f;
+
+        static readonly int[] PowersAcrossEveryTier = { 1, 8, 30, 100, 300 };
+
+        [Test]
+        public void ThePlayerWearsARiggedMeshFromTheAdventurersPack()
+        {
+            var mesh = CharacterCast.MeshOf(PartStyle.Start);
+
+            Assert.That(mesh, Is.Not.EqualTo(PartModel.None));
+            Assert.That(ArtPacks.Of(mesh), Is.EqualTo(ArtPack.Adventurers));
+            Assert.That(ArtPacks.IsRigged(mesh), Is.True);
+            Assert.That(AdventurerPack.Carries(mesh), Is.True);
+            Assert.That(PartModels.Of(PartStyle.Start), Is.EqualTo(mesh));
+        }
+
+        [Test]
+        public void ThePlayerWearsTheSameMeshAtEveryPowerTier()
+        {
+            var tiers = PowersAcrossEveryTier.Select(VisualTier.Of).Distinct().ToList();
+
+            Assert.That(tiers.Count, Is.EqualTo(VisualTier.Count));
+
+            foreach (var power in PowersAcrossEveryTier)
+            {
+                Assert.That(
+                    CharacterCast.MeshOfPlayer(PlayerLook.Of(power)),
+                    Is.EqualTo(CharacterCast.MeshOf(PartStyle.Start)),
+                    "power " + power);
+            }
+        }
+
+        [Test]
+        public void TheTierSeamStillChangesHowTheFigureReadsWithoutChangingTheMesh()
+        {
+            var looks = PowersAcrossEveryTier.Select(PlayerLook.Of).ToList();
+
+            for (var step = 1; step < looks.Count; step++)
+            {
+                Assert.That(looks[step].Tier, Is.EqualTo(looks[step - 1].Tier + 1));
+                Assert.That(
+                    looks[step].Scale,
+                    Is.EqualTo(looks[step - 1].Scale * PlayerLook.Growth).Within(Tolerance));
+                Assert.That(looks[step].Tint, Is.Not.EqualTo(looks[step - 1].Tint));
+            }
+
+            Assert.That(
+                looks.Select(look => CharacterCast.MeshOfPlayer(look)).Distinct().Count(),
+                Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AdversariesWearNoMeshUntilTheirOwnTicket()
+        {
+            Assert.That(CharacterCast.MeshOf(PartStyle.Enemy), Is.EqualTo(PartModel.None));
+            Assert.That(CharacterCast.MeshOf(PartStyle.Boss), Is.EqualTo(PartModel.None));
+            Assert.That(CharacterCast.Wears(PartStyle.Enemy), Is.False);
+            Assert.That(CharacterCast.Wears(PartStyle.Boss), Is.False);
+        }
+
+        [Test]
+        public void OnlyTheCastAnswersWhichMeshItWears()
+        {
+            Assert.That(CharacterCast.Roles.Count, Is.EqualTo(3));
+
+            foreach (PartStyle style in Enum.GetValues(typeof(PartStyle)))
+            {
+                if (CharacterCast.IsRole(style))
+                {
+                    Assert.That(() => CharacterCast.MeshOf(style), Throws.Nothing, style.ToString());
+                    continue;
+                }
+
+                Assert.That(
+                    () => CharacterCast.MeshOf(style),
+                    Throws.InstanceOf<ArgumentOutOfRangeException>(),
+                    style.ToString());
+            }
+        }
+
+        [Test]
+        public void AFigureStandsTheHeightItsOwnScaleAsksFor()
+        {
+            var mesh = CharacterCast.MeshOf(PartStyle.Start);
+            var scale = LevelBlueprintBuilder.FigureScale;
+
+            Assert.That(
+                FigureFit.StandingHeight(PartModel.None, scale),
+                Is.EqualTo(scale * FigureFit.CapsuleScales).Within(Tolerance));
+            Assert.That(
+                FigureFit.StandingHeight(mesh, scale),
+                Is.EqualTo(scale * AdventurerPack.StandingScales).Within(Tolerance));
+            Assert.That(
+                AdventurerPack.HeightOf(mesh) * FigureFit.ScaleOf(mesh) * scale,
+                Is.EqualTo(FigureFit.StandingHeight(mesh, scale)).Within(Tolerance));
+        }
+
+        [Test]
+        public void TheTierSeamGrowsTheMeshByTheSameStepItGrewTheCapsuleBy()
+        {
+            var mesh = CharacterCast.MeshOf(PartStyle.Start);
+
+            for (var tier = 1; tier < VisualTier.Count; tier++)
+            {
+                var below = PlayerLook.Of(VisualTier.Thresholds[tier - 1] - 1).Scale;
+                var above = PlayerLook.Of(VisualTier.Thresholds[tier - 1]).Scale;
+
+                Assert.That(
+                    FigureFit.StandingHeight(mesh, above),
+                    Is.EqualTo(FigureFit.StandingHeight(mesh, below) * PlayerLook.Growth).Within(Tolerance),
+                    "tier " + tier);
+                Assert.That(
+                    FigureFit.StandingHeight(mesh, above) / FigureFit.StandingHeight(mesh, below),
+                    Is.EqualTo(
+                        FigureFit.StandingHeight(PartModel.None, above)
+                        / FigureFit.StandingHeight(PartModel.None, below)).Within(Tolerance),
+                    "tier " + tier);
+            }
+        }
+
+        [Test]
+        public void AMeshFigurePutsItsFeetOnTheTileTheCapsuleFloatedAbove()
+        {
+            var player = Player();
+            var tile = IsoProjection.Of(PlayerNode().Position);
+
+            Assert.That(player.Model, Is.EqualTo(CharacterCast.MeshOf(PartStyle.Start)));
+            Assert.That(player.Position.Y, Is.GreaterThan(tile.Y));
+            Assert.That(ModelPose.PositionOf(player).Y, Is.EqualTo(tile.Y).Within(Tolerance));
+            Assert.That(ModelPose.PositionOf(player).X, Is.EqualTo(tile.X).Within(Tolerance));
+            Assert.That(ModelPose.PositionOf(player).Z, Is.EqualTo(tile.Z).Within(Tolerance));
+            Assert.That(FigureFit.LiftOf(player.Model), Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void AMeshFigureIsFittedInsideTheTileItStandsOn()
+        {
+            var mesh = CharacterCast.MeshOf(PartStyle.Start);
+            var scale = ModelPose.ScaleOf(Player()).Y;
+
+            Assert.That(
+                AdventurerPack.WidthOf(mesh) * scale,
+                Is.LessThan(IsoProjection.TileEdge));
+            Assert.That(
+                AdventurerPack.DepthOf(mesh) * scale,
+                Is.LessThan(IsoProjection.TileEdge));
+            Assert.That(
+                AdventurerPack.HeightOf(mesh) * scale,
+                Is.LessThan(IsoProjection.StepHeight));
+            Assert.That(
+                FigureFit.SpreadOf(mesh, LevelBlueprintBuilder.FigureScale),
+                Is.LessThan(IsoProjection.TileEdge));
+            Assert.That(
+                FigureFit.SpreadOf(mesh, LevelBlueprintBuilder.FigureScale),
+                Is.GreaterThan(FigureFit.WidthOf(mesh, LevelBlueprintBuilder.FigureScale)));
+        }
+
+        [Test]
+        public void AMeshFigureHidesLessGroundThanTheCapsuleItReplaces()
+        {
+            var mesh = CharacterCast.MeshOf(PartStyle.Start);
+            var scale = LevelBlueprintBuilder.FigureScale;
+
+            Assert.That(
+                IsoProjection.SightReach(FigureFit.StandingHeight(mesh, scale)),
+                Is.LessThan(IsoProjection.SightReach(FigureFit.StandingHeight(PartModel.None, scale))));
+            Assert.That(
+                FigureFit.HiddenGroundOf(mesh, scale),
+                Is.LessThan(FigureFit.HiddenGroundOf(PartModel.None, scale)));
+        }
+
+        [Test]
+        public void AMeshFigureStaysInsideTheOcclusionBoundTheWallWorkSet()
+        {
+            var mesh = CharacterCast.MeshOf(PartStyle.Start);
+            var scale = LevelBlueprintBuilder.FigureScale;
+            var bound = IsoProjection.TileEdge * IsoProjection.OcclusionBound * IsoProjection.TileEdge;
+
+            Assert.That(IsoProjection.OcclusionBound, Is.EqualTo(0.5f));
+            Assert.That(FigureFit.HiddenGroundOf(mesh, scale), Is.LessThan(bound));
+            Assert.That(FigureFit.HiddenSpreadOf(mesh, scale), Is.LessThan(bound));
+            Assert.That(
+                FigureFit.HiddenSpreadOf(mesh, scale),
+                Is.GreaterThan(FigureFit.HiddenGroundOf(mesh, scale)));
+            Assert.That(
+                IsoProjection.TileEdge * IsoProjection.SightReach(DungeonPack.HeightOf(PartModel.WallPanel)),
+                Is.LessThan(bound));
+        }
+
+        [Test]
+        public void AMeshFigureTurnsItsFaceTowardTheCamera()
+        {
+            var forward = IsoProjection.CameraForward;
+            var toward = Math.Atan2(-forward.X, -forward.Z) * 180.0 / Math.PI;
+            var wanted = (float)((toward + 360.0) % 360.0);
+
+            Assert.That(AdventurerPack.Facing, Is.EqualTo(wanted).Within(1e-3f));
+            Assert.That(ModelPose.RotationOf(Player()).Y, Is.EqualTo(wanted).Within(1e-3f));
+        }
+
+        [Test]
+        public void TheAdventurersImportScaleMapsThePacksGridOntoOneTile()
+        {
+            Assert.That(AdventurerPack.GridUnits, Is.EqualTo(DungeonPack.GridUnits));
+            Assert.That(
+                AdventurerPack.GridUnits * AdventurerPack.ImportScale,
+                Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
+            Assert.That(AdventurerPack.ImportScale, Is.EqualTo(DungeonPack.ImportScale).Within(Tolerance));
+        }
+
+        [Test]
+        public void EveryCastMeshCarriesAMeasuredPackFootprint()
+        {
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (!AdventurerPack.Carries(model))
+                {
+                    Assert.That(
+                        () => AdventurerPack.PackHeightOf(model),
+                        Throws.InstanceOf<ArgumentOutOfRangeException>(),
+                        model.ToString());
+                    continue;
+                }
+
+                Assert.That(AdventurerPack.PackHeightOf(model), Is.GreaterThan(0f), model.ToString());
+                Assert.That(AdventurerPack.PackWidthOf(model), Is.GreaterThan(0f), model.ToString());
+                Assert.That(AdventurerPack.PackDepthOf(model), Is.GreaterThan(0f), model.ToString());
+                Assert.That(AdventurerPack.PackBaseOf(model), Is.LessThanOrEqualTo(0f), model.ToString());
+                Assert.That(
+                    AdventurerPack.HeightOf(model),
+                    Is.EqualTo(AdventurerPack.PackHeightOf(model) * AdventurerPack.ImportScale)
+                        .Within(Tolerance),
+                    model.ToString());
+            }
+        }
+
+        [Test]
+        public void OnlyACastMeshOrAPrimitiveCanStandAsAFigure()
+        {
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (model == PartModel.None || ArtPacks.IsRigged(model))
+                {
+                    Assert.That(() => FigureFit.ScaleOf(model), Throws.Nothing, model.ToString());
+                    continue;
+                }
+
+                Assert.That(
+                    () => FigureFit.ScaleOf(model),
+                    Throws.InstanceOf<ArgumentOutOfRangeException>(),
+                    model.ToString());
+            }
+        }
+
+        [Test]
+        public void EveryPartModelBelongsToExactlyOnePack()
+        {
+            Assert.That(
+                () => ArtPacks.Of(PartModel.None),
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (model == PartModel.None)
+                {
+                    continue;
+                }
+
+                var pack = ArtPacks.Of(model);
+
+                Assert.That(
+                    pack == ArtPack.Adventurers,
+                    Is.EqualTo(AdventurerPack.Carries(model)),
+                    model.ToString());
+                Assert.That(
+                    ArtPacks.ImportScaleFor(model),
+                    Is.EqualTo(ArtPacks.ImportScaleOf(pack)).Within(Tolerance),
+                    model.ToString());
+            }
+        }
+
+        static DecisionNode PlayerNode()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+
+            return graph.Decisions.Nodes.First(node => node.Type == NodeType.Start);
+        }
+
+        static WorldPart Player()
+        {
+            WorldPart prop;
+            LevelBlueprintBuilder.TryProp(PlayerNode(), out prop);
+
+            return prop;
+        }
+    }
+}

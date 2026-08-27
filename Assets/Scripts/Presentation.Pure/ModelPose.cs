@@ -17,6 +17,8 @@ namespace Game.Presentation.Pure
                         part.Position.X, part.Position.Y - part.Scale.Y * 0.5f, part.Position.Z);
                 case PartModel.Staircase:
                     return Footed(part);
+                case PartModel.Knight:
+                    return Standing(part);
                 case PartModel.None:
                 case PartModel.FloorTile:
                     return part.Position;
@@ -34,6 +36,9 @@ namespace Game.Presentation.Pure
                     return new WorldPoint(0f, part.Rotation.Y, 0f);
                 case PartModel.Chest:
                     return new WorldPoint(part.Rotation.X, part.Rotation.Y + ChestFacing, part.Rotation.Z);
+                case PartModel.Knight:
+                    return new WorldPoint(
+                        part.Rotation.X, part.Rotation.Y + AdventurerPack.Facing, part.Rotation.Z);
                 case PartModel.None:
                 case PartModel.WallPanel:
                 case PartModel.CoinStack:
@@ -58,6 +63,8 @@ namespace Game.Presentation.Pure
                     return Fitted(part);
                 case PartModel.Staircase:
                     return Stepped(part);
+                case PartModel.Knight:
+                    return Sized(part);
                 case PartModel.None:
                     return part.Scale;
                 default:
@@ -81,6 +88,23 @@ namespace Game.Presentation.Pure
                 part.Position.X + back.X * part.Scale.Z * 0.5f,
                 part.Position.Y - part.Scale.Y * 0.5f,
                 part.Position.Z + back.Z * part.Scale.Z * 0.5f);
+        }
+
+        static WorldPoint Standing(WorldPart part)
+        {
+            var ground = part.Position.Y - part.Scale.Y * FigureFit.LiftOf(PartModel.None);
+
+            return new WorldPoint(
+                part.Position.X,
+                ground + part.Scale.Y * FigureFit.LiftOf(part.Model),
+                part.Position.Z);
+        }
+
+        static WorldPoint Sized(WorldPart part)
+        {
+            var fit = FigureFit.ScaleOf(part.Model);
+
+            return new WorldPoint(part.Scale.X * fit, part.Scale.Y * fit, part.Scale.Z * fit);
         }
 
         static WorldPoint Stepped(WorldPart part)

@@ -7,6 +7,7 @@ namespace Game.Presentation.Pure
         WallPanel,
         Chest,
         CoinStack,
-        Staircase
+        Staircase,
+        Knight
     }
 }

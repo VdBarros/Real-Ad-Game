@@ -19,10 +19,11 @@ namespace Game.Presentation.Pure
                     return PartModel.CoinStack;
                 case PartStyle.Staircase:
                     return PartModel.Staircase;
-                case PartStyle.Pillar:
                 case PartStyle.Start:
                 case PartStyle.Enemy:
                 case PartStyle.Boss:
+                    return CharacterCast.MeshOf(style);
+                case PartStyle.Pillar:
                 case PartStyle.Trail:
                 case PartStyle.Spark:
                     return PartModel.None;
