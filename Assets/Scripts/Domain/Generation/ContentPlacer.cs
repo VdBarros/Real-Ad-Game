@@ -68,6 +68,12 @@ namespace Game.Domain
                 return false;
             }
 
+            if (envelope.FirstRegionUnderTheFloor(tuning.SpreadFloor) != null)
+            {
+                rejection = ContentRejection.RegionSpreadTooThin;
+                return false;
+            }
+
             var graph = board.Rebuild();
             var verdict = SolvabilityValidator.Validate(graph, tuning);
             if (!verdict.IsSafe)

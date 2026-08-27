@@ -8,7 +8,7 @@ namespace Game.Domain
 
         const int LayoutReasonCount = (int)LayoutRejection.TooFewOffPathSlots + 1;
 
-        const int ContentReasonCount = (int)ContentRejection.PanelStalled + 1;
+        const int ContentReasonCount = (int)ContentRejection.RegionSpreadTooThin + 1;
 
         public static PlacedLevel Generate(long seed, MazePreset preset)
         {

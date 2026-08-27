@@ -34,6 +34,7 @@ namespace Game.Domain
 
         internal static PowerEnvelope Of(ContentBoard board, PowerTuning tuning)
         {
+            var startRegionId = board.RegionOf(board.StartNodeId);
             var rows = new List<RegionEnvelope>(board.RegionIds.Count);
             foreach (var regionId in board.RegionIds)
             {
@@ -63,10 +64,24 @@ namespace Game.Domain
                     EnvelopeWalks.CheapestUnlock(board, tuning, regionId),
                     EnvelopeWalks.RichestEntry(board, tuning, regionId),
                     cheapestEnemy,
-                    dearestEnemy));
+                    dearestEnemy,
+                    regionId == startRegionId));
             }
 
             return new PowerEnvelope(rows);
+        }
+
+        public RegionEnvelope FirstRegionUnderTheFloor(double floor)
+        {
+            foreach (var region in regions)
+            {
+                if (!region.SpreadClears(floor))
+                {
+                    return region;
+                }
+            }
+
+            return null;
         }
 
         public bool FloorHolds

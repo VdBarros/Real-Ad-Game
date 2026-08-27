@@ -10,9 +10,13 @@ namespace Game.Domain
 
         public const double PlateauEliteFraction = 1.0;
 
+        public const double PlateauSpreadFloor = 4.0;
+
         const int OpeningStartingPower = 2;
 
         const double OpeningEliteFraction = 0.0;
+
+        const double OpeningSpreadFloor = 1.0;
 
         public LevelPlan(MazePreset preset, ContentRecipe recipe, PowerTuning tuning)
         {
@@ -52,6 +56,11 @@ namespace Game.Domain
             get { return Tuning.EliteFraction; }
         }
 
+        public double SpreadFloor
+        {
+            get { return Tuning.SpreadFloor; }
+        }
+
         public static LevelPlan For(int levelNumber)
         {
             return For(MazePreset.Ship, levelNumber);
@@ -69,7 +78,8 @@ namespace Game.Domain
                 ContentRecipe.For(preset),
                 PowerTuning.For(preset)
                     .Rebased(StartingPowerAt(levelNumber))
-                    .Locking(EliteFractionAt(levelNumber)));
+                    .Locking(EliteFractionAt(levelNumber))
+                    .Routing(SpreadFloorAt(levelNumber)));
         }
 
         public static double EliteFractionAt(int levelNumber)
@@ -85,6 +95,21 @@ namespace Game.Domain
             var steps = PlateauLevel - 1;
 
             return OpeningEliteFraction + climb * (levelNumber - 1) / steps;
+        }
+
+        public static double SpreadFloorAt(int levelNumber)
+        {
+            RequireLevel(levelNumber);
+
+            if (levelNumber >= PlateauLevel)
+            {
+                return PlateauSpreadFloor;
+            }
+
+            var climb = PlateauSpreadFloor - OpeningSpreadFloor;
+            var steps = PlateauLevel - 1;
+
+            return OpeningSpreadFloor + climb * (levelNumber - 1) / steps;
         }
 
         public static int StartingPowerAt(int levelNumber)

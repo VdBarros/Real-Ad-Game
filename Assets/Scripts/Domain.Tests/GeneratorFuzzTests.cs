@@ -98,6 +98,36 @@ namespace Game.Domain.Tests
         }
 
         [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void EveryRegionAwayFromTheStartClearsItsPlansSpreadFloor(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+            var floor = sweep.Plan.SpreadFloor;
+
+            foreach (var accepted in sweep.Accepted)
+            {
+                foreach (var region in accepted.Level.Envelope.Regions)
+                {
+                    Assert.That(
+                        region.SpreadClears(floor),
+                        Is.True,
+                        "Seed " + accepted.Level.AttemptSeed + " shipped " + region
+                            + " under a floor of " + SweepStatistics.Round(floor) + ".");
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPlanAboveTheOpeningOne))]
+        public void TheSpreadOfEveryPlanAboveTheOpeningOneLeavesOneBehind(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            Assert.That(
+                sweep.SpreadFloorReached(),
+                Is.GreaterThan(1.0),
+                sweep.Name + " spread " + sweep.Spread());
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
         public void TheSpineOfEveryAcceptedLevelAffordsTheBoss(int levelNumber)
         {
             foreach (var accepted in PlanSweep(levelNumber).Accepted)
