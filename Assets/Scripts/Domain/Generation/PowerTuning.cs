@@ -7,13 +7,18 @@ namespace Game.Domain
     {
         public const int FloorRepairPasses = 6;
 
+        public const double EliteShare = 0.15;
+
         static readonly int[] Ladder = { 2, 3, 4 };
 
-        public static readonly PowerTuning Tiny = new PowerTuning(2, 200, 0.6, 0.2, 0.8, 0.8, 0.7);
+        public static readonly PowerTuning Tiny =
+            new PowerTuning(2, 200, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1);
 
-        public static readonly PowerTuning Ship = new PowerTuning(2, 600, 0.6, 0.2, 0.8, 0.8, 0.7);
+        public static readonly PowerTuning Ship =
+            new PowerTuning(2, 600, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1);
 
-        public static readonly PowerTuning Stress = new PowerTuning(2, 2000, 0.6, 0.2, 0.8, 0.8, 0.7);
+        public static readonly PowerTuning Stress =
+            new PowerTuning(2, 2000, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1);
 
         public PowerTuning(
             int startingPower,
@@ -22,7 +27,10 @@ namespace Game.Domain
             double jitter,
             double bossFactor,
             double gatePreference,
-            double pocketTreasure)
+            double pocketTreasure,
+            double eliteFraction,
+            double spreadFloor,
+            int openingChoices)
         {
             if (startingPower < 1)
             {
@@ -40,6 +48,19 @@ namespace Game.Domain
             RequireShare(jitter, nameof(jitter));
             RequireShare(gatePreference, nameof(gatePreference));
             RequireShare(pocketTreasure, nameof(pocketTreasure));
+            RequireShare(eliteFraction, nameof(eliteFraction));
+
+            if (openingChoices < 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(openingChoices), openingChoices, "A level opens on at least one fight.");
+            }
+
+            if (spreadFloor < 1.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(spreadFloor), spreadFloor, "A region is never entered poorer than it can be unlocked.");
+            }
 
             if (bossFactor <= 0.0 || bossFactor >= 1.0)
             {
@@ -54,6 +75,9 @@ namespace Game.Domain
             BossFactor = bossFactor;
             GatePreference = gatePreference;
             PocketTreasure = pocketTreasure;
+            EliteFraction = eliteFraction;
+            SpreadFloor = spreadFloor;
+            OpeningChoices = openingChoices;
         }
 
         public static IReadOnlyList<int> MultiplierLadder
@@ -75,6 +99,12 @@ namespace Game.Domain
 
         public double PocketTreasure { get; }
 
+        public double EliteFraction { get; }
+
+        public double SpreadFloor { get; }
+
+        public int OpeningChoices { get; }
+
         public PowerTuning Rebased(int startingPower)
         {
             if (startingPower == StartingPower)
@@ -89,7 +119,70 @@ namespace Game.Domain
                 Jitter,
                 BossFactor,
                 GatePreference,
-                PocketTreasure);
+                PocketTreasure,
+                EliteFraction,
+                SpreadFloor,
+                OpeningChoices);
+        }
+
+        public PowerTuning Locking(double eliteFraction)
+        {
+            if (eliteFraction == EliteFraction)
+            {
+                return this;
+            }
+
+            return new PowerTuning(
+                StartingPower,
+                StripTarget,
+                EnemyCap,
+                Jitter,
+                BossFactor,
+                GatePreference,
+                PocketTreasure,
+                eliteFraction,
+                SpreadFloor,
+                OpeningChoices);
+        }
+
+        public PowerTuning Routing(double spreadFloor)
+        {
+            if (spreadFloor == SpreadFloor)
+            {
+                return this;
+            }
+
+            return new PowerTuning(
+                StartingPower,
+                StripTarget,
+                EnemyCap,
+                Jitter,
+                BossFactor,
+                GatePreference,
+                PocketTreasure,
+                EliteFraction,
+                spreadFloor,
+                OpeningChoices);
+        }
+
+        public PowerTuning Opening(int openingChoices)
+        {
+            if (openingChoices == OpeningChoices)
+            {
+                return this;
+            }
+
+            return new PowerTuning(
+                StartingPower,
+                StripTarget,
+                EnemyCap,
+                Jitter,
+                BossFactor,
+                GatePreference,
+                PocketTreasure,
+                EliteFraction,
+                SpreadFloor,
+                openingChoices);
         }
 
         public static PowerTuning For(MazePreset preset)

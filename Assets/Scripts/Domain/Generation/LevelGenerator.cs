@@ -8,7 +8,7 @@ namespace Game.Domain
 
         const int LayoutReasonCount = (int)LayoutRejection.TooFewOffPathSlots + 1;
 
-        const int ContentReasonCount = (int)ContentRejection.PanelStalled + 1;
+        const int ContentReasonCount = (int)ContentRejection.OpeningWithoutAChoice + 1;
 
         public static PlacedLevel Generate(long seed, MazePreset preset)
         {
@@ -81,7 +81,8 @@ namespace Game.Domain
             contentRejection = ContentRejection.None;
 
             MazeLayout layout;
-            if (!MazeLayoutGenerator.TryGenerate(attemptSeed, preset, out layout, out layoutRejection))
+            if (!MazeLayoutGenerator.TryGenerate(
+                    attemptSeed, preset, tuning.OpeningChoices, out layout, out layoutRejection))
             {
                 return false;
             }

@@ -43,6 +43,13 @@ namespace Game.Domain.Tests
             yield return 20;
         }
 
+        static IEnumerable<int> EveryPlanAboveTheOpeningOne()
+        {
+            yield return 7;
+            yield return LevelPlan.PlateauLevel;
+            yield return 20;
+        }
+
         [TestCaseSource(nameof(EveryPreset))]
         public void TheValidatorClearsEveryAcceptedLevel(MazePreset preset)
         {
@@ -90,6 +97,123 @@ namespace Game.Domain.Tests
                 sweep.Name + " rejected " + sweep.Rejections + " of " + sweep.Attempts + " attempts.");
         }
 
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void EveryRegionAwayFromTheStartClearsItsPlansSpreadFloor(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+            var floor = sweep.Plan.SpreadFloor;
+
+            foreach (var accepted in sweep.Accepted)
+            {
+                foreach (var region in accepted.Level.Envelope.Regions)
+                {
+                    Assert.That(
+                        region.SpreadClears(floor),
+                        Is.True,
+                        "Seed " + accepted.Level.AttemptSeed + " shipped " + region
+                            + " under a floor of " + SweepStatistics.Round(floor) + ".");
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void EveryAcceptedLevelOpensOnTheChoicesItsPlanAsksFor(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            foreach (var accepted in sweep.Accepted)
+            {
+                Assert.That(
+                    OpeningFrontier.Of(accepted.Level.Graph, accepted.Level.Tuning).Count,
+                    Is.GreaterThanOrEqualTo(sweep.Plan.OpeningChoices),
+                    "Seed " + accepted.Level.AttemptSeed + " opened on a corridor.");
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPlanAboveTheOpeningOne))]
+        public void EveryLevelAboveTheOpeningPlanOpensOnMoreThanOneFight(int levelNumber)
+        {
+            foreach (var accepted in PlanSweep(levelNumber).Accepted)
+            {
+                Assert.That(
+                    OpeningFrontier.Of(accepted.Level.Graph, accepted.Level.Tuning).Count,
+                    Is.GreaterThan(1),
+                    "Seed " + accepted.Level.AttemptSeed + " left the first tap without a choice.");
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheSpreadOfEveryPlanLeavesOneBehind(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            Assert.That(
+                sweep.SpreadFloorReached(),
+                Is.GreaterThan(1.0),
+                sweep.Name + " spread " + sweep.Spread());
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheSpineOfEveryAcceptedLevelAffordsTheBoss(int levelNumber)
+        {
+            foreach (var accepted in PlanSweep(levelNumber).Accepted)
+            {
+                Assert.That(
+                    Spine.Of(accepted.Level.Graph, accepted.Level.Tuning).ReachesTheBoss,
+                    Is.True,
+                    "Seed " + accepted.Level.AttemptSeed + " left its Spine short of the boss.");
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void EveryEnemyOnTheSpineIsAffordableWhenTheSpineReachesIt(int levelNumber)
+        {
+            foreach (var accepted in PlanSweep(levelNumber).Accepted)
+            {
+                var decisions = accepted.Level.Graph.Decisions;
+                var spine = Spine.Of(accepted.Level.Graph, accepted.Level.Tuning);
+
+                for (var index = 0; index < spine.Length; index++)
+                {
+                    var node = decisions.Node(spine.NodeIds[index]);
+                    if (node.Type != NodeType.Enemy)
+                    {
+                        continue;
+                    }
+
+                    Assert.That(
+                        spine.ArrivalPowerAt(index),
+                        Is.GreaterThan(node.Value),
+                        "Seed " + accepted.Level.AttemptSeed + " put enemy #" + node.Id
+                            + " on its Spine unable to pay for it.");
+                }
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPlanAboveTheOpeningOne))]
+        public void EveryLevelAboveTheOpeningPlanHoldsAnEnemyOutOfReachOnArrival(int levelNumber)
+        {
+            foreach (var accepted in PlanSweep(levelNumber).Accepted)
+            {
+                Assert.That(
+                    Elites.Of(accepted.Level.Graph, accepted.Level.Tuning),
+                    Is.Not.Empty,
+                    "Seed " + accepted.Level.AttemptSeed + " opened every door it had.");
+            }
+        }
+
+        [Test]
+        public void TheDeepestLockOnALevelGetsDeeperAsTheCurveClimbs()
+        {
+            var opening = PlanSweep(1);
+            var plateau = PlanSweep(LevelPlan.PlateauLevel);
+
+            Assert.That(
+                plateau.MedianDeepestLock(),
+                Is.GreaterThan(opening.MedianDeepestLock()),
+                "opening " + opening.DeepestLock() + "; plateau " + plateau.DeepestLock());
+        }
+
         [Test]
         public void TheSeaOfOnesThinsAsTheCurveClimbs()
         {
@@ -111,6 +235,9 @@ namespace Game.Domain.Tests
                 Console.WriteLine(sweep + ", " + sweep.Plan);
                 Console.WriteLine("  spread P_max/P_min " + sweep.Spread());
                 Console.WriteLine("  enemy numbers " + sweep.EnemyNumbers());
+                Console.WriteLine("  elites " + sweep.Locks());
+                Console.WriteLine("  spine " + sweep.SpineReach());
+                Console.WriteLine("  opening " + sweep.Opening());
             }
         }
 

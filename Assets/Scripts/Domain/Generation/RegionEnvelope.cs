@@ -4,9 +4,16 @@ namespace Game.Domain
 {
     public sealed class RegionEnvelope
     {
-        public RegionEnvelope(int regionId, int cheapestEntry, int richestEntry, int cheapestEnemy, int dearestEnemy)
+        public RegionEnvelope(
+            int regionId,
+            int cheapestEntry,
+            int richestEntry,
+            int cheapestEnemy,
+            int dearestEnemy,
+            bool holdsTheStart)
         {
             RegionId = regionId;
+            HoldsTheStart = holdsTheStart;
             CheapestEntry = cheapestEntry;
             RichestEntry = richestEntry;
             CheapestEnemy = cheapestEnemy;
@@ -14,6 +21,8 @@ namespace Game.Domain
         }
 
         public int RegionId { get; }
+
+        public bool HoldsTheStart { get; }
 
         public int CheapestEntry { get; }
 
@@ -41,6 +50,11 @@ namespace Game.Domain
         public double Spread
         {
             get { return CheapestEntry <= 0 ? 0.0 : (double)RichestEntry / CheapestEntry; }
+        }
+
+        public bool SpreadClears(double floor)
+        {
+            return HoldsTheStart || Spread >= floor;
         }
 
         public override string ToString()

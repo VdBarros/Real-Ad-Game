@@ -53,8 +53,7 @@ namespace Game.Domain
 
             var passes = RepairRegionFloor(board, tuning);
 
-            var bound = PowerBound.Of(board, tuning);
-            board.SetValue(bossNodeId, Math.Max(2, (int)Math.Floor(bound * tuning.BossFactor + 0.5)));
+            board.SetValue(bossNodeId, BossNumber(board, tuning));
 
             var envelope = PowerEnvelope.Of(board, tuning);
             if (!envelope.FloorHolds)
@@ -66,6 +65,18 @@ namespace Game.Domain
             if (!envelope.WallsAreOrdered)
             {
                 rejection = ContentRejection.EnvelopeInverted;
+                return false;
+            }
+
+            if (envelope.FirstRegionUnderTheFloor(tuning.SpreadFloor) != null)
+            {
+                rejection = ContentRejection.RegionSpreadTooThin;
+                return false;
+            }
+
+            if (OpeningFrontier.Of(board, tuning).Count < tuning.OpeningChoices)
+            {
+                rejection = ContentRejection.OpeningWithoutAChoice;
                 return false;
             }
 
@@ -365,6 +376,9 @@ namespace Game.Domain
             var power = tuning.StartingPower;
             var arrivalByRegion = new Dictionary<int, int>();
             var regionsWithAMintedEnemy = new HashSet<int>();
+            var walked = new List<int>(content.Count);
+            var powerAfter = new List<int>(content.Count);
+            var uncapped = new int[board.Count];
 
             for (var step = 0; step < content.Count; step++)
             {
@@ -378,7 +392,7 @@ namespace Game.Domain
                     }
                 }
 
-                var take = NextOnTheWorstWalk(board, reachable, consumed, power);
+                var take = PoorWalk.Next(board, reachable, consumed, power);
                 if (take < 0)
                 {
                     return ContentRejection.AdversaryStalled;
@@ -394,6 +408,7 @@ namespace Game.Domain
                     var minted = Math.Max(1, (int)Math.Floor((goal - power) * jitter + 0.5));
                     if (type == NodeType.Enemy)
                     {
+                        uncapped[take] = minted;
                         minted = Math.Min(minted, Math.Max(1, (int)(power * tuning.EnemyCap)));
                         var region = board.RegionOf(take);
                         if (regionsWithAMintedEnemy.Add(region))
@@ -419,6 +434,8 @@ namespace Game.Domain
 
                 power = board.PowerAfter(power, take);
                 consumed[take] = true;
+                walked.Add(take);
+                powerAfter.Add(power);
             }
 
             for (var nodeId = 0; nodeId < board.Count; nodeId++)
@@ -429,58 +446,70 @@ namespace Game.Domain
                 }
             }
 
+            MintOffTheSpine(board, tuning, random, walked, powerAfter, uncapped);
             return ContentRejection.None;
         }
 
-        static int NextOnTheWorstWalk(ContentBoard board, List<int> reachable, bool[] consumed, int power)
+        static void MintOffTheSpine(
+            ContentBoard board,
+            PowerTuning tuning,
+            StageRandom random,
+            List<int> walked,
+            List<int> powerAfter,
+            int[] uncapped)
         {
-            var multiplier = -1;
-            var additive = -1;
-            var affordable = -1;
-            var any = -1;
-
-            foreach (var nodeId in reachable)
+            var offSpine = new List<int>();
+            for (var index = SpineLength(powerAfter, BossNumber(board, tuning)); index < walked.Count; index++)
             {
-                if (consumed[nodeId] || !board.IsContent(nodeId))
+                if (board.TypeOf(walked[index]) == NodeType.Enemy)
                 {
-                    continue;
-                }
-
-                if (any < 0)
-                {
-                    any = nodeId;
-                }
-
-                var type = board.TypeOf(nodeId);
-                if (type == NodeType.Multiplier && multiplier < 0)
-                {
-                    multiplier = nodeId;
-                }
-
-                if (type == NodeType.Additive && additive < 0)
-                {
-                    additive = nodeId;
-                }
-
-                if (type == NodeType.Enemy
-                    && affordable < 0
-                    && (!board.IsMinted(nodeId) || power > board.ValueOf(nodeId)))
-                {
-                    affordable = nodeId;
+                    offSpine.Add(walked[index]);
                 }
             }
 
-            if (multiplier >= 0)
+            var rich = (int)Math.Floor(tuning.EliteFraction * offSpine.Count + 0.5);
+            if (rich <= 0)
             {
-                return multiplier;
+                return;
             }
 
-            if (additive >= 0)
+            var wallet = new Dictionary<int, int>();
+            foreach (var regionId in board.RegionIds)
             {
-                return additive;
+                wallet.Add(regionId, EnvelopeWalks.RichestEntry(board, tuning, regionId));
             }
 
-            return affordable >= 0 ? affordable : any;
+            var order = random.Shuffled(offSpine);
+            for (var index = 0; index < rich; index++)
+            {
+                var nodeId = order[index];
+                var minted = Math.Max(
+                    uncapped[nodeId],
+                    Math.Max(1, (int)(wallet[board.RegionOf(nodeId)] * PowerTuning.EliteShare)));
+
+                if (minted > board.ValueOf(nodeId))
+                {
+                    board.SetValue(nodeId, minted);
+                }
+            }
+        }
+
+        static int SpineLength(List<int> powerAfter, int bossPower)
+        {
+            for (var index = 0; index < powerAfter.Count; index++)
+            {
+                if (powerAfter[index] > bossPower)
+                {
+                    return index + 1;
+                }
+            }
+
+            return powerAfter.Count;
+        }
+
+        static int BossNumber(ContentBoard board, PowerTuning tuning)
+        {
+            return Math.Max(2, (int)Math.Floor(PowerBound.Of(board, tuning) * tuning.BossFactor + 0.5));
         }
 
         static int RepairRegionFloor(ContentBoard board, PowerTuning tuning)

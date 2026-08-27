@@ -13,6 +13,8 @@ namespace Game.Domain
         GatedBehindBoss,
         BossBeyondBound,
         BossWithinReach,
-        PanelStalled
+        PanelStalled,
+        RegionSpreadTooThin,
+        OpeningWithoutAChoice
     }
 }
