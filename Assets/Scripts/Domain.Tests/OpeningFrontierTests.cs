@@ -39,7 +39,7 @@ namespace Game.Domain.Tests
         {
             var frontier = OpeningFrontier.Of(LevelSketch.Solvable().Build(), LevelSketch.Tuning);
 
-            Assert.That(frontier.NodeIds, Does.Not.Contain(LevelSketch.DeepEnemyNodeId));
+            Assert.That(frontier.NodeIds, Has.No.Member(LevelSketch.DeepEnemyNodeId));
         }
 
         [Test]
