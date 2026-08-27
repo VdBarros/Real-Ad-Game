@@ -19,7 +19,7 @@ namespace Game.EditorTooling
 
         const float AngleEpsilon = 0.01f;
 
-        const float OcclusionBound = 0.5f;
+        const float OcclusionBound = IsoProjection.OcclusionBound;
 
         const int Complaints = 6;
 

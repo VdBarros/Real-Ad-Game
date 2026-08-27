@@ -203,7 +203,9 @@ namespace Game.Domain.Tests
             foreach (var node in graph.Decisions.Nodes)
             {
                 WorldPart prop;
-                if (!LevelBlueprintBuilder.TryProp(node, out prop) || prop.Model == PartModel.None)
+                if (!LevelBlueprintBuilder.TryProp(node, out prop)
+                    || prop.Model == PartModel.None
+                    || CharacterCast.IsRole(prop.Style))
                 {
                     continue;
                 }
@@ -277,15 +279,15 @@ namespace Game.Domain.Tests
                 if (model == PartModel.None)
                 {
                     Assert.That(
-                        () => DungeonPack.PackHeightOf(model),
+                        () => ArtPacks.PackHeightOf(model),
                         Throws.InstanceOf<ArgumentOutOfRangeException>());
                     continue;
                 }
 
-                Assert.That(DungeonPack.PackHeightOf(model), Is.GreaterThan(0f), model.ToString());
+                Assert.That(ArtPacks.PackHeightOf(model), Is.GreaterThan(0f), model.ToString());
                 Assert.That(
-                    DungeonPack.HeightOf(model),
-                    Is.EqualTo(DungeonPack.PackHeightOf(model) * DungeonPack.ImportScale).Within(Tolerance),
+                    ArtPacks.HeightOf(model),
+                    Is.EqualTo(ArtPacks.PackHeightOf(model) * ArtPacks.ImportScaleFor(model)).Within(Tolerance),
                     model.ToString());
             }
         }

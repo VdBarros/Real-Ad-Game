@@ -135,8 +135,9 @@ namespace Game.Presentation
         GameObject Plant(int slot)
         {
             var trophy = Forge(PartNames.Trophy(slot), transform);
-            trophy.transform.localPosition = Vector(Trophy.PositionOf(slot));
+            trophy.transform.localPosition = Vector(Trophy.PositionOf(slot)) * CapsuleUnit;
             trophy.transform.localEulerAngles = Vector(Trophy.RotationOf(slot));
+            trophy.transform.localScale = Vector(Trophy.Size) * CapsuleUnit;
             return trophy;
         }
 

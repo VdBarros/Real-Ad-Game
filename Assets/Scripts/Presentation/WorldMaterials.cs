@@ -104,7 +104,7 @@ namespace Game.Presentation
                 return;
             }
 
-            var atlas = models.Atlas;
+            var atlas = models.AtlasFor(PartModels.Of(style));
             if (atlas == null)
             {
                 return;
