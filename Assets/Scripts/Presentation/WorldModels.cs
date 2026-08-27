@@ -115,7 +115,7 @@ namespace Game.Presentation
                 case PartModel.FloorTile:
                     return "floor_tile_large";
                 case PartModel.WallPanel:
-                    return "wall";
+                    return "barrier";
                 case PartModel.Chest:
                     return "chest";
                 case PartModel.Candles:

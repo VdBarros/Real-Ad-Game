@@ -10,7 +10,9 @@ namespace Game.Presentation.Pure
 
         public const float FloorTilePackHeight = 0.15f;
 
-        public const float WallPanelPackHeight = 4f;
+        public const float WallPanelPackHeight = 1.1f;
+
+        public const float WallPanelPackWidth = GridUnits;
 
         public const float ChestPackHeight = 1.3f;
 
@@ -19,6 +21,11 @@ namespace Game.Presentation.Pure
         public static float ImportScale
         {
             get { return IsoProjection.TileEdge / GridUnits; }
+        }
+
+        public static float WallPanelWidth
+        {
+            get { return WallPanelPackWidth * ImportScale; }
         }
 
         public static float PackHeightOf(PartModel model)

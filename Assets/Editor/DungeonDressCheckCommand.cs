@@ -23,6 +23,8 @@ namespace Game.EditorTooling
 
         const float SilhouetteRatio = 1.5f;
 
+        const float OcclusionBound = 0.5f;
+
         const int Complaints = 6;
 
         public static void Check()
@@ -238,15 +240,24 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                Math.Abs(panel.size.x - edge) <= Epsilon
-                && Math.Abs(panel.size.y - IsoProjection.WallHeight) <= Epsilon,
-                "the imported wall panel spans one tile edge by one wall height",
+                Math.Abs(panel.size.x - DungeonPack.WallPanelWidth) <= Epsilon
+                && Math.Abs(DungeonPack.WallPanelWidth - edge) <= Epsilon,
+                "the imported wall panel spans one tile edge at the pinned width, so it needs no stretching",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "it measures {0:0.#####} wide by {1:0.#####} tall against {2:0.#####} by {3:0.#####}",
+                    "it measures {0:0.#####} wide against the pinned {1:0.#####} and a tile edge of {2:0.#####}",
                     panel.size.x,
+                    DungeonPack.WallPanelWidth,
+                    edge));
+
+            failures += Assert(
+                report,
+                panel.size.y < IsoProjection.WallHeight,
+                "the imported wall panel is a parapet rather than a full-height wall",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it stands {0:0.#####} tall against one wall height of {1:0.#####}",
                     panel.size.y,
-                    edge,
                     IsoProjection.WallHeight));
 
             failures += Assert(
@@ -422,6 +433,7 @@ namespace Game.EditorTooling
             var placed = 0;
             var turned = 0;
             var spanning = 0;
+            var standing = 0f;
             var edge = IsoProjection.TileEdge;
             var complaint = new List<string>();
 
@@ -479,6 +491,8 @@ namespace Game.EditorTooling
                         ? along.size.x
                         : along.size.z;
 
+                    standing = Math.Max(standing, along.size.y);
+
                     if (Math.Abs(across - edge) <= Epsilon)
                     {
                         spanning++;
@@ -510,15 +524,23 @@ namespace Game.EditorTooling
                 spanning + " of " + walls + " do"
                 + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
 
-            report.AppendFormat(
-                CultureInfo.InvariantCulture,
-                "\n  a solid panel of one wall height hides {0:0.###} tile edges of ground behind it at "
-                + "the camera's {1:0.#} degree pitch, so the tile behind a near-side wall is {2}",
-                IsoProjection.SightReach(IsoProjection.WallHeight) / edge,
-                IsoProjection.CameraPitch,
-                IsoProjection.SightReach(IsoProjection.WallHeight) >= edge
-                    ? "wholly out of sight"
-                    : "partly in sight");
+            var hidden = IsoProjection.SightReach(standing);
+
+            failures += Assert(
+                report,
+                walls > 0 && hidden <= edge * OcclusionBound,
+                "a wall hides at most " + OcclusionBound.ToString("0.##", CultureInfo.InvariantCulture)
+                + " of the tile edge behind it, so a near-side corridor floor stays readable",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "a wall standing {0:0.#####} tall hides {1:0.###} tile edges of ground at the camera's "
+                    + "{2:0.#} degree pitch, against the bound of {3:0.###} and the {4:0.###} that a solid "
+                    + "panel of one wall height hid",
+                    standing,
+                    hidden / edge,
+                    IsoProjection.CameraPitch,
+                    OcclusionBound,
+                    IsoProjection.SightReach(IsoProjection.WallHeight) / edge));
 
             return failures;
         }

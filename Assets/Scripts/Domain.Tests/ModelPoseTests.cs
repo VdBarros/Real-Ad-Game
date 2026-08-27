@@ -88,6 +88,9 @@ namespace Game.Domain.Tests
             Assert.That(
                 DungeonPack.GridUnits * DungeonPack.ImportScale,
                 Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
+            Assert.That(
+                DungeonPack.WallPanelWidth,
+                Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
         }
 
         [Test]
@@ -154,17 +157,20 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AWallPanelIsFittedToOneWallHeight()
+        public void AWallPanelSpansItsTileEdgeAndKeepsTheParapetsOwnHeight()
         {
             var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
             var wall = blueprint.AllParts.First(part => part.Style == PartStyle.Wall);
             var scale = ModelPose.ScaleOf(wall);
 
             Assert.That(
+                scale.X * DungeonPack.WallPanelWidth,
+                Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
+            Assert.That(scale.Y, Is.EqualTo(scale.X).Within(Tolerance));
+            Assert.That(scale.Z, Is.EqualTo(scale.X).Within(Tolerance));
+            Assert.That(
                 scale.Y * DungeonPack.HeightOf(PartModel.WallPanel),
-                Is.EqualTo(IsoProjection.WallHeight).Within(Tolerance));
-            Assert.That(scale.X, Is.EqualTo(scale.Y).Within(Tolerance));
-            Assert.That(scale.Z, Is.EqualTo(scale.Y).Within(Tolerance));
+                Is.LessThan(IsoProjection.WallHeight));
         }
 
         [Test]
@@ -297,6 +303,21 @@ namespace Game.Domain.Tests
             Assert.That(
                 IsoProjection.SightReach(IsoProjection.WallHeight * 2f),
                 Is.EqualTo(IsoProjection.SightReach(IsoProjection.WallHeight) * 2f).Within(Tolerance));
+        }
+
+        [Test]
+        public void TheParapetLeavesMostOfTheTileBehindItInSight()
+        {
+            var standing = DungeonPack.HeightOf(PartModel.WallPanel);
+
+            Assert.That(standing, Is.LessThan(IsoProjection.WallHeight));
+            Assert.That(IsoProjection.SightReach(standing), Is.EqualTo(0.336805f).Within(1e-4f));
+            Assert.That(
+                IsoProjection.SightReach(standing),
+                Is.LessThan(IsoProjection.TileEdge * 0.5f));
+            Assert.That(
+                IsoProjection.SightReach(standing),
+                Is.LessThan(IsoProjection.SightReach(IsoProjection.WallHeight)));
         }
 
         static WorldPart Pickup(PartStyle style)

@@ -49,6 +49,7 @@ namespace Game.Presentation.Pure
                 case PartModel.FloorTile:
                     return new WorldPoint(part.Scale.X, part.Scale.Z, part.Scale.Y);
                 case PartModel.WallPanel:
+                    return Spanning(part);
                 case PartModel.Chest:
                 case PartModel.Candles:
                     return Fitted(part);
@@ -65,6 +66,13 @@ namespace Game.Presentation.Pure
             var fit = 1f / DungeonPack.HeightOf(part.Model);
 
             return new WorldPoint(part.Scale.X * fit, part.Scale.Y * fit, part.Scale.Z * fit);
+        }
+
+        static WorldPoint Spanning(WorldPart part)
+        {
+            var fit = part.Scale.X / DungeonPack.WallPanelWidth;
+
+            return new WorldPoint(fit, fit, fit);
         }
     }
 }
