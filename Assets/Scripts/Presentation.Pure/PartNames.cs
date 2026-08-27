@@ -41,6 +41,11 @@ namespace Game.Presentation.Pure
             return "Stair" + Key(position);
         }
 
+        public static string Footing(TilePosition position)
+        {
+            return "Footing" + Key(position);
+        }
+
         public static string Node(int nodeId)
         {
             return "Node_" + nodeId.ToString(CultureInfo.InvariantCulture);

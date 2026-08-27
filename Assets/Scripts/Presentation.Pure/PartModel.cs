@@ -8,6 +8,7 @@ namespace Game.Presentation.Pure
         Chest,
         CoinStack,
         Staircase,
+        Foundation,
         Knight,
         SkeletonMinion,
         SkeletonRogue,

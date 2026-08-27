@@ -24,6 +24,12 @@ namespace Game.Presentation.Pure
 
         public const float StaircasePackRun = GridUnits;
 
+        public const float FoundationPackHeight = 2f;
+
+        public const float FoundationPackWidth = 2.2f;
+
+        public const float FoundationPackRun = 2.2f;
+
         public static float ImportScale
         {
             get { return IsoProjection.TileEdge / GridUnits; }
@@ -44,6 +50,16 @@ namespace Game.Presentation.Pure
             get { return StaircasePackRun * ImportScale; }
         }
 
+        public static float FoundationWidth
+        {
+            get { return FoundationPackWidth * ImportScale; }
+        }
+
+        public static float FoundationRun
+        {
+            get { return FoundationPackRun * ImportScale; }
+        }
+
         public static float PackHeightOf(PartModel model)
         {
             switch (model)
@@ -58,6 +74,8 @@ namespace Game.Presentation.Pure
                     return CoinStackPackHeight;
                 case PartModel.Staircase:
                     return StaircasePackHeight;
+                case PartModel.Foundation:
+                    return FoundationPackHeight;
                 case PartModel.None:
                     throw new ArgumentOutOfRangeException(
                         nameof(model), model, "A part with no model has no mesh to measure.");

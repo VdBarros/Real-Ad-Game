@@ -13,6 +13,7 @@ namespace Game.Presentation.Pure
                 case PartModel.WallPanel:
                 case PartModel.Chest:
                 case PartModel.CoinStack:
+                case PartModel.Foundation:
                     return new WorldPoint(
                         part.Position.X, part.Position.Y - part.Scale.Y * 0.5f, part.Position.Z);
                 case PartModel.Staircase:
@@ -53,6 +54,7 @@ namespace Game.Presentation.Pure
                 case PartModel.WallPanel:
                 case PartModel.CoinStack:
                 case PartModel.Staircase:
+                case PartModel.Foundation:
                     return part.Rotation;
                 default:
                     throw new ArgumentOutOfRangeException(
@@ -73,6 +75,8 @@ namespace Game.Presentation.Pure
                     return Fitted(part);
                 case PartModel.Staircase:
                     return Stepped(part);
+                case PartModel.Foundation:
+                    return Stretched(part);
                 case PartModel.Knight:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
@@ -127,6 +131,14 @@ namespace Game.Presentation.Pure
                 part.Scale.X / DungeonPack.StaircaseWidth,
                 part.Scale.Y / DungeonPack.HeightOf(part.Model),
                 part.Scale.Z / DungeonPack.StaircaseRun);
+        }
+
+        static WorldPoint Stretched(WorldPart part)
+        {
+            return new WorldPoint(
+                part.Scale.X / DungeonPack.FoundationWidth,
+                part.Scale.Y / DungeonPack.HeightOf(PartModel.Foundation),
+                part.Scale.Z / DungeonPack.FoundationRun);
         }
 
         static WorldPoint Spanning(WorldPart part)

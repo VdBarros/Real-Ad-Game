@@ -30,6 +30,8 @@ namespace Game.Presentation
                     return new Color(0.30f, 0.82f, 0.93f);
                 case PartStyle.Staircase:
                     return new Color(0.44f, 0.46f, 0.53f);
+                case PartStyle.Foundation:
+                    return new Color(0.38f, 0.40f, 0.47f);
                 case PartStyle.Trail:
                     return new Color(0.97f, 0.93f, 0.55f);
                 case PartStyle.Spark:
