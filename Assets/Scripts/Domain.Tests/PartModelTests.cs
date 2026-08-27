@@ -1,0 +1,182 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Game.Presentation.Pure;
+using NUnit.Framework;
+
+namespace Game.Domain.Tests
+{
+    public class PartModelTests
+    {
+        [Test]
+        public void EveryStyleNamesTheModelItWants()
+        {
+            foreach (PartStyle style in Enum.GetValues(typeof(PartStyle)))
+            {
+                Assert.That(() => PartModels.Of(style), Throws.Nothing, style.ToString());
+            }
+        }
+
+        [Test]
+        public void FloorTilesWantTheFloorTileModel()
+        {
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
+            var floors = PartsStyled(blueprint, PartStyle.Floor);
+
+            Assert.That(floors, Is.Not.Empty);
+            Assert.That(floors.All(part => part.Model == PartModel.FloorTile), Is.True);
+        }
+
+        [Test]
+        public void AClearedFloorTileWantsTheSameModelAsACursedOne()
+        {
+            Assert.That(PartModels.Of(PartStyle.Cleared), Is.EqualTo(PartModel.FloorTile));
+            Assert.That(PartModels.Of(PartStyle.Cleared), Is.EqualTo(PartModels.Of(PartStyle.Floor)));
+        }
+
+        [Test]
+        public void WallsWantTheWallPanelModel()
+        {
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
+            var walls = PartsStyled(blueprint, PartStyle.Wall);
+
+            Assert.That(walls, Is.Not.Empty);
+            Assert.That(walls.All(part => part.Model == PartModel.WallPanel), Is.True);
+        }
+
+        [Test]
+        public void AnAdditiveNodeWantsAChestAndAMultiplierWantsCandles()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+
+            Assert.That(Prop(graph, blueprint, NodeType.Additive).Model, Is.EqualTo(PartModel.Chest));
+            Assert.That(Prop(graph, blueprint, NodeType.Multiplier).Model, Is.EqualTo(PartModel.Candles));
+        }
+
+        [Test]
+        public void TheTwoRewardKindsWantDifferentModels()
+        {
+            Assert.That(PartModels.Of(PartStyle.Additive), Is.Not.EqualTo(PartModels.Of(PartStyle.Multiplier)));
+        }
+
+        [Test]
+        public void FiguresWantNoModelAndKeepTheirPrimitive()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+
+            foreach (var type in new[] { NodeType.Start, NodeType.Enemy, NodeType.Boss })
+            {
+                var figure = Prop(graph, blueprint, type);
+
+                Assert.That(figure.Model, Is.EqualTo(PartModel.None), type.ToString());
+                Assert.That(figure.Shape, Is.EqualTo(PartShape.Capsule), type.ToString());
+            }
+        }
+
+        [Test]
+        public void EffectsWantNoModel()
+        {
+            Assert.That(PartModels.Of(PartStyle.Trail), Is.EqualTo(PartModel.None));
+            Assert.That(PartModels.Of(PartStyle.Spark), Is.EqualTo(PartModel.None));
+        }
+
+        [Test]
+        public void EveryPartTheBlueprintEmitsCarriesTheModelItsStyleWants()
+        {
+            var blueprint = LevelBlueprintBuilder.Build(
+                LevelGenerator.Generate(20250824L, MazePreset.Ship).Graph);
+
+            Assert.That(blueprint.AllParts, Is.Not.Empty);
+
+            foreach (var part in blueprint.AllParts)
+            {
+                Assert.That(part.Model, Is.EqualTo(PartModels.Of(part.Style)), part.Name);
+            }
+        }
+
+        [Test]
+        public void CarryingAModelLeavesEveryTileWhereItWas()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+            var floors = PartsStyled(blueprint, PartStyle.Floor).ToDictionary(part => part.Name);
+
+            Assert.That(floors.Count, Is.EqualTo(graph.Tiles.Tiles.Count));
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                var floor = floors[PartNames.Tile(tile.Position)];
+
+                Assert.That(floor.Position, Is.EqualTo(IsoProjection.Of(tile.Position)), floor.Name);
+                Assert.That(floor.Rotation, Is.EqualTo(new WorldPoint(90f, 0f, 0f)), floor.Name);
+                Assert.That(
+                    floor.Scale,
+                    Is.EqualTo(new WorldPoint(IsoProjection.TileEdge, IsoProjection.TileEdge, 1f)),
+                    floor.Name);
+            }
+        }
+
+        [Test]
+        public void CarryingAModelLeavesOneWallOnEveryTileSideThatFacesOutsideTheGrid()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+            var walls = PartsStyled(blueprint, PartStyle.Wall).ToDictionary(part => part.Name);
+            var outward = 0;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                foreach (var side in TileSides.All)
+                {
+                    var beyond = TileSides.Step(tile.Position, side);
+                    var name = PartNames.Wall(tile.Position, side);
+
+                    if (graph.Tiles.ContainsPlace(beyond.X, beyond.Y))
+                    {
+                        Assert.That(walls.ContainsKey(name), Is.False, name);
+                        continue;
+                    }
+
+                    Assert.That(walls.ContainsKey(name), Is.True, name);
+                    outward++;
+
+                    var wall = walls[name];
+                    var here = IsoProjection.Of(tile.Position);
+                    var there = IsoProjection.Of(beyond);
+
+                    Assert.That(
+                        wall.Position,
+                        Is.EqualTo(new WorldPoint(
+                            (here.X + there.X) * 0.5f,
+                            here.Y + IsoProjection.WallHeight * 0.5f,
+                            (here.Z + there.Z) * 0.5f)),
+                        name);
+                    Assert.That(
+                        wall.Rotation,
+                        Is.EqualTo(new WorldPoint(0f, TileSides.InwardYaw(side), 0f)),
+                        name);
+                    Assert.That(
+                        wall.Scale,
+                        Is.EqualTo(new WorldPoint(
+                            IsoProjection.TileEdge, IsoProjection.WallHeight, 1f)),
+                        name);
+                }
+            }
+
+            Assert.That(walls.Count, Is.EqualTo(outward));
+        }
+
+        static WorldPart Prop(LevelGraph graph, LevelBlueprint blueprint, NodeType type)
+        {
+            var node = graph.Decisions.Nodes.First(candidate => candidate.Type == type);
+            return blueprint.AllParts.First(part => part.Name == PartNames.Node(node.Id));
+        }
+
+        static IReadOnlyList<WorldPart> PartsStyled(LevelBlueprint blueprint, PartStyle style)
+        {
+            return blueprint.AllParts.Where(part => part.Style == style).ToList();
+        }
+    }
+}
