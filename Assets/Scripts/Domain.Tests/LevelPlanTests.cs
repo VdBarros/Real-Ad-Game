@@ -129,7 +129,9 @@ namespace Game.Domain.Tests
                 var second = LevelPlan.For(level);
 
                 Assert.That(second.Preset, Is.SameAs(first.Preset));
-                Assert.That(second.Recipe, Is.SameAs(first.Recipe));
+                Assert.That(second.Recipe.Multipliers, Is.EqualTo(first.Recipe.Multipliers));
+                Assert.That(second.Recipe.Enemies, Is.EqualTo(first.Recipe.Enemies));
+                Assert.That(second.Recipe.Additives, Is.EqualTo(first.Recipe.Additives));
                 Assert.That(second.Tuning.StartingPower, Is.EqualTo(first.Tuning.StartingPower));
                 Assert.That(second.Tuning.StripTarget, Is.EqualTo(first.Tuning.StripTarget));
             }
@@ -169,13 +171,13 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void APlanMovesThePowerARunOpensOnAndTheShareOfLocksAndNothingElse()
+        public void APlanLeavesEveryDialNoLevelNumberOwnsWhereTheOpeningPlanPutIt()
         {
             for (var level = 1; level <= WellPastThePlateau; level++)
             {
                 var plan = LevelPlan.For(level);
 
-                Assert.That(plan.Recipe, Is.SameAs(ContentRecipe.Ship));
+                Assert.That(plan.Preset.BraidFactor, Is.EqualTo(MazePreset.Ship.BraidFactor));
                 Assert.That(plan.Tuning.EnemyCap, Is.EqualTo(PowerTuning.Ship.EnemyCap));
                 Assert.That(plan.Tuning.Jitter, Is.EqualTo(PowerTuning.Ship.Jitter));
                 Assert.That(plan.Tuning.BossFactor, Is.EqualTo(PowerTuning.Ship.BossFactor));
@@ -219,6 +221,125 @@ namespace Game.Domain.Tests
             Assert.That(plan.StartingPower, Is.EqualTo(LevelPlan.PlateauStartingPower));
             Assert.That(plan.ToString(), Does.Contain(MazePreset.Ship.Name));
             Assert.That(plan.ToString(), Does.Contain(LevelPlan.PlateauStartingPower.ToString()));
+        }
+
+        [Test]
+        public void TheOpeningPlanKeepsTheTwoMultipliersTheBacklogAllowedIt()
+        {
+            Assert.That(LevelPlan.For(1).Recipe.Multipliers, Is.EqualTo(2));
+            Assert.That(LevelPlan.MultiplierDriftAt(1), Is.Zero);
+        }
+
+        [Test]
+        public void TheThirdMultiplierEntersOnlyWhereTheRaisedBaseCarriesIt()
+        {
+            Assert.That(LevelPlan.ThirdMultiplierLevel, Is.GreaterThan(1));
+            Assert.That(
+                LevelPlan.StartingPowerAt(LevelPlan.ThirdMultiplierLevel),
+                Is.GreaterThan(LevelPlan.StartingPowerAt(1) * 4));
+
+            for (var level = 1; level <= WellPastThePlateau; level++)
+            {
+                var expected = level < LevelPlan.ThirdMultiplierLevel ? 2 : 3;
+
+                Assert.That(
+                    LevelPlan.For(level).Recipe.Multipliers,
+                    Is.EqualTo(expected),
+                    "Level " + level + " counted its multipliers off the curve.");
+            }
+        }
+
+        [Test]
+        public void AdditivesThinAsTheLevelNumberRisesAndEnemiesTakeTheSlots()
+        {
+            for (var level = 2; level <= WellPastThePlateau; level++)
+            {
+                var earlier = LevelPlan.For(level - 1).Recipe;
+                var later = LevelPlan.For(level).Recipe;
+
+                Assert.That(
+                    later.Additives,
+                    Is.LessThanOrEqualTo(earlier.Additives),
+                    "Level " + level + " asks for more boosts than the level before it.");
+                Assert.That(
+                    later.Enemies + later.Multipliers,
+                    Is.GreaterThanOrEqualTo(earlier.Enemies + earlier.Multipliers),
+                    "Level " + level + " let a slot go missing.");
+            }
+
+            Assert.That(LevelPlan.For(1).Recipe.Additives, Is.EqualTo(7));
+            Assert.That(LevelPlan.For(1).Recipe.Enemies, Is.EqualTo(14));
+            Assert.That(LevelPlan.For(LevelPlan.PlateauLevel).Recipe.Additives, Is.EqualTo(4));
+            Assert.That(LevelPlan.For(LevelPlan.PlateauLevel).Recipe.Enemies, Is.EqualTo(16));
+        }
+
+        [Test]
+        public void TheRecipeMixIsFlatAboveThePlateau()
+        {
+            var plateau = LevelPlan.For(LevelPlan.PlateauLevel).Recipe;
+
+            for (var level = LevelPlan.PlateauLevel; level <= WellPastThePlateau; level++)
+            {
+                var recipe = LevelPlan.For(level).Recipe;
+
+                Assert.That(recipe.Multipliers, Is.EqualTo(plateau.Multipliers));
+                Assert.That(recipe.Enemies, Is.EqualTo(plateau.Enemies));
+                Assert.That(recipe.Additives, Is.EqualTo(plateau.Additives));
+            }
+        }
+
+        [Test]
+        public void TheOffPathFloorRisesWithTheLevelNumber()
+        {
+            Assert.That(LevelPlan.For(1).MinimumOffPathSlots, Is.EqualTo(MazePreset.Ship.MinimumOffPathSlots));
+            Assert.That(
+                LevelPlan.For(LevelPlan.PlateauLevel).MinimumOffPathSlots,
+                Is.EqualTo(MazePreset.Ship.MinimumOffPathSlots + LevelPlan.PlateauOffPathDemand));
+
+            for (var level = 2; level <= WellPastThePlateau; level++)
+            {
+                Assert.That(
+                    LevelPlan.For(level).MinimumOffPathSlots,
+                    Is.GreaterThanOrEqualTo(LevelPlan.For(level - 1).MinimumOffPathSlots),
+                    "Level " + level + " asks the layout for fewer off-path slots than the level before it.");
+            }
+
+            Assert.That(
+                LevelPlan.For(LevelPlan.PlateauLevel).MinimumOffPathSlots,
+                Is.GreaterThan(LevelPlan.For(1).MinimumOffPathSlots));
+        }
+
+        [Test]
+        public void TheOffPathFloorIsFlatAboveThePlateau()
+        {
+            for (var level = LevelPlan.PlateauLevel; level <= WellPastThePlateau; level++)
+            {
+                Assert.That(LevelPlan.OffPathDemandAt(level), Is.EqualTo(LevelPlan.PlateauOffPathDemand));
+            }
+        }
+
+        [Test]
+        public void TheOpeningPlanPutsABoostWhereItLikesAndEveryPlanAboveItDoesNot()
+        {
+            Assert.That(LevelPlan.For(1).PickupsAskForADetour, Is.False);
+
+            for (var level = 2; level <= WellPastThePlateau; level++)
+            {
+                Assert.That(
+                    LevelPlan.For(level).PickupsAskForADetour,
+                    Is.True,
+                    "Level " + level + " still hands out a boost on the way past.");
+            }
+        }
+
+        [Test]
+        public void EveryKnobOnTheCurveIsCountedFromTheFirstLevel()
+        {
+            Assert.That(() => LevelPlan.AdditiveDriftAt(0), Throws.InstanceOf<ArgumentOutOfRangeException>());
+            Assert.That(() => LevelPlan.MultiplierDriftAt(0), Throws.InstanceOf<ArgumentOutOfRangeException>());
+            Assert.That(() => LevelPlan.OffPathDemandAt(0), Throws.InstanceOf<ArgumentOutOfRangeException>());
+            Assert.That(() => LevelPlan.RecipeAt(MazePreset.Ship, 0), Throws.InstanceOf<ArgumentOutOfRangeException>());
+            Assert.That(() => LevelPlan.RecipeAt(null, 1), Throws.ArgumentNullException);
         }
 
         [Test]

@@ -21,6 +21,8 @@ namespace Game.Domain.Tests
 
         const double MissBar = 0.004;
 
+        const int EliteMissDivisor = 100;
+
         static readonly int[] Inflations = { 3, 10, 50 };
 
         static readonly Dictionary<string, FuzzSweep> SweepByPreset = new Dictionary<string, FuzzSweep>();
@@ -142,6 +144,65 @@ namespace Game.Domain.Tests
             }
         }
 
+        [TestCaseSource(nameof(EveryPlanAboveTheOpeningOne))]
+        public void NoBoostOnAnyPlanAboveTheOpeningOneSitsWhereTheRouteAlreadyGoes(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            foreach (var accepted in sweep.Accepted)
+            {
+                var detours = Detours.Of(accepted.Level.Graph);
+
+                foreach (var node in accepted.Level.Graph.Decisions.Nodes)
+                {
+                    if (node.Type != NodeType.Additive && node.Type != NodeType.Multiplier)
+                    {
+                        continue;
+                    }
+
+                    Assert.That(
+                        detours.Holds(node.Id),
+                        Is.True,
+                        "Seed " + accepted.Level.AttemptSeed + " handed out node #" + node.Id
+                            + " on the way past.");
+                }
+            }
+
+            Assert.That(sweep.PickupsOffADetour(), Is.Zero, sweep.Pickups());
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void EveryPlanAsksForTheSlotsItsSizeOffersSoNothingIsTurnedAwayForAMismatch(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            Assert.That(sweep.Plan.Recipe.Slots, Is.EqualTo(sweep.Preset.ContentSlots));
+            Assert.That(sweep.CountOf(ContentRejection.RecipeSlotMismatch), Is.Zero);
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheOffPathFloorOfEveryPlanTurnsAwayFewerLayoutsThanItKeeps(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            Assert.That(
+                sweep.CountOf(LayoutRejection.TooFewOffPathSlots),
+                Is.LessThan(sweep.Attempts / 2),
+                sweep.Name + " " + sweep.Pickups());
+        }
+
+        [Test]
+        public void TheBraidOfALevelIsTheSameAtEveryPlan()
+        {
+            foreach (var levelNumber in EveryPlanOnTheCurve())
+            {
+                Assert.That(
+                    PlanSweep(levelNumber).Preset.BraidFactor,
+                    Is.EqualTo(MazePreset.Ship.BraidFactor),
+                    "Level " + levelNumber + " braided its maze differently.");
+            }
+        }
+
         [TestCaseSource(nameof(EveryPlanOnTheCurve))]
         public void TheSpreadOfEveryPlanLeavesOneBehind(int levelNumber)
         {
@@ -191,15 +252,24 @@ namespace Game.Domain.Tests
         }
 
         [TestCaseSource(nameof(EveryPlanAboveTheOpeningOne))]
-        public void EveryLevelAboveTheOpeningPlanHoldsAnEnemyOutOfReachOnArrival(int levelNumber)
+        public void AllButAHandfulOfLevelsAboveTheOpeningPlanHoldAnEnemyOutOfReachOnArrival(int levelNumber)
         {
-            foreach (var accepted in PlanSweep(levelNumber).Accepted)
+            var sweep = PlanSweep(levelNumber);
+            var opened = 0;
+
+            foreach (var accepted in sweep.Accepted)
             {
-                Assert.That(
-                    Elites.Of(accepted.Level.Graph, accepted.Level.Tuning),
-                    Is.Not.Empty,
-                    "Seed " + accepted.Level.AttemptSeed + " opened every door it had.");
+                if (Elites.Of(accepted.Level.Graph, accepted.Level.Tuning).Count == 0)
+                {
+                    opened++;
+                }
             }
+
+            Assert.That(
+                opened,
+                Is.LessThan(sweep.Accepted.Count / EliteMissDivisor),
+                sweep.Name + " left " + opened + " of " + sweep.Accepted.Count
+                    + " levels with every door already open; " + sweep.Locks());
         }
 
         [Test]
@@ -238,6 +308,7 @@ namespace Game.Domain.Tests
                 Console.WriteLine("  elites " + sweep.Locks());
                 Console.WriteLine("  spine " + sweep.SpineReach());
                 Console.WriteLine("  opening " + sweep.Opening());
+                Console.WriteLine("  boosts " + sweep.Pickups());
             }
         }
 

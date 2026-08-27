@@ -148,7 +148,7 @@ namespace Game.Domain.Tests
         [Test]
         public void ASolvabilityReasonFillsTheHistogramTheCapThrowsWith()
         {
-            var greedy = new PowerTuning(2, 600, 0.6, 0.2, 0.9999, 0.8, 0.7, 0.0, 1.0, 1);
+            var greedy = new PowerTuning(2, 600, 0.6, 0.2, 0.9999, 0.8, 0.7, 0.0, 1.0, 1, false, 0);
 
             var thrown = Assert.Throws<LevelGenerationException>(
                 () => LevelGenerator.Generate(Seed, MazePreset.Ship, ContentRecipe.Ship, greedy, out _));

@@ -59,6 +59,23 @@ namespace Game.Domain
                 throw new ArgumentNullException(nameof(preset));
             }
 
+            return TryGenerate(
+                seed, preset, waysOutOfTheStart, preset.MinimumOffPathSlots, out layout, out rejection);
+        }
+
+        public static bool TryGenerate(
+            long seed,
+            MazePreset preset,
+            int waysOutOfTheStart,
+            int minimumOffPathSlots,
+            out MazeLayout layout,
+            out LayoutRejection rejection)
+        {
+            if (preset == null)
+            {
+                throw new ArgumentNullException(nameof(preset));
+            }
+
             layout = null;
             rejection = LayoutRejection.None;
 
@@ -97,7 +114,7 @@ namespace Game.Domain
                 return false;
             }
 
-            if (metrics.OffPathSlotCount < preset.MinimumOffPathSlots)
+            if (metrics.OffPathSlotCount < minimumOffPathSlots)
             {
                 rejection = LayoutRejection.TooFewOffPathSlots;
                 return false;
