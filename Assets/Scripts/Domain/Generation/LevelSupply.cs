@@ -38,6 +38,8 @@ namespace Game.Domain
 
         public LevelPlan LastPlan { get; private set; }
 
+        public int LastLevelNumber { get; private set; }
+
         public int DrawsFailed
         {
             get { return SeedsSpent - LevelsDrawn; }
@@ -65,6 +67,7 @@ namespace Game.Domain
 
             var plan = PlanOf(SeedsSpent);
             LastPlan = plan;
+            LastLevelNumber = SeedsSpent;
 
             LevelGenerationReport report;
             var level = LevelGenerator.Generate(

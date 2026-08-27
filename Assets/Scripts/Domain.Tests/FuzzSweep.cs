@@ -18,23 +18,31 @@ namespace Game.Domain.Tests
 
     sealed class FuzzSweep
     {
+        const int RatedLevels = 200;
+
         readonly List<AcceptedLevel> accepted;
         readonly Dictionary<LayoutRejection, int> layoutReasons = new Dictionary<LayoutRejection, int>();
         readonly Dictionary<ContentRejection, int> contentReasons = new Dictionary<ContentRejection, int>();
         double milliseconds;
         List<int> enemyValues;
+        List<int> stingyStars;
+        List<int> routedStars;
+        List<double> routedPositions;
 
-        public FuzzSweep(string name, LevelPlan plan, int seeds)
+        public FuzzSweep(string name, LevelPlan plan, int seeds, int levelNumber)
         {
             Name = name;
             Plan = plan;
             Seeds = seeds;
+            LevelNumber = levelNumber;
             accepted = new List<AcceptedLevel>(seeds);
         }
 
         public string Name { get; }
 
         public LevelPlan Plan { get; }
+
+        public int LevelNumber { get; }
 
         public MazePreset Preset
         {
@@ -195,6 +203,158 @@ namespace Game.Domain.Tests
                 + " p50 " + SweepStatistics.Round(SweepStatistics.Percentile(sorted, 0.5))
                 + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(sorted, 0.9))
                 + " over " + sorted.Count + " regions";
+        }
+
+        public int ParsWithTheirWallsMet()
+        {
+            var met = 0;
+            foreach (var level in accepted)
+            {
+                if (level.Level.Par.IsDegenerate)
+                {
+                    met++;
+                }
+            }
+
+            return met;
+        }
+
+        public int BossesSharingTheStartsRegion()
+        {
+            var sharing = 0;
+            foreach (var level in accepted)
+            {
+                var graph = level.Level.Graph;
+                if (graph.RegionOf(level.Level.BossNodeId) == graph.RegionOf(level.Level.StartNodeId))
+                {
+                    sharing++;
+                }
+            }
+
+            return sharing;
+        }
+
+        public double ShareOfParsWithTheirWallsMet()
+        {
+            return accepted.Count == 0 ? 0.0 : (double)ParsWithTheirWallsMet() / accepted.Count;
+        }
+
+        public IReadOnlyList<int> StingyStars()
+        {
+            Rate();
+            return stingyStars;
+        }
+
+        public IReadOnlyList<int> RoutedStars()
+        {
+            Rate();
+            return routedStars;
+        }
+
+        public IReadOnlyList<double> RoutedPositions()
+        {
+            Rate();
+            return routedPositions;
+        }
+
+        public double MedianRoutedPosition()
+        {
+            var sorted = new List<double>(RoutedPositions());
+            sorted.Sort();
+            return sorted.Count == 0 ? 0.0 : SweepStatistics.Percentile(sorted, 0.5);
+        }
+
+        void Rate()
+        {
+            if (stingyStars != null)
+            {
+                return;
+            }
+
+            var sample = accepted.GetRange(0, Math.Min(accepted.Count, RatedLevels));
+            stingyStars = StarsOver(sample, ReferenceRuns.Stingy);
+            routedStars = StarsOver(sample, ReferenceRuns.Routed);
+            routedPositions = PositionsOver(sample, ReferenceRuns.Routed);
+        }
+
+        public string Rating()
+        {
+            var spans = new List<double>();
+            foreach (var level in accepted)
+            {
+                if (!level.Level.Par.IsDegenerate)
+                {
+                    spans.Add(level.Level.Par.Span);
+                }
+            }
+
+            spans.Sort();
+            var positions = new List<double>(RoutedPositions());
+            positions.Sort();
+
+            return "boss shares the start's region on " + BossesSharingTheStartsRegion()
+                + " of " + accepted.Count + "; walls met on " + ParsWithTheirWallsMet()
+                + " of " + accepted.Count + " ("
+                + SweepStatistics.Round(100.0 * ShareOfParsWithTheirWallsMet()) + "%), span p10 "
+                + SweepStatistics.Round(SweepStatistics.Percentile(spans, 0.1))
+                + " p50 " + SweepStatistics.Round(SweepStatistics.Percentile(spans, 0.5))
+                + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(spans, 0.9))
+                + "; second star at " + SweepStatistics.Round(LevelPlan.SecondStarAt(LevelNumber))
+                + " third at " + SweepStatistics.Round(LevelPlan.ThirdStarAt(LevelNumber))
+                + "; stingy " + Tally(StingyStars())
+                + "; routed " + Tally(RoutedStars())
+                + " at position p10 " + SweepStatistics.Round(SweepStatistics.Percentile(positions, 0.1))
+                + " p50 " + SweepStatistics.Round(SweepStatistics.Percentile(positions, 0.5))
+                + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(positions, 0.9))
+                + " over " + positions.Count + " levels";
+        }
+
+        static string Tally(IReadOnlyList<int> stars)
+        {
+            if (stars.Count == 0)
+            {
+                return "nothing rated";
+            }
+
+            var tally = new int[Stars.Most + 1];
+            foreach (var count in stars)
+            {
+                tally[count]++;
+            }
+
+            var described = string.Empty;
+            for (var count = Stars.Fewest; count <= Stars.Most; count++)
+            {
+                described += (count == Stars.Fewest ? string.Empty : "/")
+                    + count + "*=" + SweepStatistics.Round(100.0 * tally[count] / stars.Count) + "%";
+            }
+
+            return described;
+        }
+
+        List<int> StarsOver(List<AcceptedLevel> sample, Func<PlacedLevel, int> finish)
+        {
+            var counts = new List<int>(sample.Count);
+            foreach (var level in sample)
+            {
+                counts.Add(Stars.For(level.Level.Par, finish(level.Level), LevelNumber));
+            }
+
+            return counts;
+        }
+
+        List<double> PositionsOver(List<AcceptedLevel> sample, Func<PlacedLevel, int> finish)
+        {
+            var places = new List<double>(sample.Count);
+            foreach (var level in sample)
+            {
+                if (!level.Level.Par.IsDegenerate)
+                {
+                    places.Add(level.Level.Par.PositionOf(finish(level.Level)));
+                }
+            }
+
+            return places;
         }
 
         public string Opening()

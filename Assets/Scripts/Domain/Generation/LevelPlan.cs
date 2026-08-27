@@ -18,6 +18,10 @@ namespace Game.Domain
 
         public const int PlateauOffPathDemand = 4;
 
+        public const double PlateauSecondStar = 0.45;
+
+        public const double PlateauThirdStar = 0.9;
+
         public const int ThirdMultiplierLevel = 11;
 
         const int OpeningStartingPower = 2;
@@ -31,6 +35,10 @@ namespace Game.Domain
         const int OpeningAdditiveDrift = 0;
 
         const int OpeningOffPathDemand = 0;
+
+        const double OpeningSecondStar = 1.0 / 3.0;
+
+        const double OpeningThirdStar = 2.0 / 3.0;
 
         public LevelPlan(MazePreset preset, ContentRecipe recipe, PowerTuning tuning)
         {
@@ -210,6 +218,28 @@ namespace Game.Domain
             var steps = PlateauLevel - 1;
 
             return OpeningSpreadFloor + climb * (levelNumber - 1) / steps;
+        }
+
+        public static double SecondStarAt(int levelNumber)
+        {
+            return Climbed(levelNumber, OpeningSecondStar, PlateauSecondStar);
+        }
+
+        public static double ThirdStarAt(int levelNumber)
+        {
+            return Climbed(levelNumber, OpeningThirdStar, PlateauThirdStar);
+        }
+
+        static double Climbed(int levelNumber, double opening, double plateau)
+        {
+            RequireLevel(levelNumber);
+
+            if (levelNumber >= PlateauLevel)
+            {
+                return plateau;
+            }
+
+            return opening + (plateau - opening) * (levelNumber - 1) / (PlateauLevel - 1);
         }
 
         public static int StartingPowerAt(int levelNumber)

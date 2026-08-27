@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using Game.Domain;
 using Game.Presentation;
 using Game.Presentation.Pure;
 using TMPro;
@@ -22,6 +23,10 @@ namespace Game.Flow
 
         public const string PowerName = "FinalPower";
 
+        public const string StarsName = "Stars";
+
+        public const string StarName = "Star";
+
         public const string NextName = "Next";
 
         public const string NextLabelName = "NextLabel";
@@ -42,6 +47,12 @@ namespace Game.Flow
 
         const float ButtonHeight = 140f;
 
+        const float StarSize = 76f;
+
+        const float StarGap = 26f;
+
+        const float StarsY = -105f;
+
         static readonly Color Veil = new Color(0.04f, 0.05f, 0.07f, 0.82f);
 
         static readonly Color Card = new Color(0.11f, 0.13f, 0.18f, 1f);
@@ -52,6 +63,10 @@ namespace Game.Flow
 
         static readonly Color Call = new Color(0.24f, 0.55f, 0.92f, 1f);
 
+        static readonly Color Lit = new Color(0.98f, 0.79f, 0.28f, 1f);
+
+        static readonly Color Unlit = new Color(0.23f, 0.26f, 0.33f, 1f);
+
         GameObject root;
 
         GameObject events;
@@ -61,6 +76,8 @@ namespace Game.Flow
         BaseInputModule displaced;
 
         TextMeshProUGUI reading;
+
+        Image[] stars;
 
         Button next;
 
@@ -85,6 +102,8 @@ namespace Game.Flow
 
         public int Power { get; private set; }
 
+        public int StarsHeld { get; private set; }
+
         public Button Next
         {
             get { return next; }
@@ -95,7 +114,7 @@ namespace Game.Flow
             get { return root; }
         }
 
-        public void Show(int power)
+        public void Show(int power, int starsHeld)
         {
             RequireOpen();
 
@@ -105,8 +124,22 @@ namespace Game.Flow
                     nameof(power), power, "A run that beat the boss ended holding power.");
             }
 
+            if (starsHeld < Stars.Fewest || starsHeld > Stars.Most)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(starsHeld), starsHeld, "A rating the domain handed over counts between "
+                        + Stars.Fewest + " and " + Stars.Most + " stars.");
+            }
+
             Power = power;
+            StarsHeld = starsHeld;
             reading.text = power.ToString(CultureInfo.InvariantCulture);
+
+            for (var index = 0; index < stars.Length; index++)
+            {
+                stars[index].color = index < starsHeld ? Lit : Unlit;
+            }
+
             root.SetActive(true);
         }
 
@@ -142,6 +175,7 @@ namespace Game.Flow
 
             Write(CaptionName, card, 220f, 64f, Quiet, Caption);
             reading = Write(PowerName, card, 40f, 220f, Ink, string.Empty);
+            stars = Rate(card);
 
             var button = Frame(NextName, card);
             Centre(button, -230f, ButtonWidth, ButtonHeight);
@@ -155,6 +189,29 @@ namespace Game.Flow
 
             RaiseEvents();
             root.SetActive(false);
+        }
+
+        static Image[] Rate(Transform parent)
+        {
+            var row = Frame(StarsName, parent);
+            Centre(row, StarsY, Stars.Most * StarSize + (Stars.Most - 1) * StarGap, StarSize);
+
+            var lamps = new Image[Stars.Most];
+            var stride = StarSize + StarGap;
+            var leftmost = -0.5f * (Stars.Most - 1) * stride;
+
+            for (var index = 0; index < lamps.Length; index++)
+            {
+                var lamp = Frame(StarName + (index + 1), row);
+                lamp.anchorMin = new Vector2(0.5f, 0.5f);
+                lamp.anchorMax = new Vector2(0.5f, 0.5f);
+                lamp.pivot = new Vector2(0.5f, 0.5f);
+                lamp.anchoredPosition = new Vector2(leftmost + index * stride, 0f);
+                lamp.sizeDelta = new Vector2(StarSize, StarSize);
+                lamps[index] = Paint(lamp, Unlit);
+            }
+
+            return lamps;
         }
 
         void RaiseEvents()
@@ -268,6 +325,7 @@ namespace Game.Flow
             }
 
             reading = null;
+            stars = null;
             disposed = true;
         }
     }
