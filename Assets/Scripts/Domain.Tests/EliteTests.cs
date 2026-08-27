@@ -29,7 +29,7 @@ namespace Game.Domain.Tests
             Assert.That(Elites.Of(level, LevelSketch.Tuning), Does.Contain(LevelSketch.DeepEnemyNodeId));
             Assert.That(
                 Elites.Of(LevelSketch.Solvable().Revalued(4, 0, 1).Build(), LevelSketch.Tuning),
-                Does.Not.Contain(LevelSketch.DeepEnemyNodeId));
+                Has.No.Member(LevelSketch.DeepEnemyNodeId));
         }
 
         [Test]
