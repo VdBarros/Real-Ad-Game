@@ -80,5 +80,29 @@ namespace Game.Domain.Tests
                 ScreenFrame.PixelsPerMetre(IsoProjection.OrthographicSize) * IsoProjection.OrthographicSize * 2f,
                 Is.EqualTo((float)ScreenFrame.Height).Within(1e-3f));
         }
+
+        [Test]
+        public void ATileCoversLessScreenThanItsEdgeSquaredBecauseTheCameraLooksAcrossIt()
+        {
+            var perMetre = ScreenFrame.PixelsPerMetre(IsoProjection.OrthographicSize);
+            var ground = ScreenFrame.TileGroundPixels(IsoProjection.OrthographicSize);
+
+            Assert.That(ground, Is.LessThan(perMetre * perMetre));
+            Assert.That(
+                ground,
+                Is.EqualTo(perMetre * perMetre * (float)Math.Sin(IsoProjection.CameraPitch * Math.PI / 180.0))
+                    .Within(1e-2f));
+        }
+
+        [Test]
+        public void ATighterFramingPutsMoreScreenOnATile()
+        {
+            Assert.That(
+                ScreenFrame.TileGroundPixels(LevelFraming.OpeningSize),
+                Is.GreaterThan(ScreenFrame.TileGroundPixels(IsoProjection.OrthographicSize)));
+            Assert.That(
+                () => ScreenFrame.TileGroundPixels(0f),
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
+        }
     }
 }

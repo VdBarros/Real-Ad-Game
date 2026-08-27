@@ -9,6 +9,16 @@ namespace Game.EditorTooling
     {
         public static void Shoot(Camera camera, string path)
         {
+            var frame = Frame(camera);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllBytes(path, frame.EncodeToPNG());
+
+            Object.DestroyImmediate(frame);
+        }
+
+        public static Texture2D Frame(Camera camera)
+        {
             var aspect = camera.aspect;
             camera.aspect = (float)ScreenFrame.Width / ScreenFrame.Height;
 
@@ -28,14 +38,12 @@ namespace Game.EditorTooling
             frame.Apply();
             RenderTexture.active = previous;
 
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllBytes(path, frame.EncodeToPNG());
-
             camera.targetTexture = null;
             camera.aspect = aspect;
-            Object.DestroyImmediate(frame);
             target.Release();
             Object.DestroyImmediate(target);
+
+            return frame;
         }
 
         public static void Sun()

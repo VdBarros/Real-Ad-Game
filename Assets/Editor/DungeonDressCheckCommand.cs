@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
 using Game.Domain;
 using Game.Presentation;
@@ -25,13 +26,27 @@ namespace Game.EditorTooling
 
         const float OcclusionBound = 0.5f;
 
+        const float FootprintShare = 0.3f;
+
+        const float ToneContrast = 1.6f;
+
+        const float ShotDistance = 60f;
+
+        const int ShotThreshold = 8;
+
+        const string AdditiveShot = "dev/scratch/t-30-additive.png";
+
+        const string MultiplierShot = "dev/scratch/t-30-multiplier.png";
+
+        const string FloorShot = "dev/scratch/t-30-floor-only.png";
+
         const int Complaints = 6;
 
         public static void Check()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            var report = new StringBuilder("t-22 walls and props, ship seed ")
+            var report = new StringBuilder("t-22/t-30 walls and props, ship seed ")
                 .Append(Seed.ToString(CultureInfo.InvariantCulture))
                 .Append(':');
             var failures = 0;
@@ -44,7 +59,7 @@ namespace Game.EditorTooling
                 failures += Built(models, report);
             }
 
-            report.Append("\n  t-22: ")
+            report.Append("\n  t-22/t-30: ")
                 .Append(failures == 0
                     ? "every assertion above held"
                     : failures + (failures == 1 ? " assertion" : " assertions") + " above failed");
@@ -300,6 +315,7 @@ namespace Game.EditorTooling
             failures += EveryWallLandsOnItsTileEdge(graph, byName, report);
             failures += EveryPropStandsOnItsTile(graph, byName, report);
             failures += TheRewardsReadApart(graph, byName, report);
+            failures += TheRewardsReadAgainstTheFloor(root, graph, byName, report);
             failures += TheMaterialsStayFlat(root, report);
 
             WorldObjects.Destroy(root);
@@ -596,9 +612,9 @@ namespace Game.EditorTooling
             LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
             var chest = Footprint(graph, byName, PartModel.Chest);
-            var candles = Footprint(graph, byName, PartModel.Candles);
+            var hoard = Footprint(graph, byName, PartModels.Of(PartStyle.Multiplier));
 
-            if (chest.size == Vector3.zero || candles.size == Vector3.zero)
+            if (chest.size == Vector3.zero || hoard.size == Vector3.zero)
             {
                 return Assert(
                     report,
@@ -607,23 +623,265 @@ namespace Game.EditorTooling
                     "the world raised no pair to compare");
             }
 
-            var tall = Math.Abs(chest.size.y - candles.size.y) <= Epsilon;
-            var wide = chest.size.x >= candles.size.x * SilhouetteRatio;
+            var chestGround = chest.size.x * chest.size.z;
+            var hoardGround = hoard.size.x * hoard.size.z;
+            var tall = Math.Abs(chest.size.y - hoard.size.y) <= Epsilon;
+            var apart = Math.Min(chestGround, hoardGround) > 0f
+                && Math.Max(chestGround, hoardGround)
+                >= Math.Min(chestGround, hoardGround) * SilhouetteRatio;
+            var failures = 0;
 
-            return Assert(
+            failures += Assert(
                 report,
-                tall && wide,
-                "the two reward kinds stand the same height and read apart by width alone",
+                tall && apart,
+                "the two reward kinds stand the same height and cover different ground, so a scan tells "
+                + "an additive from a multiplier by shape",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "the chest is {0:0.###} wide and {1:0.###} tall against the candle group's "
-                    + "{2:0.###} by {3:0.###}, a width ratio of {4:0.##} against the {5:0.##} asked for",
+                    "the chest is {0:0.###} by {1:0.###} on the ground and {2:0.###} tall against the "
+                    + "multiplier prop's {3:0.###} by {4:0.###} by {5:0.###}, a ground ratio of {6:0.##} "
+                    + "against the {7:0.##} asked for",
                     chest.size.x,
+                    chest.size.z,
                     chest.size.y,
-                    candles.size.x,
-                    candles.size.y,
-                    candles.size.x <= 0f ? 0f : chest.size.x / candles.size.x,
+                    hoard.size.x,
+                    hoard.size.z,
+                    hoard.size.y,
+                    Math.Min(chestGround, hoardGround) <= 0f
+                        ? 0f
+                        : Math.Max(chestGround, hoardGround) / Math.Min(chestGround, hoardGround),
                     SilhouetteRatio));
+
+            var edge = IsoProjection.TileEdge;
+            var widest = Math.Max(
+                Math.Max(chest.size.x, chest.size.z), Math.Max(hoard.size.x, hoard.size.z));
+
+            failures += Assert(
+                report,
+                widest <= edge,
+                "neither reward prop spills off the tile it stands on once the fit-to-cube rule has "
+                + "stretched it",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the wider of the two spans {0:0.###} of a {1:0.###} tile edge",
+                    widest,
+                    edge));
+
+            return failures;
+        }
+
+        static int TheRewardsReadAgainstTheFloor(
+            GameObject root, LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            PreviewFilm.Sun();
+            Unbadge(root);
+
+            var multiplier = Photograph(
+                graph, byName, PartModels.Of(PartStyle.Multiplier), "multiplier", MultiplierShot, FloorShot);
+            var additive = Photograph(
+                graph, byName, PartModels.Of(PartStyle.Additive), "additive", AdditiveShot, null);
+
+            if (multiplier.Pixels < 0 || additive.Pixels < 0)
+            {
+                return Assert(
+                    report,
+                    false,
+                    "both reward props stand somewhere the gameplay camera can photograph them",
+                    "the ship seed raised no pair to photograph");
+            }
+
+            var tile = ScreenFrame.TileGroundPixels(IsoProjection.OrthographicSize);
+            var failures = 0;
+
+            report.Append("\n  at gameplay zoom ")
+                .Append(IsoProjection.OrthographicSize.ToString("0.#", CultureInfo.InvariantCulture))
+                .Append(" one tile of ground covers ")
+                .Append(tile.ToString("0", CultureInfo.InvariantCulture))
+                .Append(" of the ")
+                .Append(ScreenFrame.Width * ScreenFrame.Height)
+                .Append(" pixels in frame");
+
+            failures += ReadsAgainstTheFloor(report, multiplier, tile);
+            failures += ReadsAgainstTheFloor(report, additive, tile);
+
+            return failures;
+        }
+
+        static int ReadsAgainstTheFloor(StringBuilder report, Reading reading, float tile)
+        {
+            var failures = 0;
+            var share = tile <= 0f ? 0f : reading.Pixels / tile;
+
+            failures += Assert(
+                report,
+                share >= FootprintShare,
+                "the " + reading.Name + " prop covers at least "
+                + FootprintShare.ToString("0.##", CultureInfo.InvariantCulture)
+                + " of a tile of ground at gameplay zoom, so it is a shape rather than a speck",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it covers {0} pixels, {1:0.###} of a tile",
+                    reading.Pixels,
+                    share));
+
+            failures += Assert(
+                report,
+                reading.Contrast >= ToneContrast,
+                "the " + reading.Name + " prop reads at least "
+                + ToneContrast.ToString("0.##", CultureInfo.InvariantCulture)
+                + ":1 in tone against the floor it stands on, so it is not dark on dark",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "its lit pixels average {0:0.####} relative luminance against the {1:0.####} of the ground "
+                    + "they hide, a contrast of {2:0.##}:1, and {3:0.####} across the rest of the frame "
+                    + "at {4:0.##}:1",
+                    reading.Prop,
+                    reading.Behind,
+                    reading.Contrast,
+                    reading.Around,
+                    ContrastOf(reading.Prop, reading.Around)));
+
+            return failures;
+        }
+
+        static Reading Photograph(
+            LevelGraph graph,
+            IDictionary<string, Transform> byName,
+            PartModel model,
+            string name,
+            string path,
+            string barePath)
+        {
+            var reading = new Reading { Name = name, Pixels = -1 };
+            var instance = PropOf(graph, byName, model);
+
+            if (instance == null)
+            {
+                return reading;
+            }
+
+            var camera = Rig(instance.position);
+            UnityEngine.Object.DestroyImmediate(PreviewFilm.Frame(camera));
+
+            instance.gameObject.SetActive(false);
+            var bare = PreviewFilm.Frame(camera);
+            instance.gameObject.SetActive(true);
+            var dressed = PreviewFilm.Frame(camera);
+
+            var before = bare.GetPixels32();
+            var after = dressed.GetPixels32();
+            var covered = 0;
+            var prop = 0.0;
+            var behind = 0.0;
+            var elsewhere = 0.0;
+
+            for (var pixel = 0; pixel < after.Length; pixel++)
+            {
+                if (Apart(before[pixel], after[pixel]))
+                {
+                    covered++;
+                    prop += Luminance(after[pixel]);
+                    behind += Luminance(before[pixel]);
+                }
+                else
+                {
+                    elsewhere += Luminance(before[pixel]);
+                }
+            }
+
+            reading.Pixels = covered;
+            reading.Prop = covered == 0 ? 0.0 : prop / covered;
+            reading.Behind = covered == 0 ? 0.0 : behind / covered;
+            reading.Around = after.Length == covered ? 0.0 : elsewhere / (after.Length - covered);
+
+            Write(dressed, path);
+            Write(bare, barePath);
+
+            UnityEngine.Object.DestroyImmediate(bare);
+            UnityEngine.Object.DestroyImmediate(dressed);
+            UnityEngine.Object.DestroyImmediate(camera.gameObject);
+
+            return reading;
+        }
+
+        static bool Apart(Color32 before, Color32 after)
+        {
+            return Math.Abs(before.r - after.r) > ShotThreshold
+                || Math.Abs(before.g - after.g) > ShotThreshold
+                || Math.Abs(before.b - after.b) > ShotThreshold;
+        }
+
+        static double Luminance(Color32 colour)
+        {
+            return 0.2126 * Linear(colour.r) + 0.7152 * Linear(colour.g) + 0.0722 * Linear(colour.b);
+        }
+
+        static double Linear(byte channel)
+        {
+            var value = channel / 255.0;
+
+            return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+        }
+
+        static double ContrastOf(double one, double other)
+        {
+            return (Math.Max(one, other) + 0.05) / (Math.Min(one, other) + 0.05);
+        }
+
+        static void Write(Texture2D frame, string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllBytes(path, frame.EncodeToPNG());
+        }
+
+        static void Unbadge(GameObject root)
+        {
+            foreach (var node in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (node.name == PartNames.BadgesGroup)
+                {
+                    node.gameObject.SetActive(false);
+                }
+            }
+        }
+
+        static Camera Rig(Vector3 centre)
+        {
+            var camera = new GameObject("DressCamera").AddComponent<Camera>();
+            camera.transform.rotation = Quaternion.Euler(
+                IsoProjection.CameraPitch, IsoProjection.CameraYaw, IsoProjection.CameraRoll);
+            camera.transform.position = centre - camera.transform.forward * ShotDistance;
+            camera.orthographic = true;
+            camera.orthographicSize = IsoProjection.OrthographicSize;
+            camera.nearClipPlane = 0.03f;
+            camera.farClipPlane = ShotDistance * 3f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.06f, 0.07f, 0.09f);
+
+            return camera;
+        }
+
+        struct Reading
+        {
+            public string Name;
+
+            public int Pixels;
+
+            public double Prop;
+
+            public double Behind;
+
+            public double Around;
+
+            public double Contrast
+            {
+                get { return ContrastOf(Prop, Behind); }
+            }
         }
 
         static int TheMaterialsStayFlat(GameObject root, StringBuilder report)
@@ -694,6 +952,14 @@ namespace Game.EditorTooling
         static Bounds Footprint(
             LevelGraph graph, IDictionary<string, Transform> byName, PartModel model)
         {
+            var instance = PropOf(graph, byName, model);
+
+            return instance == null ? new Bounds(Vector3.zero, Vector3.zero) : World(instance);
+        }
+
+        static Transform PropOf(
+            LevelGraph graph, IDictionary<string, Transform> byName, PartModel model)
+        {
             foreach (var node in graph.Decisions.Nodes)
             {
                 WorldPart prop;
@@ -705,11 +971,11 @@ namespace Game.EditorTooling
                 Transform instance;
                 if (byName.TryGetValue(prop.Name, out instance))
                 {
-                    return World(instance);
+                    return instance;
                 }
             }
 
-            return new Bounds(Vector3.zero, Vector3.zero);
+            return null;
         }
 
         static Bounds Local(GameObject prefab)
