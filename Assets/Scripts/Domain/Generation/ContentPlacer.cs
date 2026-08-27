@@ -38,7 +38,7 @@ namespace Game.Domain
             var board = ContentBoard.Of(layout.Graph);
             var random = StageRandom.ForStage(layout.AttemptSeed, "content");
 
-            var bossNodeId = DeepestSlot(layout);
+            var bossNodeId = Detours.DeepestSlotOf(layout);
             if (!TryAssignRoles(board, layout, recipe, tuning, random, bossNodeId))
             {
                 rejection = ContentRejection.RolesUnfilled;
@@ -114,26 +114,6 @@ namespace Game.Domain
             }
         }
 
-        static int DeepestSlot(MazeLayout layout)
-        {
-            var deepest = -1;
-            var deepestDistance = -1;
-            foreach (var slotId in layout.SlotNodeIds)
-            {
-                var distance = layout.DistanceFromStart.DistanceTo(
-                    layout.Graph.Decisions.Node(slotId).Position);
-                if (distance <= deepestDistance)
-                {
-                    continue;
-                }
-
-                deepest = slotId;
-                deepestDistance = distance;
-            }
-
-            return deepest;
-        }
-
         static bool TryAssignRoles(
             ContentBoard board,
             MazeLayout layout,
@@ -148,6 +128,8 @@ namespace Game.Domain
                 isGate[nodeId] = true;
             }
 
+            var detours = tuning.PickupsAskForADetour ? Detours.Of(layout, bossNodeId) : null;
+
             var rest = new List<int>();
             var pockets = new List<int>();
             var gates = new List<int>();
@@ -160,6 +142,20 @@ namespace Game.Domain
                 }
 
                 rest.Add(slotId);
+                if (detours != null)
+                {
+                    if (detours.Holds(slotId))
+                    {
+                        pockets.Add(slotId);
+                    }
+                    else if (isGate[slotId])
+                    {
+                        gates.Add(slotId);
+                    }
+
+                    continue;
+                }
+
                 if (layout.Graph.Tiles.Neighbours(layout.Graph.Decisions.Node(slotId).Position).Count == 1)
                 {
                     pockets.Add(slotId);
@@ -177,7 +173,12 @@ namespace Game.Domain
 
             foreach (var nodeId in random.Shuffled(pockets))
             {
-                if (random.NextDouble() < tuning.PocketTreasure && (needMultipliers > 0 || needAdditives > 0))
+                var treasureWanted = needMultipliers > 0 || needAdditives > 0;
+                var takesTreasure = detours != null
+                    ? treasureWanted
+                    : random.NextDouble() < tuning.PocketTreasure && treasureWanted;
+
+                if (takesTreasure)
                 {
                     if (needMultipliers > 0
                         && random.NextDouble() < (double)needMultipliers / (needMultipliers + needAdditives))
@@ -203,8 +204,18 @@ namespace Game.Domain
                 }
             }
 
+            if (detours != null && needMultipliers + needAdditives > 0)
+            {
+                return false;
+            }
+
             foreach (var nodeId in random.Shuffled(gates))
             {
+                if (role[nodeId] != NodeType.Unassigned)
+                {
+                    continue;
+                }
+
                 if (needEnemies > 0 && random.NextDouble() < tuning.GatePreference)
                 {
                     role[nodeId] = NodeType.Enemy;
@@ -266,7 +277,7 @@ namespace Game.Domain
                 return false;
             }
 
-            SpreadEnemiesAcrossRegions(layout, rest, role);
+            SpreadEnemiesAcrossRegions(layout, rest, role, detours);
 
             board.SetType(bossNodeId, NodeType.Boss);
             foreach (var nodeId in rest)
@@ -277,7 +288,8 @@ namespace Game.Domain
             return true;
         }
 
-        static void SpreadEnemiesAcrossRegions(MazeLayout layout, List<int> rest, NodeType[] role)
+        static void SpreadEnemiesAcrossRegions(
+            MazeLayout layout, List<int> rest, NodeType[] role, Detours detours)
         {
             var regionIds = new List<int>();
             var enemiesByRegion = new Dictionary<int, List<int>>();
@@ -313,13 +325,23 @@ namespace Game.Domain
                 }
 
                 var donor = -1;
+                var spared = -1;
                 foreach (var other in regionIds)
                 {
-                    if (enemiesByRegion[other].Count > 1
-                        && (donor < 0 || enemiesByRegion[other].Count > enemiesByRegion[donor].Count))
+                    if (enemiesByRegion[other].Count <= 1
+                        || (donor >= 0 && enemiesByRegion[other].Count <= enemiesByRegion[donor].Count))
                     {
-                        donor = other;
+                        continue;
                     }
+
+                    var candidate = SparedEnemyIn(enemiesByRegion[other], detours);
+                    if (candidate < 0)
+                    {
+                        continue;
+                    }
+
+                    donor = other;
+                    spared = candidate;
                 }
 
                 if (donor < 0)
@@ -327,17 +349,29 @@ namespace Game.Domain
                     continue;
                 }
 
-                var spared = enemiesByRegion[donor][enemiesByRegion[donor].Count - 1];
                 var starved = treasureByRegion[regionId][0];
 
                 role[spared] = role[starved];
                 role[starved] = NodeType.Enemy;
 
-                enemiesByRegion[donor].RemoveAt(enemiesByRegion[donor].Count - 1);
+                enemiesByRegion[donor].Remove(spared);
                 treasureByRegion[donor].Add(spared);
                 enemiesByRegion[regionId].Add(starved);
                 treasureByRegion[regionId].RemoveAt(0);
             }
+        }
+
+        static int SparedEnemyIn(List<int> enemies, Detours detours)
+        {
+            for (var index = enemies.Count - 1; index >= 0; index--)
+            {
+                if (detours == null || detours.Holds(enemies[index]))
+                {
+                    return enemies[index];
+                }
+            }
+
+            return -1;
         }
 
         static ContentRejection Mint(ContentBoard board, PowerTuning tuning, StageRandom random)

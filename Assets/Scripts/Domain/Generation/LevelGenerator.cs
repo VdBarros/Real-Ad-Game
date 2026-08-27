@@ -82,7 +82,12 @@ namespace Game.Domain
 
             MazeLayout layout;
             if (!MazeLayoutGenerator.TryGenerate(
-                    attemptSeed, preset, tuning.OpeningChoices, out layout, out layoutRejection))
+                    attemptSeed,
+                    preset,
+                    tuning.OpeningChoices,
+                    preset.MinimumOffPathSlots + tuning.OffPathDemand,
+                    out layout,
+                    out layoutRejection))
             {
                 return false;
             }

@@ -12,13 +12,13 @@ namespace Game.Domain
         static readonly int[] Ladder = { 2, 3, 4 };
 
         public static readonly PowerTuning Tiny =
-            new PowerTuning(2, 200, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1);
+            new PowerTuning(2, 200, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1, false, 0);
 
         public static readonly PowerTuning Ship =
-            new PowerTuning(2, 600, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1);
+            new PowerTuning(2, 600, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1, false, 0);
 
         public static readonly PowerTuning Stress =
-            new PowerTuning(2, 2000, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1);
+            new PowerTuning(2, 2000, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1, false, 0);
 
         public PowerTuning(
             int startingPower,
@@ -30,7 +30,9 @@ namespace Game.Domain
             double pocketTreasure,
             double eliteFraction,
             double spreadFloor,
-            int openingChoices)
+            int openingChoices,
+            bool pickupsAskForADetour,
+            int offPathDemand)
         {
             if (startingPower < 1)
             {
@@ -62,6 +64,12 @@ namespace Game.Domain
                     nameof(spreadFloor), spreadFloor, "A region is never entered poorer than it can be unlocked.");
             }
 
+            if (offPathDemand < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(offPathDemand), offPathDemand, "A plan asks for no fewer off-path slots than its preset.");
+            }
+
             if (bossFactor <= 0.0 || bossFactor >= 1.0)
             {
                 throw new ArgumentOutOfRangeException(
@@ -78,6 +86,8 @@ namespace Game.Domain
             EliteFraction = eliteFraction;
             SpreadFloor = spreadFloor;
             OpeningChoices = openingChoices;
+            PickupsAskForADetour = pickupsAskForADetour;
+            OffPathDemand = offPathDemand;
         }
 
         public static IReadOnlyList<int> MultiplierLadder
@@ -105,6 +115,10 @@ namespace Game.Domain
 
         public int OpeningChoices { get; }
 
+        public bool PickupsAskForADetour { get; }
+
+        public int OffPathDemand { get; }
+
         public PowerTuning Rebased(int startingPower)
         {
             if (startingPower == StartingPower)
@@ -122,7 +136,9 @@ namespace Game.Domain
                 PocketTreasure,
                 EliteFraction,
                 SpreadFloor,
-                OpeningChoices);
+                OpeningChoices,
+                PickupsAskForADetour,
+                OffPathDemand);
         }
 
         public PowerTuning Locking(double eliteFraction)
@@ -142,7 +158,9 @@ namespace Game.Domain
                 PocketTreasure,
                 eliteFraction,
                 SpreadFloor,
-                OpeningChoices);
+                OpeningChoices,
+                PickupsAskForADetour,
+                OffPathDemand);
         }
 
         public PowerTuning Routing(double spreadFloor)
@@ -162,7 +180,9 @@ namespace Game.Domain
                 PocketTreasure,
                 EliteFraction,
                 spreadFloor,
-                OpeningChoices);
+                OpeningChoices,
+                PickupsAskForADetour,
+                OffPathDemand);
         }
 
         public PowerTuning Opening(int openingChoices)
@@ -182,7 +202,53 @@ namespace Game.Domain
                 PocketTreasure,
                 EliteFraction,
                 SpreadFloor,
-                openingChoices);
+                openingChoices,
+                PickupsAskForADetour,
+                OffPathDemand);
+        }
+
+        public PowerTuning Detouring(bool pickupsAskForADetour)
+        {
+            if (pickupsAskForADetour == PickupsAskForADetour)
+            {
+                return this;
+            }
+
+            return new PowerTuning(
+                StartingPower,
+                StripTarget,
+                EnemyCap,
+                Jitter,
+                BossFactor,
+                GatePreference,
+                PocketTreasure,
+                EliteFraction,
+                SpreadFloor,
+                OpeningChoices,
+                pickupsAskForADetour,
+                OffPathDemand);
+        }
+
+        public PowerTuning Demanding(int offPathDemand)
+        {
+            if (offPathDemand == OffPathDemand)
+            {
+                return this;
+            }
+
+            return new PowerTuning(
+                StartingPower,
+                StripTarget,
+                EnemyCap,
+                Jitter,
+                BossFactor,
+                GatePreference,
+                PocketTreasure,
+                EliteFraction,
+                SpreadFloor,
+                OpeningChoices,
+                PickupsAskForADetour,
+                offPathDemand);
         }
 
         public static PowerTuning For(MazePreset preset)

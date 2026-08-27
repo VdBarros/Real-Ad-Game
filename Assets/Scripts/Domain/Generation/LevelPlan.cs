@@ -14,6 +14,16 @@ namespace Game.Domain
 
         public const int PlateauOpeningChoices = 2;
 
+        public const int PlateauAdditiveDrift = 3;
+
+        public const int PlateauOffPathDemand = 4;
+
+        public const double PlateauSecondStar = 0.45;
+
+        public const double PlateauThirdStar = 0.9;
+
+        public const int ThirdMultiplierLevel = 11;
+
         const int OpeningStartingPower = 2;
 
         const double OpeningEliteFraction = 0.0;
@@ -21,6 +31,14 @@ namespace Game.Domain
         const double OpeningSpreadFloor = 1.0;
 
         const int OpeningPlanChoices = 1;
+
+        const int OpeningAdditiveDrift = 0;
+
+        const int OpeningOffPathDemand = 0;
+
+        const double OpeningSecondStar = 1.0 / 3.0;
+
+        const double OpeningThirdStar = 2.0 / 3.0;
 
         public LevelPlan(MazePreset preset, ContentRecipe recipe, PowerTuning tuning)
         {
@@ -70,6 +88,16 @@ namespace Game.Domain
             get { return Tuning.OpeningChoices; }
         }
 
+        public bool PickupsAskForADetour
+        {
+            get { return Tuning.PickupsAskForADetour; }
+        }
+
+        public int MinimumOffPathSlots
+        {
+            get { return Preset.MinimumOffPathSlots + Tuning.OffPathDemand; }
+        }
+
         public static LevelPlan For(int levelNumber)
         {
             return For(MazePreset.Ship, levelNumber);
@@ -84,12 +112,75 @@ namespace Game.Domain
 
             return new LevelPlan(
                 preset,
-                ContentRecipe.For(preset),
+                RecipeAt(preset, levelNumber),
                 PowerTuning.For(preset)
                     .Rebased(StartingPowerAt(levelNumber))
                     .Locking(EliteFractionAt(levelNumber))
                     .Routing(SpreadFloorAt(levelNumber))
-                    .Opening(OpeningChoicesAt(levelNumber)));
+                    .Opening(OpeningChoicesAt(levelNumber))
+                    .Detouring(levelNumber > 1)
+                    .Demanding(OffPathDemandAt(levelNumber)));
+        }
+
+        public static ContentRecipe RecipeAt(MazePreset preset, int levelNumber)
+        {
+            if (preset == null)
+            {
+                throw new ArgumentNullException(nameof(preset));
+            }
+
+            RequireLevel(levelNumber);
+
+            var opening = ContentRecipe.For(preset);
+            var thinner = Math.Min(AdditiveDriftAt(levelNumber), opening.Additives - 1);
+            var extra = MultiplierDriftAt(levelNumber);
+
+            if (thinner == 0 && extra == 0)
+            {
+                return opening;
+            }
+
+            return new ContentRecipe(
+                opening.Multipliers + extra,
+                opening.Enemies + thinner - extra,
+                opening.Additives - thinner);
+        }
+
+        public static int AdditiveDriftAt(int levelNumber)
+        {
+            RequireLevel(levelNumber);
+
+            if (levelNumber >= PlateauLevel)
+            {
+                return PlateauAdditiveDrift;
+            }
+
+            var climb = PlateauAdditiveDrift - OpeningAdditiveDrift;
+            var steps = PlateauLevel - 1;
+
+            return OpeningAdditiveDrift + (climb * (levelNumber - 1) + steps / 2) / steps;
+        }
+
+        public static int MultiplierDriftAt(int levelNumber)
+        {
+            RequireLevel(levelNumber);
+
+            return levelNumber >= ThirdMultiplierLevel ? 1 : 0;
+        }
+
+        public static int OffPathDemandAt(int levelNumber)
+        {
+            RequireLevel(levelNumber);
+
+            if (levelNumber >= PlateauLevel)
+            {
+                return PlateauOffPathDemand;
+            }
+
+            var climb = PlateauOffPathDemand - OpeningOffPathDemand;
+            var steps = PlateauLevel - 1;
+
+            return OpeningOffPathDemand + (climb * (levelNumber - 1) + steps / 2) / steps;
         }
 
         public static double EliteFractionAt(int levelNumber)
@@ -129,6 +220,28 @@ namespace Game.Domain
             return OpeningSpreadFloor + climb * (levelNumber - 1) / steps;
         }
 
+        public static double SecondStarAt(int levelNumber)
+        {
+            return Climbed(levelNumber, OpeningSecondStar, PlateauSecondStar);
+        }
+
+        public static double ThirdStarAt(int levelNumber)
+        {
+            return Climbed(levelNumber, OpeningThirdStar, PlateauThirdStar);
+        }
+
+        static double Climbed(int levelNumber, double opening, double plateau)
+        {
+            RequireLevel(levelNumber);
+
+            if (levelNumber >= PlateauLevel)
+            {
+                return plateau;
+            }
+
+            return opening + (plateau - opening) * (levelNumber - 1) / (PlateauLevel - 1);
+        }
+
         public static int StartingPowerAt(int levelNumber)
         {
             RequireLevel(levelNumber);
@@ -156,7 +269,9 @@ namespace Game.Domain
         public override string ToString()
         {
             return Preset.Name + " opening on " + StartingPower + ", " + Recipe
-                + ", " + (int)(EliteFraction * 100.0 + 0.5) + "% of off-Spine enemies minted rich";
+                + ", " + (int)(EliteFraction * 100.0 + 0.5) + "% of off-Spine enemies minted rich, "
+                + MinimumOffPathSlots + " off-path slots"
+                + (PickupsAskForADetour ? ", pickups on detours only" : ", pickups anywhere");
         }
     }
 }

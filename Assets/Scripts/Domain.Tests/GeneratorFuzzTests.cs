@@ -21,6 +21,10 @@ namespace Game.Domain.Tests
 
         const double MissBar = 0.004;
 
+        const double DegenerateParBar = 0.05;
+
+        const int EliteMissDivisor = 100;
+
         static readonly int[] Inflations = { 3, 10, 50 };
 
         static readonly Dictionary<string, FuzzSweep> SweepByPreset = new Dictionary<string, FuzzSweep>();
@@ -142,6 +146,65 @@ namespace Game.Domain.Tests
             }
         }
 
+        [TestCaseSource(nameof(EveryPlanAboveTheOpeningOne))]
+        public void NoBoostOnAnyPlanAboveTheOpeningOneSitsWhereTheRouteAlreadyGoes(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            foreach (var accepted in sweep.Accepted)
+            {
+                var detours = Detours.Of(accepted.Level.Graph);
+
+                foreach (var node in accepted.Level.Graph.Decisions.Nodes)
+                {
+                    if (node.Type != NodeType.Additive && node.Type != NodeType.Multiplier)
+                    {
+                        continue;
+                    }
+
+                    Assert.That(
+                        detours.Holds(node.Id),
+                        Is.True,
+                        "Seed " + accepted.Level.AttemptSeed + " handed out node #" + node.Id
+                            + " on the way past.");
+                }
+            }
+
+            Assert.That(sweep.PickupsOffADetour(), Is.Zero, sweep.Pickups());
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void EveryPlanAsksForTheSlotsItsSizeOffersSoNothingIsTurnedAwayForAMismatch(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            Assert.That(sweep.Plan.Recipe.Slots, Is.EqualTo(sweep.Preset.ContentSlots));
+            Assert.That(sweep.CountOf(ContentRejection.RecipeSlotMismatch), Is.Zero);
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheOffPathFloorOfEveryPlanTurnsAwayFewerLayoutsThanItKeeps(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            Assert.That(
+                sweep.CountOf(LayoutRejection.TooFewOffPathSlots),
+                Is.LessThan(sweep.Attempts / 2),
+                sweep.Name + " " + sweep.Pickups());
+        }
+
+        [Test]
+        public void TheBraidOfALevelIsTheSameAtEveryPlan()
+        {
+            foreach (var levelNumber in EveryPlanOnTheCurve())
+            {
+                Assert.That(
+                    PlanSweep(levelNumber).Preset.BraidFactor,
+                    Is.EqualTo(MazePreset.Ship.BraidFactor),
+                    "Level " + levelNumber + " braided its maze differently.");
+            }
+        }
+
         [TestCaseSource(nameof(EveryPlanOnTheCurve))]
         public void TheSpreadOfEveryPlanLeavesOneBehind(int levelNumber)
         {
@@ -191,15 +254,156 @@ namespace Game.Domain.Tests
         }
 
         [TestCaseSource(nameof(EveryPlanAboveTheOpeningOne))]
-        public void EveryLevelAboveTheOpeningPlanHoldsAnEnemyOutOfReachOnArrival(int levelNumber)
+        public void AllButAHandfulOfLevelsAboveTheOpeningPlanHoldAnEnemyOutOfReachOnArrival(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+            var opened = 0;
+
+            foreach (var accepted in sweep.Accepted)
+            {
+                if (Elites.Of(accepted.Level.Graph, accepted.Level.Tuning).Count == 0)
+                {
+                    opened++;
+                }
+            }
+
+            Assert.That(
+                opened,
+                Is.LessThan(sweep.Accepted.Count / EliteMissDivisor),
+                sweep.Name + " left " + opened + " of " + sweep.Accepted.Count
+                    + " levels with every door already open; " + sweep.Locks());
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheParOfEveryAcceptedLevelStandsOnItsBeelineAndItsRichestEntry(int levelNumber)
         {
             foreach (var accepted in PlanSweep(levelNumber).Accepted)
             {
+                var level = accepted.Level;
+                var bossRegion = level.Graph.RegionOf(level.BossNodeId);
+                var entry = -1;
+
+                foreach (var region in level.Envelope.Regions)
+                {
+                    if (region.RegionId == bossRegion)
+                    {
+                        entry = region.RichestEntry;
+                    }
+                }
+
                 Assert.That(
-                    Elites.Of(accepted.Level.Graph, accepted.Level.Tuning),
-                    Is.Not.Empty,
-                    "Seed " + accepted.Level.AttemptSeed + " opened every door it had.");
+                    level.Par.Floor,
+                    Is.EqualTo(level.ShortestPathPower + level.BossPower),
+                    "Seed " + level.AttemptSeed + " authored a Par floor away from its beeline.");
+
+                Assert.That(
+                    level.Par.Ceiling,
+                    Is.EqualTo(entry + level.BossPower),
+                    "Seed " + level.AttemptSeed + " authored a Par ceiling away from its richest entry.");
             }
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void ARunFinishingAtEitherWallOfItsParIsRatedFromThatWall(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            foreach (var accepted in sweep.Accepted)
+            {
+                var par = accepted.Level.Par;
+
+                Assert.That(
+                    Stars.For(par, par.Ceiling, levelNumber),
+                    Is.EqualTo(Stars.Most),
+                    "Seed " + accepted.Level.AttemptSeed + " kept the third star out of reach of " + par + ".");
+
+                if (par.IsDegenerate)
+                {
+                    continue;
+                }
+
+                Assert.That(
+                    Stars.For(par, par.Floor, levelNumber),
+                    Is.EqualTo(Stars.Fewest),
+                    "Seed " + accepted.Level.AttemptSeed + " handed a beeline more than one star on " + par + ".");
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheWallsOfAParStandApartOnAllButAMeasuredFewOfEveryPlansLevels(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            Assert.That(
+                sweep.ShareOfParsWithTheirWallsMet(),
+                Is.LessThan(DegenerateParBar),
+                sweep.Name + " par " + sweep.Rating());
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void ARoutedRunOutScoresAStingyOneOnEveryPlan(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+            var stingy = Tallied(sweep.StingyStars());
+            var routed = Tallied(sweep.RoutedStars());
+
+            Assert.That(
+                routed,
+                Is.GreaterThan(stingy),
+                sweep.Name + " rated routing no better than plodding: " + sweep.Rating());
+        }
+
+        [Test]
+        public void TheThirdStarGetsHarderToHoldAsTheCurveClimbs()
+        {
+            var opening = PlanSweep(1);
+            var plateau = PlanSweep(LevelPlan.PlateauLevel);
+
+            Assert.That(
+                LevelPlan.ThirdStarAt(plateau.LevelNumber),
+                Is.GreaterThan(LevelPlan.ThirdStarAt(opening.LevelNumber)),
+                "opening " + opening.Rating() + "; plateau " + plateau.Rating());
+
+            Assert.That(
+                ShareAtTheTop(plateau.StingyStars()),
+                Is.LessThan(ShareAtTheTop(opening.StingyStars())),
+                "A stingy run held the third star as often at the plateau: opening "
+                    + opening.Rating() + "; plateau " + plateau.Rating());
+        }
+
+        static double ShareAtTheTop(IReadOnlyList<int> stars)
+        {
+            if (stars.Count == 0)
+            {
+                return 0.0;
+            }
+
+            var top = 0;
+            foreach (var count in stars)
+            {
+                if (count == Stars.Most)
+                {
+                    top++;
+                }
+            }
+
+            return (double)top / stars.Count;
+        }
+
+        static double Tallied(IReadOnlyList<int> stars)
+        {
+            if (stars.Count == 0)
+            {
+                return 0.0;
+            }
+
+            var total = 0;
+            foreach (var count in stars)
+            {
+                total += count;
+            }
+
+            return (double)total / stars.Count;
         }
 
         [Test]
@@ -238,6 +442,8 @@ namespace Game.Domain.Tests
                 Console.WriteLine("  elites " + sweep.Locks());
                 Console.WriteLine("  spine " + sweep.SpineReach());
                 Console.WriteLine("  opening " + sweep.Opening());
+                Console.WriteLine("  boosts " + sweep.Pickups());
+                Console.WriteLine("  par " + sweep.Rating());
             }
         }
 
@@ -365,7 +571,7 @@ namespace Game.Domain.Tests
             }
 
             var seeds = preset.Name == MazePreset.Ship.Name ? ShipSeeds : TinySeeds;
-            sweep = Walked(new FuzzSweep(preset.Name, LevelPlan.For(preset, 1), seeds));
+            sweep = Walked(new FuzzSweep(preset.Name, LevelPlan.For(preset, 1), seeds, 1));
 
             SweepByPreset.Add(preset.Name, sweep);
             return sweep;
@@ -379,7 +585,8 @@ namespace Game.Domain.Tests
                 return sweep;
             }
 
-            sweep = Walked(new FuzzSweep("level " + levelNumber, LevelPlan.For(levelNumber), PlanSeeds));
+            sweep = Walked(new FuzzSweep(
+                "level " + levelNumber, LevelPlan.For(levelNumber), PlanSeeds, levelNumber));
 
             SweepByLevel.Add(levelNumber, sweep);
             return sweep;

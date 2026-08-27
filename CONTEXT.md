@@ -256,11 +256,14 @@ routing is worth.
 ## Par
 
 What routing a level well is worth, expressed as the two powers a run can
-finish it holding: the beeline to the boss at the bottom, and the richest
-possible arrival at the boss at the top. Where a finished run's power landed
-between the two is what the result reports back to the player. Par is read off
-the completed level rather than authored beside it, so it cannot drift from the
-level it belongs to, and it gates nothing — a level always leads to the next one.
+finish it holding: the beeline to the boss at the bottom, and the richest entry
+into the boss's region at the top. Both walls count the boss the run had to beat
+to finish, so a Par and the number it rates are the same kind of number. Where a
+finished run's power landed between the two is what the result reports back to
+the player, and a Par whose walls meet rates nothing, because the routing on
+that level was worth nothing. Par is read off the completed level rather than
+authored beside it, so it cannot drift from the level it belongs to, and it
+gates nothing — a level always leads to the next one.
 
 ## Recipe
 
