@@ -63,6 +63,19 @@ corridor — no adjacency of its own, never a slot, and never a decision node,
 since its tiles have corridor-degree two like any other corridor tile.
 _Avoid_: stair, stair link, ramp.
 
+## Footing
+
+What a tile carries in the one-step drop under its own floor, and a pure decision
+of the tile grid rather than of the tile's class. A tile whose floor stands one
+step above a neighbour's is footed with a **flight**, the pack's staircase laid
+against the climb that leads away from the ground it stands above; a staircase
+tile level with every neighbour is footed with a **plinth**, a foundation
+stretched to fill the drop flush; a tile level with or below all of them is footed
+with nothing. So most of a staircase's tiles carry a plinth and the terrace tile
+at the head of a climb carries a flight, which is what makes a run read as one
+climb rather than as one flight per tile.
+_Avoid_: buttress, base, skirt.
+
 ## Corridor
 
 Exactly one decision-graph edge, together with the run of tiles it covers. A
