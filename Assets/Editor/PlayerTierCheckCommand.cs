@@ -86,6 +86,7 @@ namespace Game.EditorTooling
             var failures = 0;
 
             failures += WearsTheCastMesh(player, worn, pack, report);
+            failures += MeasuredAgainstThePinnedFootprint(worn, pack, report);
             failures += FittedToTheTile(player, worn, pack, report);
             failures += HidesLittleGround(player, worn, pack, report);
             failures += EverythingElseStillFallsBack(root, graph, report);
@@ -258,6 +259,53 @@ namespace Game.EditorTooling
                     toward));
 
             return failures;
+        }
+
+        static int MeasuredAgainstThePinnedFootprint(
+            PartModel worn, ICollection<Mesh> pack, StringBuilder report)
+        {
+            var path = worn == PartModel.None ? null : WorldModels.AssetPathOf(worn);
+            var prefab = path == null ? null : Resources.Load<GameObject>(path);
+
+            if (prefab == null)
+            {
+                return Assert(
+                    report,
+                    false,
+                    "the asset the model table names measures the footprint the pack constants pin",
+                    "Resources/" + (path ?? "nothing") + " loads nothing to measure");
+            }
+
+            var instance = UnityEngine.Object.Instantiate(prefab);
+            instance.transform.position = Vector3.zero;
+            instance.transform.rotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+            CharacterDress.Bare(instance);
+
+            var box = Worn(instance.transform, pack);
+
+            WorldObjects.Destroy(instance);
+
+            return Assert(
+                report,
+                Math.Abs(box.size.x - AdventurerPack.WidthOf(worn)) <= Epsilon
+                && Math.Abs(box.size.z - AdventurerPack.DepthOf(worn)) <= Epsilon
+                && Math.Abs(box.size.y - AdventurerPack.HeightOf(worn)) <= Epsilon
+                && Math.Abs(box.min.y - AdventurerPack.BaseOf(worn)) <= Epsilon,
+                "the asset the model table names measures the footprint the pack constants pin, "
+                + "unrotated and unscaled",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it measures {0:0.#####} by {1:0.#####} by {2:0.#####} with a base at {3:0.#####}, "
+                    + "against the pinned {4:0.#####} by {5:0.#####} by {6:0.#####} and {7:0.#####}",
+                    box.size.x,
+                    box.size.y,
+                    box.size.z,
+                    box.min.y,
+                    AdventurerPack.WidthOf(worn),
+                    AdventurerPack.HeightOf(worn),
+                    AdventurerPack.DepthOf(worn),
+                    AdventurerPack.BaseOf(worn)));
         }
 
         static int FittedToTheTile(
