@@ -352,12 +352,57 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void AFoundationIsStretchedToItsTileOnPurposeAndStillSpillsNothingOffIt()
+        {
+            var plinth = FirstPlinth();
+            var scale = ModelPose.ScaleOf(plinth);
+            var footed = ModelPose.PositionOf(plinth);
+
+            Assert.That(DungeonPack.FoundationWidth, Is.LessThan(IsoProjection.TileEdge));
+            Assert.That(DungeonPack.FoundationRun, Is.LessThan(IsoProjection.TileEdge));
+            Assert.That(
+                DungeonPack.HeightOf(PartModel.Foundation), Is.LessThan(IsoProjection.StepHeight));
+
+            Assert.That(scale.X, Is.GreaterThan(1f));
+            Assert.That(scale.Y, Is.GreaterThan(1f));
+            Assert.That(scale.Z, Is.GreaterThan(1f));
+
+            Assert.That(
+                DungeonPack.FoundationWidth * scale.X,
+                Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
+            Assert.That(
+                DungeonPack.FoundationRun * scale.Z,
+                Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
+            Assert.That(
+                DungeonPack.HeightOf(PartModel.Foundation) * scale.Y,
+                Is.EqualTo(IsoProjection.StepHeight).Within(Tolerance));
+
+            Assert.That(
+                footed.Y,
+                Is.EqualTo(plinth.Position.Y - IsoProjection.StepHeight * 0.5f).Within(Tolerance));
+            Assert.That(footed.X, Is.EqualTo(plinth.Position.X).Within(Tolerance));
+            Assert.That(footed.Z, Is.EqualTo(plinth.Position.Z).Within(Tolerance));
+            Assert.That(ModelPose.RotationOf(plinth), Is.EqualTo(plinth.Rotation));
+        }
+
+        [Test]
+        public void AFoundationFillsTheDropAStaircaseFlightOnlyNotches()
+        {
+            Assert.That(
+                StaircaseFlight.PackCrestAtItsFarEnd / StaircaseFlight.PackCrestAtItsOrigin,
+                Is.LessThan(0.5f));
+            Assert.That(
+                ModelPose.ScaleOf(FirstPlinth()).Y * DungeonPack.HeightOf(PartModel.Foundation),
+                Is.EqualTo(IsoProjection.StepHeight).Within(Tolerance));
+        }
+
+        [Test]
         public void AStaircaseSetsItsCrestDownOnTheEdgeTheClimbEndsAt()
         {
             var graph = LevelGraphFixture.TwoTerraces();
             var stair = FirstStaircase();
             var head = TileSides.Toward(
-                StaircaseClimb.AscentOf(graph.Tiles, StairFixture.TileUnder(graph, stair)));
+                TileFootings.AscentOf(graph.Tiles, StairFixture.TileUnder(graph, stair)));
             var crest = StaircaseFlight.CrestOf(stair);
             var sunk = StaircaseFlight.SinkOf(stair);
             var ground = stair.Position.Y - IsoProjection.StepHeight * 0.5f;
@@ -395,7 +440,7 @@ namespace Game.Domain.Tests
         {
             var graph = LevelGraphFixture.TwoTerraces();
             var stair = FirstStaircase();
-            var ascent = StaircaseClimb.AscentOf(graph.Tiles, StairFixture.TileUnder(graph, stair));
+            var ascent = TileFootings.AscentOf(graph.Tiles, StairFixture.TileUnder(graph, stair));
 
             Assert.That(StaircaseFlight.PackCrestAtItsOrigin, Is.GreaterThan(StaircaseFlight.PackCrestAtItsFarEnd));
             Assert.That(StaircaseFlight.LaidAgainst(ascent), Is.EqualTo(TileSides.Opposite(ascent)));
@@ -424,6 +469,13 @@ namespace Game.Domain.Tests
             return LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces())
                 .AllParts
                 .First(part => part.Model == PartModel.Staircase);
+        }
+
+        static WorldPart FirstPlinth()
+        {
+            return LevelBlueprintBuilder.Build(LevelGenerator.Generate(20250824L, MazePreset.Ship).Graph)
+                .AllParts
+                .First(part => part.Model == PartModel.Foundation);
         }
 
         static WorldPart Pickup(PartStyle style)

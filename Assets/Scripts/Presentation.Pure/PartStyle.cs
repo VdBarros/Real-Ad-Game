@@ -12,6 +12,7 @@ namespace Game.Presentation.Pure
         Additive,
         Multiplier,
         Staircase,
+        Foundation,
         Trail,
         Spark
     }

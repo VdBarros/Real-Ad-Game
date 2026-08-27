@@ -13,15 +13,17 @@ namespace Game.Domain.Tests
         const float Tolerance = 1e-5f;
 
         [Test]
-        public void EveryStaircaseTileCarriesTheStaircaseModel()
+        public void EveryTileAStepAboveALowerNeighbourCarriesTheStaircaseModel()
         {
             var graph = Ship();
             var stairs = StairsByName(graph);
-            var climbing = graph.Tiles.Tiles.Where(tile => StaircaseClimb.Climbs(tile.Position)).ToList();
+            var standing = graph.Tiles.Tiles
+                .Where(tile => TileFootings.Under(graph.Tiles, tile.Position) == TileFooting.Flight)
+                .ToList();
 
-            Assert.That(climbing, Is.Not.Empty);
+            Assert.That(standing, Is.Not.Empty);
 
-            foreach (var tile in climbing)
+            foreach (var tile in standing)
             {
                 var name = PartNames.Stair(tile.Position);
 
@@ -30,33 +32,122 @@ namespace Game.Domain.Tests
                 Assert.That(stairs[name].Style, Is.EqualTo(PartStyle.Staircase), name);
             }
 
-            Assert.That(stairs.Count, Is.EqualTo(climbing.Count));
+            Assert.That(stairs.Count, Is.EqualTo(standing.Count));
         }
 
         [Test]
-        public void ATerraceTileCarriesNoStaircaseModel()
+        public void EveryClimbingTileLevelWithItsNeighboursCarriesTheFoundationModel()
+        {
+            var graph = Ship();
+            var plinths = PlinthsByName(graph);
+            var level = graph.Tiles.Tiles
+                .Where(tile => TileFootings.Under(graph.Tiles, tile.Position) == TileFooting.Plinth)
+                .ToList();
+
+            Assert.That(level, Is.Not.Empty);
+
+            foreach (var tile in level)
+            {
+                var name = PartNames.Footing(tile.Position);
+
+                Assert.That(plinths.ContainsKey(name), Is.True, name);
+                Assert.That(plinths[name].Model, Is.EqualTo(PartModel.Foundation), name);
+                Assert.That(plinths[name].Style, Is.EqualTo(PartStyle.Foundation), name);
+                Assert.That(StaircaseClimb.Climbs(tile.Position), Is.True, name);
+            }
+
+            Assert.That(plinths.Count, Is.EqualTo(level.Count));
+        }
+
+        [Test]
+        public void ATileLevelWithOrBelowEveryNeighbourCarriesNoFlightUnderneath()
         {
             var graph = Ship();
             var blueprint = LevelBlueprintBuilder.Build(graph);
-            var onATerrace = graph.Tiles.Tiles.Where(tile => !StaircaseClimb.Climbs(tile.Position)).ToList();
-
-            Assert.That(onATerrace, Is.Not.Empty);
+            var bare = 0;
 
             foreach (var part in blueprint.AllParts)
             {
-                if (part.Model == PartModel.Staircase)
+                if (part.Model != PartModel.Staircase)
                 {
-                    Assert.That(Terraces.IsTerrace(StairFixture.TileUnder(graph, part).Elevation), Is.False, part.Name);
+                    continue;
                 }
+
+                Assert.That(
+                    TileFootings.Under(graph.Tiles, StairFixture.TileUnder(graph, part)),
+                    Is.EqualTo(TileFooting.Flight),
+                    part.Name);
             }
 
-            foreach (var tile in onATerrace)
+            foreach (var tile in graph.Tiles.Tiles)
             {
+                if (TileFootings.Under(graph.Tiles, tile.Position) != TileFooting.Nothing)
+                {
+                    continue;
+                }
+
+                bare++;
                 Assert.That(
                     blueprint.AllParts.Any(part => part.Name == PartNames.Stair(tile.Position)),
                     Is.False,
                     PartNames.Stair(tile.Position));
+                Assert.That(
+                    blueprint.AllParts.Any(part => part.Name == PartNames.Footing(tile.Position)),
+                    Is.False,
+                    PartNames.Footing(tile.Position));
             }
+
+            Assert.That(bare, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void ATerraceTileAtTheHeadOfAClimbCarriesTheFlightThatTopsTheClimbOut()
+        {
+            var graph = Ship();
+            var stairs = StairsByName(graph);
+            var heads = 0;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                if (StaircaseClimb.Climbs(tile.Position)
+                    || TileFootings.Under(graph.Tiles, tile.Position) != TileFooting.Flight)
+                {
+                    continue;
+                }
+
+                heads++;
+                var name = PartNames.Stair(tile.Position);
+
+                Assert.That(stairs.ContainsKey(name), Is.True, name);
+                Assert.That(Terraces.IsTerrace(tile.Position.Elevation), Is.True, name);
+            }
+
+            Assert.That(heads, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void AFoundationFillsTheWholeDropUnderALevelTile()
+        {
+            var graph = Ship();
+            var counted = 0;
+
+            foreach (var part in PlinthsByName(graph).Values)
+            {
+                var tile = FootingFixture.TileUnder(graph, part);
+                var ground = IsoProjection.Of(tile);
+
+                counted++;
+                Assert.That(part.Scale.Y, Is.EqualTo(IsoProjection.StepHeight), part.Name);
+                Assert.That(part.Scale.X, Is.EqualTo(IsoProjection.TileEdge), part.Name);
+                Assert.That(part.Scale.Z, Is.EqualTo(IsoProjection.TileEdge), part.Name);
+                Assert.That(part.Position.X, Is.EqualTo(ground.X), part.Name);
+                Assert.That(part.Position.Z, Is.EqualTo(ground.Z), part.Name);
+                Assert.That(
+                    part.Position.Y, Is.EqualTo(ground.Y - IsoProjection.StepHeight * 0.5f), part.Name);
+                Assert.That(part.Rotation, Is.EqualTo(new WorldPoint(0f, 0f, 0f)), part.Name);
+            }
+
+            Assert.That(counted, Is.GreaterThan(0));
         }
 
         [Test]
@@ -106,7 +197,7 @@ namespace Game.Domain.Tests
             foreach (var part in StairsByName(graph).Values)
             {
                 var tile = StairFixture.TileUnder(graph, part);
-                var ascent = StaircaseClimb.AscentOf(graph.Tiles, tile);
+                var ascent = TileFootings.AscentOf(graph.Tiles, tile);
                 var ground = IsoProjection.Of(tile);
                 var crest = StaircaseFlight.ReachAlong(StaircaseFlight.CrestOf(part), ground, ascent);
                 var sunk = StaircaseFlight.ReachAlong(StaircaseFlight.SinkOf(part), ground, ascent);
@@ -336,6 +427,13 @@ namespace Game.Domain.Tests
         {
             return LevelBlueprintBuilder.Build(graph).AllParts
                 .Where(part => part.Model == PartModel.Staircase)
+                .ToDictionary(part => part.Name);
+        }
+
+        static IDictionary<string, WorldPart> PlinthsByName(LevelGraph graph)
+        {
+            return LevelBlueprintBuilder.Build(graph).AllParts
+                .Where(part => part.Model == PartModel.Foundation)
                 .ToDictionary(part => part.Name);
         }
 

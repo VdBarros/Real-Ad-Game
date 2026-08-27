@@ -19,6 +19,8 @@ namespace Game.Presentation.Pure
                     return PartModel.CoinStack;
                 case PartStyle.Staircase:
                     return PartModel.Staircase;
+                case PartStyle.Foundation:
+                    return PartModel.Foundation;
                 case PartStyle.Start:
                 case PartStyle.Enemy:
                 case PartStyle.Boss:

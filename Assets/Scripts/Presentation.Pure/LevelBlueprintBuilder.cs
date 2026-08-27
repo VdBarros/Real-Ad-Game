@@ -29,9 +29,15 @@ namespace Game.Presentation.Pure
                 var target = tilesByTerrace[slot];
                 target.Add(FloorQuad(tile.Position));
 
-                if (StaircaseClimb.Climbs(tile.Position))
+                switch (TileFootings.Under(graph.Tiles, tile.Position))
                 {
-                    target.Add(Staircase(tile.Position, StaircaseClimb.AscentOf(graph.Tiles, tile.Position)));
+                    case TileFooting.Flight:
+                        target.Add(Staircase(
+                            tile.Position, TileFootings.AscentOf(graph.Tiles, tile.Position)));
+                        break;
+                    case TileFooting.Plinth:
+                        target.Add(Plinth(tile.Position));
+                        break;
                 }
 
                 foreach (var side in TileSides.All)
@@ -113,6 +119,20 @@ namespace Game.Presentation.Pure
                 PartStyle.Staircase,
                 new WorldPoint(tile.X, tile.Y - IsoProjection.StepHeight * 0.5f, tile.Z),
                 new WorldPoint(0f, TileSides.InwardYaw(StaircaseFlight.LaidAgainst(ascent)), 0f),
+                new WorldPoint(IsoProjection.TileEdge, IsoProjection.StepHeight, IsoProjection.TileEdge));
+        }
+
+        static WorldPart Plinth(TilePosition position)
+        {
+            var tile = IsoProjection.Of(position);
+
+            return new WorldPart(
+                PartNames.Footing(position),
+                PartShape.Cube,
+                PartModels.Of(PartStyle.Foundation),
+                PartStyle.Foundation,
+                new WorldPoint(tile.X, tile.Y - IsoProjection.StepHeight * 0.5f, tile.Z),
+                new WorldPoint(0f, 0f, 0f),
                 new WorldPoint(IsoProjection.TileEdge, IsoProjection.StepHeight, IsoProjection.TileEdge));
         }
 
