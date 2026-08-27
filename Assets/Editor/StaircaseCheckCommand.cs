@@ -25,13 +25,25 @@ namespace Game.EditorTooling
 
         const int Complaints = 6;
 
+        const int Samples = 24;
+
+        const float ShotDistance = 60f;
+
+        const float DetailOrthographicSize = 4f;
+
+        const string PlayShot = "dev/scratch/t-36-level-run-play.png";
+
+        const string DetailShot = "dev/scratch/t-36-level-run-detail.png";
+
+        const float SerrationBound = 0.05f;
+
         static readonly int Slices = StaircaseFlight.PackCrestFromItsOriginOnward.Count;
 
         public static void Check()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            var report = new StringBuilder("t-23/t-31 staircase steps, ship seed ")
+            var report = new StringBuilder("t-23/t-31/t-36 staircase steps, ship seed ")
                 .Append(Seed.ToString(CultureInfo.InvariantCulture))
                 .Append(':');
             var failures = 0;
@@ -43,7 +55,7 @@ namespace Game.EditorTooling
                 failures += Built(models, report);
             }
 
-            report.Append("\n  t-23/t-31: ")
+            report.Append("\n  t-23/t-31/t-36: ")
                 .Append(failures == 0
                     ? "every assertion above held"
                     : failures + (failures == 1 ? " assertion" : " assertions") + " above failed");
@@ -166,6 +178,8 @@ namespace Game.EditorTooling
 
             var fitted = box.size.y * ModelPose.ScaleOf(AStaircasePart()).Y;
 
+            failures += Plinth(models, report);
+
             failures += Assert(
                 report,
                 Math.Abs(fitted - IsoProjection.StepHeight) <= Epsilon,
@@ -179,6 +193,81 @@ namespace Game.EditorTooling
                     fitted,
                     IsoProjection.StepHeight,
                     Terraces.Rise * IsoProjection.StepHeight));
+
+            return failures;
+        }
+
+        static int Plinth(WorldModels models, StringBuilder report)
+        {
+            var prefab = models.Of(PartModel.Foundation);
+
+            if (prefab == null)
+            {
+                return Assert(
+                    report, false, "the foundation mesh sits on the grid", "there is no mesh to measure");
+            }
+
+            var box = Local(prefab);
+            var edge = IsoProjection.TileEdge;
+            var step = IsoProjection.StepHeight;
+            var failures = Assert(
+                report,
+                Math.Abs(box.size.x - DungeonPack.FoundationWidth) <= Epsilon
+                && Math.Abs(box.size.z - DungeonPack.FoundationRun) <= Epsilon
+                && Math.Abs(box.size.y - DungeonPack.HeightOf(PartModel.Foundation)) <= Epsilon,
+                "the imported foundation measures the pinned spans the plinth is stretched from",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it measures {0:0.#####} by {1:0.#####} by {2:0.#####} against the pinned "
+                    + "{3:0.#####} by {4:0.#####} by {5:0.#####}",
+                    box.size.x,
+                    box.size.y,
+                    box.size.z,
+                    DungeonPack.FoundationWidth,
+                    DungeonPack.HeightOf(PartModel.Foundation),
+                    DungeonPack.FoundationRun));
+
+            failures += Assert(
+                report,
+                Math.Abs(box.center.x) <= Epsilon
+                && Math.Abs(box.center.z) <= Epsilon
+                && Math.Abs(box.min.y) <= Epsilon,
+                "the foundation pivots on the centre of its own base, so a tile centre places it",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "its bounds sit at ({0:0.#####}, {1:0.#####}, {2:0.#####}) with a base at {3:0.#####}",
+                    box.center.x,
+                    box.center.y,
+                    box.center.z,
+                    box.min.y));
+
+            var scale = ModelPose.ScaleOf(APlinthPart());
+            var stretched = new Vector3(box.size.x * scale.X, box.size.y * scale.Y, box.size.z * scale.Z);
+
+            failures += Assert(
+                report,
+                Math.Abs(stretched.x - edge) <= Epsilon
+                && Math.Abs(stretched.z - edge) <= Epsilon
+                && Math.Abs(stretched.y - step) <= Epsilon
+                && scale.X > 1f && scale.Y > 1f && scale.Z > 1f,
+                "the foundation is stretched to its tile on purpose, and the stretch lands it on exactly "
+                + "one tile edge by one tile edge by one step, so it spills nothing",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0:0.#####} by {1:0.#####} by {2:0.#####} is stretched {3:0.###}x, {4:0.###}x, "
+                    + "{5:0.###}x to {6:0.#####} by {7:0.#####} by {8:0.#####} against a tile edge of "
+                    + "{9:0.#####} and a step of {10:0.#####}",
+                    box.size.x,
+                    box.size.y,
+                    box.size.z,
+                    scale.X,
+                    scale.Y,
+                    scale.Z,
+                    stretched.x,
+                    stretched.y,
+                    stretched.z,
+                    edge,
+                    step));
 
             return failures;
         }
@@ -198,18 +287,79 @@ namespace Game.EditorTooling
 
             report.Append(Shape(graph));
 
-            failures += EveryClimbWearsAStaircase(models, graph, byName, report);
+            failures += EveryFootingWearsTheMeshItAsksFor(models, graph, byName, report);
             failures += EveryFlightCrestsAtTheHeadOfItsOwnClimb(graph, byName, report);
-            failures += NoTerraceTileWearsOne(graph, byName, report);
+            failures += NoTileWearsAFootingItsGridDidNotAskFor(graph, byName, report);
+            failures += NoLevelRunIsSerratedUnderneath(graph, byName, report);
             failures += EveryStaircaseSitsInItsDrop(graph, byName, report);
+            failures += EveryPlinthFillsItsDropAndSpillsNothing(graph, byName, report);
             failures += AStaircaseStaysWalkableGround(graph, byName, report);
             failures += AStaircaseHidesNothing(graph, byName, report);
             failures += TheMaterialsStayFlat(root, report);
+
+            Photograph(graph, report);
 
             WorldObjects.Destroy(root);
             builder.Dispose();
 
             return failures;
+        }
+
+        static void Photograph(LevelGraph graph, StringBuilder report)
+        {
+            var middle = LevelRunCentre(graph);
+
+            PreviewFilm.Sun();
+
+            var play = PreviewFilm.Rig(middle, ShotDistance, IsoProjection.OrthographicSize);
+            PreviewFilm.Warm(play);
+            PreviewFilm.Shoot(play, PlayShot);
+            WorldObjects.Destroy(play.gameObject);
+
+            var detail = PreviewFilm.Rig(middle, ShotDistance, DetailOrthographicSize);
+            PreviewFilm.Warm(detail);
+            PreviewFilm.Shoot(detail, DetailShot);
+            WorldObjects.Destroy(detail.gameObject);
+
+            report.Append("\n  the level run at gameplay distance is in ")
+                .Append(PlayShot)
+                .Append(" and cropped in ")
+                .Append(DetailShot);
+        }
+
+        static Vector3 LevelRunCentre(LevelGraph graph)
+        {
+            var sum = Vector3.zero;
+            var counted = 0;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                if (TileFootings.Under(graph.Tiles, tile.Position) == TileFooting.Nothing)
+                {
+                    continue;
+                }
+
+                var ground = IsoProjection.Of(tile.Position);
+                sum += new Vector3(ground.X, ground.Y, ground.Z);
+                counted++;
+            }
+
+            return counted == 0 ? Vector3.zero : sum / counted;
+        }
+
+        static int Flights(LevelGraph graph)
+        {
+            var flights = 0;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                if (TileFootings.Under(graph.Tiles, tile.Position) == TileFooting.Flight)
+                {
+                    flights++;
+                }
+            }
+
+            return flights;
         }
 
         static string Shape(LevelGraph graph)
@@ -274,31 +424,51 @@ namespace Game.EditorTooling
                 bends / 2 == 1 ? "time" : "times");
         }
 
-        static int EveryClimbWearsAStaircase(
+        static int EveryFootingWearsTheMeshItAsksFor(
             WorldModels models,
             LevelGraph graph,
             IDictionary<string, Transform> byName,
             StringBuilder report)
         {
-            var wanted = Meshes(models.Of(PartModel.Staircase));
-            var climbs = 0;
-            var meshed = 0;
+            var flightMeshes = Meshes(models.Of(PartModel.Staircase));
+            var plinthMeshes = Meshes(models.Of(PartModel.Foundation));
+            var flights = 0;
+            var flighted = 0;
+            var plinths = 0;
+            var plinthed = 0;
             var complaint = new List<string>();
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                if (!StaircaseClimb.Climbs(tile.Position))
+                var footing = TileFootings.Under(graph.Tiles, tile.Position);
+
+                if (footing == TileFooting.Nothing)
                 {
                     continue;
                 }
 
-                climbs++;
-                var name = PartNames.Stair(tile.Position);
+                var flight = footing == TileFooting.Flight;
+                var name = flight ? PartNames.Stair(tile.Position) : PartNames.Footing(tile.Position);
+                var wanted = flight ? flightMeshes : plinthMeshes;
+
+                if (flight)
+                {
+                    flights++;
+                }
+                else
+                {
+                    plinths++;
+                }
+
                 Transform instance;
 
                 if (!byName.TryGetValue(name, out instance))
                 {
-                    complaint.Add(name + " is not in the world");
+                    if (complaint.Count < Complaints)
+                    {
+                        complaint.Add(name + " is not in the world");
+                    }
+
                     continue;
                 }
 
@@ -313,9 +483,13 @@ namespace Game.EditorTooling
                     }
                 }
 
-                if (dressed)
+                if (dressed && flight)
                 {
-                    meshed++;
+                    flighted++;
+                }
+                else if (dressed)
+                {
+                    plinthed++;
                 }
                 else if (complaint.Count < Complaints)
                 {
@@ -328,9 +502,10 @@ namespace Game.EditorTooling
 
             return Assert(
                 report,
-                climbs > 0 && meshed == climbs,
-                "every staircase tile carries the pack's staircase mesh",
-                meshed + " of " + climbs + " do"
+                flights > 0 && plinths > 0 && flighted == flights && plinthed == plinths,
+                "every tile a step above a lower neighbour carries the pack's staircase mesh, and every "
+                + "climbing tile level with all of them carries the pack's foundation mesh",
+                flighted + " of " + flights + " flights and " + plinthed + " of " + plinths + " plinths do"
                 + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
         }
 
@@ -346,14 +521,14 @@ namespace Game.EditorTooling
             foreach (var tile in graph.Tiles.Tiles)
             {
                 Transform instance;
-                if (!StaircaseClimb.Climbs(tile.Position)
+                if (TileFootings.Under(graph.Tiles, tile.Position) != TileFooting.Flight
                     || !byName.TryGetValue(PartNames.Stair(tile.Position), out instance))
                 {
                     continue;
                 }
 
                 counted++;
-                var ascent = StaircaseClimb.AscentOf(graph.Tiles, tile.Position);
+                var ascent = TileFootings.AscentOf(graph.Tiles, tile.Position);
                 var ground = IsoProjection.Of(tile.Position);
                 var floor = ground.Y - IsoProjection.StepHeight;
                 var head = float.NaN;
@@ -416,7 +591,7 @@ namespace Game.EditorTooling
 
             return Assert(
                 report,
-                counted > 0 && atTheHead == counted,
+                counted > 0 && atTheHead == counted && counted == Flights(graph),
                 "every flight's mass crests at the head of its own climb and sinks at its foot, so a tread "
                 + "faces the camera instead of the masonry filling the drop",
                 string.Format(
@@ -430,38 +605,232 @@ namespace Game.EditorTooling
                     complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
         }
 
-        static int NoTerraceTileWearsOne(
+        static int NoTileWearsAFootingItsGridDidNotAskFor(
             LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
+            var asked = 0;
             var raised = 0;
-            var climbs = 0;
-            var terraced = new List<string>();
+            var unasked = new List<string>();
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                var standing = byName.ContainsKey(PartNames.Stair(tile.Position));
+                var footing = TileFootings.Under(graph.Tiles, tile.Position);
+                var flight = byName.ContainsKey(PartNames.Stair(tile.Position));
+                var plinth = byName.ContainsKey(PartNames.Footing(tile.Position));
 
-                if (standing)
+                if (footing != TileFooting.Nothing)
+                {
+                    asked++;
+                }
+
+                if (flight)
                 {
                     raised++;
                 }
 
-                if (StaircaseClimb.Climbs(tile.Position))
+                if (plinth)
                 {
-                    climbs++;
+                    raised++;
                 }
-                else if (standing)
+
+                if (unasked.Count >= Complaints)
                 {
-                    terraced.Add(PartNames.Stair(tile.Position));
+                    continue;
+                }
+
+                if (flight && plinth)
+                {
+                    unasked.Add(PartNames.Tile(tile.Position) + " wears a flight and a plinth at once");
+                }
+                else if (flight && footing != TileFooting.Flight)
+                {
+                    unasked.Add(PartNames.Stair(tile.Position) + " on ground footed with " + footing);
+                }
+                else if (plinth && footing != TileFooting.Plinth)
+                {
+                    unasked.Add(PartNames.Footing(tile.Position) + " on ground footed with " + footing);
                 }
             }
 
             return Assert(
                 report,
-                terraced.Count == 0 && raised == climbs,
-                "a terrace tile carries no staircase, so the world raises exactly one per climb",
-                raised + " staircases for " + climbs + " climbing tiles"
-                + (terraced.Count == 0 ? "" : "; on a terrace: " + string.Join(", ", terraced.ToArray())));
+                unasked.Count == 0 && raised == asked,
+                "no tile wears a footing its own grid did not ask for, so the world raises exactly one "
+                + "per footed tile and none anywhere else",
+                raised + " footings for " + asked + " footed tiles"
+                + (unasked.Count == 0 ? "" : "; " + string.Join(", ", unasked.ToArray())));
+        }
+
+        static int NoLevelRunIsSerratedUnderneath(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var level = 0;
+            var serrated = 0;
+            var deepest = 0f;
+            var complaint = new List<string>();
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                if (TileFootings.Under(graph.Tiles, tile.Position) != TileFooting.Plinth)
+                {
+                    continue;
+                }
+
+                level++;
+                var shortfall = Shortfall(tile.Position, byName);
+                deepest = Math.Max(deepest, shortfall);
+
+                if (shortfall <= SerrationBound)
+                {
+                    continue;
+                }
+
+                serrated++;
+
+                if (complaint.Count < Complaints)
+                {
+                    complaint.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} leaves a notch {1:0.###} of a step deep under its floor",
+                        PartNames.Tile(tile.Position),
+                        shortfall));
+                }
+            }
+
+            return Assert(
+                report,
+                level > 0 && serrated == 0,
+                "no tile of a level interior run notches its own underside, so a run reads as one climb "
+                + "rather than as one flight per tile",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "of {0} level tiles, {1} leave a notch deeper than {2:0.##} of a step, the deepest "
+                    + "{3:0.###}{4}",
+                    level,
+                    serrated,
+                    SerrationBound,
+                    deepest,
+                    complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+        }
+
+        static float Shortfall(TilePosition position, IDictionary<string, Transform> byName)
+        {
+            var ground = IsoProjection.Of(position);
+            var floor = ground.Y - IsoProjection.StepHeight;
+            var triangles = new List<Vector3[]>();
+
+            foreach (var name in new[] { PartNames.Stair(position), PartNames.Footing(position) })
+            {
+                Transform instance;
+                if (byName.TryGetValue(name, out instance))
+                {
+                    Triangles(instance, triangles);
+                }
+            }
+
+            if (triangles.Count == 0)
+            {
+                return 1f;
+            }
+
+            var edge = IsoProjection.TileEdge;
+            var worst = 0f;
+
+            for (var axis = 0; axis < 2; axis++)
+            {
+                var lowest = 1f;
+
+                for (var slice = 0; slice < Samples; slice++)
+                {
+                    var at = (axis == 0 ? ground.X : ground.Z)
+                        + edge * ((slice + 0.5f) / Samples - 0.5f);
+                    var crest = Silhouette(triangles, axis, at);
+                    var filled = float.IsNaN(crest)
+                        ? 0f
+                        : Math.Min(1f, Math.Max(0f, (crest - floor) / IsoProjection.StepHeight));
+
+                    lowest = Math.Min(lowest, filled);
+                }
+
+                worst = Math.Max(worst, 1f - lowest);
+            }
+
+            return worst;
+        }
+
+        static float Silhouette(List<Vector3[]> triangles, int axis, float at)
+        {
+            var crest = float.NaN;
+
+            foreach (var triangle in triangles)
+            {
+                var low = float.MaxValue;
+                var high = float.MinValue;
+
+                for (var corner = 0; corner < 3; corner++)
+                {
+                    var reach = axis == 0 ? triangle[corner].x : triangle[corner].z;
+                    low = Math.Min(low, reach);
+                    high = Math.Max(high, reach);
+                }
+
+                if (at < low || at > high)
+                {
+                    continue;
+                }
+
+                for (var corner = 0; corner < 3; corner++)
+                {
+                    var here = triangle[corner];
+                    var there = triangle[(corner + 1) % 3];
+                    var from = axis == 0 ? here.x : here.z;
+                    var to = axis == 0 ? there.x : there.z;
+
+                    if (Math.Abs(to - from) <= float.Epsilon)
+                    {
+                        crest = float.IsNaN(crest)
+                            ? Math.Max(here.y, there.y)
+                            : Math.Max(crest, Math.Max(here.y, there.y));
+                        continue;
+                    }
+
+                    var share = (at - from) / (to - from);
+                    if (share < 0f || share > 1f)
+                    {
+                        continue;
+                    }
+
+                    var y = here.y + (there.y - here.y) * share;
+                    crest = float.IsNaN(crest) ? y : Math.Max(crest, y);
+                }
+            }
+
+            return crest;
+        }
+
+        static void Triangles(Transform instance, List<Vector3[]> triangles)
+        {
+            foreach (var filter in instance.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var mesh = filter.sharedMesh;
+                if (mesh == null)
+                {
+                    continue;
+                }
+
+                var vertices = mesh.vertices;
+                var indices = mesh.triangles;
+
+                for (var index = 0; index + 2 < indices.Length; index += 3)
+                {
+                    triangles.Add(new[]
+                    {
+                        filter.transform.TransformPoint(vertices[indices[index]]),
+                        filter.transform.TransformPoint(vertices[indices[index + 1]]),
+                        filter.transform.TransformPoint(vertices[indices[index + 2]])
+                    });
+                }
+            }
         }
 
         static int EveryStaircaseSitsInItsDrop(
@@ -477,7 +846,7 @@ namespace Game.EditorTooling
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                if (!StaircaseClimb.Climbs(tile.Position))
+                if (TileFootings.Under(graph.Tiles, tile.Position) != TileFooting.Flight)
                 {
                     continue;
                 }
@@ -513,7 +882,7 @@ namespace Game.EditorTooling
                         ground.Y));
                 }
 
-                var ascent = StaircaseClimb.AscentOf(graph.Tiles, tile.Position);
+                var ascent = TileFootings.AscentOf(graph.Tiles, tile.Position);
                 var along = TileSides.Toward(ascent);
                 var run = Math.Abs(along.X) > 0.5f ? box.size.x : box.size.z;
                 var across = Math.Abs(along.X) > 0.5f ? box.size.z : box.size.x;
@@ -570,6 +939,67 @@ namespace Game.EditorTooling
             return failures;
         }
 
+        static int EveryPlinthFillsItsDropAndSpillsNothing(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var plinths = 0;
+            var seated = 0;
+            var complaint = new List<string>();
+            var edge = IsoProjection.TileEdge;
+            var step = IsoProjection.StepHeight;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                if (TileFootings.Under(graph.Tiles, tile.Position) != TileFooting.Plinth)
+                {
+                    continue;
+                }
+
+                Transform instance;
+                if (!byName.TryGetValue(PartNames.Footing(tile.Position), out instance))
+                {
+                    continue;
+                }
+
+                plinths++;
+                var box = World(instance);
+                var ground = IsoProjection.Of(tile.Position);
+
+                if (Math.Abs(box.size.x - edge) <= Epsilon
+                    && Math.Abs(box.size.z - edge) <= Epsilon
+                    && Math.Abs(box.size.y - step) <= Epsilon
+                    && Math.Abs(box.center.x - ground.X) <= Epsilon
+                    && Math.Abs(box.center.z - ground.Z) <= Epsilon
+                    && Math.Abs(box.max.y - ground.Y) <= Epsilon)
+                {
+                    seated++;
+                }
+                else if (complaint.Count < Complaints)
+                {
+                    complaint.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} fills {1:0.#####} by {2:0.#####} by {3:0.#####} centred on "
+                        + "({4:0.#####}, {5:0.#####}) topping out at {6:0.#####} rather than {7:0.#####}",
+                        instance.name,
+                        box.size.x,
+                        box.size.y,
+                        box.size.z,
+                        box.center.x,
+                        box.center.z,
+                        box.max.y,
+                        ground.Y));
+                }
+            }
+
+            return Assert(
+                report,
+                plinths > 0 && seated == plinths,
+                "every plinth fills its own tile's whole drop and spills nothing off it, so a stretched "
+                + "foundation still fits the cube its tile gives it",
+                seated + " of " + plinths + " do"
+                + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+        }
+
         static int AStaircaseStaysWalkableGround(
             LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
@@ -606,11 +1036,14 @@ namespace Game.EditorTooling
                     }
                 }
 
-                Transform stair;
-                if (byName.TryGetValue(PartNames.Stair(tile.Position), out stair)
-                    && stair.GetComponentInChildren<Collider>() != null)
+                foreach (var name in new[] { PartNames.Stair(tile.Position), PartNames.Footing(tile.Position) })
                 {
-                    loose++;
+                    Transform footing;
+                    if (byName.TryGetValue(name, out footing)
+                        && footing.GetComponentInChildren<Collider>() != null)
+                    {
+                        loose++;
+                    }
                 }
             }
 
@@ -642,14 +1075,16 @@ namespace Game.EditorTooling
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                Transform instance;
-                if (!StaircaseClimb.Climbs(tile.Position)
-                    || !byName.TryGetValue(PartNames.Stair(tile.Position), out instance))
+                foreach (var name in new[] { PartNames.Stair(tile.Position), PartNames.Footing(tile.Position) })
                 {
-                    continue;
-                }
+                    Transform instance;
+                    if (!byName.TryGetValue(name, out instance))
+                    {
+                        continue;
+                    }
 
-                standing = Math.Max(standing, World(instance).max.y - IsoProjection.Of(tile.Position).Y);
+                    standing = Math.Max(standing, World(instance).max.y - IsoProjection.Of(tile.Position).Y);
+                }
             }
 
             var hidden = IsoProjection.SightReach(Math.Max(standing, 0f));
@@ -710,6 +1145,28 @@ namespace Game.EditorTooling
             }
 
             throw new InvalidOperationException("The ship level climbs, so it always has a staircase part.");
+        }
+
+        static WorldPart APlinthPart()
+        {
+            var graph = LevelGenerator.Generate(Seed, MazePreset.Ship).Graph;
+
+            foreach (var part in LevelBlueprintBuilder.Build(graph).AllParts)
+            {
+                if (part.Model == PartModel.Foundation)
+                {
+                    return part;
+                }
+            }
+
+            return new WorldPart(
+                PartNames.Footing(new TilePosition(1, 0, 0)),
+                PartShape.Cube,
+                PartModel.Foundation,
+                PartStyle.Foundation,
+                new WorldPoint(0f, -IsoProjection.StepHeight * 0.5f, 0f),
+                new WorldPoint(0f, 0f, 0f),
+                new WorldPoint(IsoProjection.TileEdge, IsoProjection.StepHeight, IsoProjection.TileEdge));
         }
 
         static HashSet<Mesh> Meshes(GameObject prefab)

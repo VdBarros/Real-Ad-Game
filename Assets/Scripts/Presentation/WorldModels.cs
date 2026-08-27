@@ -263,6 +263,8 @@ namespace Game.Presentation
                     return "coin_stack_large";
                 case PartModel.Staircase:
                     return "stairs_narrow";
+                case PartModel.Foundation:
+                    return "floor_foundation_allsides";
                 case PartModel.Knight:
                     return "Knight";
                 case PartModel.SkeletonMinion:

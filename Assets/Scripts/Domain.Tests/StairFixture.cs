@@ -18,4 +18,20 @@ namespace Game.Domain.Tests
             throw new InvalidOperationException("No tile under " + stair.Name + ".");
         }
     }
+
+    static class FootingFixture
+    {
+        public static TilePosition TileUnder(LevelGraph graph, WorldPart footing)
+        {
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                if (PartNames.Footing(tile.Position) == footing.Name)
+                {
+                    return tile.Position;
+                }
+            }
+
+            throw new InvalidOperationException("No tile under " + footing.Name + ".");
+        }
+    }
 }
