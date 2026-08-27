@@ -21,6 +21,8 @@ namespace Game.Presentation.Pure
 
         public const float CameraBack = 20f;
 
+        public const float OcclusionBound = 0.5f;
+
         public const float NearPlane = 0.3f;
 
         public const float FarPlane = 40f;

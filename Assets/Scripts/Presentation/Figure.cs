@@ -7,13 +7,27 @@ namespace Game.Presentation
     {
         Transform badge;
 
-        Renderer skin;
+        Renderer[] skins;
 
         WorldPoint ground;
+
+        PartModel worn;
 
         bool stood;
 
         protected float BaseScale { get; private set; }
+
+        protected float Scale { get; private set; }
+
+        protected PartModel Worn
+        {
+            get { return worn; }
+        }
+
+        protected float CapsuleUnit
+        {
+            get { return 1f / FigureFit.ScaleOf(worn); }
+        }
 
         protected float TileHeight
         {
@@ -25,14 +39,17 @@ namespace Game.Presentation
             get { return ground; }
         }
 
-        internal void Stand(Transform hangingBadge)
+        internal void Stand(Transform hangingBadge, PartModel mesh)
         {
             badge = hangingBadge;
-            skin = GetComponent<Renderer>();
-            BaseScale = transform.localScale.x;
+            skins = GetComponentsInChildren<Renderer>(true);
+            worn = mesh;
+            BaseScale = transform.localScale.x / FigureFit.ScaleOf(worn);
+            Scale = BaseScale;
 
             var standing = transform.localPosition;
-            ground = new WorldPoint(standing.x, standing.y - BaseScale, standing.z);
+            ground = new WorldPoint(
+                standing.x, standing.y - BaseScale * FigureFit.LiftOf(worn), standing.z);
             stood = true;
         }
 
@@ -54,9 +71,19 @@ namespace Game.Presentation
 
         protected void Wear(float scale, Tint tint)
         {
-            transform.localScale = new Vector3(scale, scale, scale);
+            Scale = scale;
+            transform.localScale = Vector3.one * (scale * FigureFit.ScaleOf(worn));
             Replant();
-            Tints.Wash(skin, tint);
+
+            if (skins == null)
+            {
+                return;
+            }
+
+            foreach (var skin in skins)
+            {
+                Tints.Wash(skin, tint);
+            }
         }
 
         void Replant()
@@ -66,13 +93,15 @@ namespace Game.Presentation
                 return;
             }
 
-            var scale = transform.localScale.x;
-            transform.localPosition = new Vector3(ground.X, ground.Y + scale, ground.Z);
+            transform.localPosition = new Vector3(
+                ground.X, ground.Y + Scale * FigureFit.LiftOf(worn), ground.Z);
 
             if (badge != null)
             {
                 badge.localPosition = new Vector3(
-                    ground.X, BadgeMetrics.AnchorAbove(ground.Y + scale * 2f), ground.Z);
+                    ground.X,
+                    BadgeMetrics.AnchorAbove(ground.Y + FigureFit.StandingHeight(worn, Scale)),
+                    ground.Z);
             }
         }
     }

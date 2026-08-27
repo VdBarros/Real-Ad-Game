@@ -61,12 +61,24 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void FiguresWantNoModelAndKeepTheirPrimitive()
+        public void ThePlayerWantsTheCastMeshAndKeepsTheCapsuleAsItsFallbackShape()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+            var player = Prop(graph, blueprint, NodeType.Start);
+
+            Assert.That(player.Model, Is.EqualTo(CharacterCast.MeshOf(PartStyle.Start)));
+            Assert.That(player.Model, Is.Not.EqualTo(PartModel.None));
+            Assert.That(player.Shape, Is.EqualTo(PartShape.Capsule));
+        }
+
+        [Test]
+        public void AdversariesStillWantNoModelAndKeepTheirPrimitive()
         {
             var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
-            foreach (var type in new[] { NodeType.Start, NodeType.Enemy, NodeType.Boss })
+            foreach (var type in new[] { NodeType.Enemy, NodeType.Boss })
             {
                 var figure = Prop(graph, blueprint, type);
 

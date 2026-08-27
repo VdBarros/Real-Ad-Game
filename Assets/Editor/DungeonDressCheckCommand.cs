@@ -23,7 +23,7 @@ namespace Game.EditorTooling
 
         const float SilhouetteRatio = 1.5f;
 
-        const float OcclusionBound = 0.5f;
+        const float OcclusionBound = IsoProjection.OcclusionBound;
 
         const float FootprintShare = 0.3f;
 
@@ -175,16 +175,24 @@ namespace Game.EditorTooling
                     continue;
                 }
 
+                var rigged = ArtPacks.IsRigged(model);
                 var settled = importer.materialImportMode == ModelImporterMaterialImportMode.None
                     && !importer.importAnimation
-                    && importer.animationType == ModelImporterAnimationType.None
+                    && importer.animationType == (rigged
+                        ? CharacterArtPostprocessor.Rig
+                        : ModelImporterAnimationType.None)
                     && !importer.importCameras
                     && !importer.importLights
                     && !importer.importBlendShapes
                     && !importer.isReadable
                     && importer.optimizeMeshVertices
                     && importer.useFileScale
-                    && Math.Abs(importer.globalScale - DungeonPack.ImportScale) < 1e-6f;
+                    && Math.Abs(importer.globalScale - ArtPacks.ImportScaleFor(model)) < 1e-6f
+                    && (!rigged
+                        || (importer.skinWeights == CharacterArtPostprocessor.SkinWeights
+                            && importer.meshCompression == CharacterArtPostprocessor.Compression
+                            && !importer.weldVertices
+                            && !importer.optimizeGameObjects));
 
                 failures += Assert(
                     report,
@@ -192,15 +200,18 @@ namespace Game.EditorTooling
                     "the postprocessor settled the " + model + " import from code",
                     string.Format(
                         CultureInfo.InvariantCulture,
-                        "materials {0}, animation {1}, blend shapes {2}, readable {3}, "
-                        + "optimised {4}, scale {5:0.####}, compression {6}",
+                        "materials {0}, animation {1}, rig {2}, blend shapes {3}, readable {4}, "
+                        + "optimised {5}, welded {6}, scale {7:0.####}, compression {8}, skin weights {9}",
                         importer.materialImportMode,
                         importer.importAnimation,
+                        importer.animationType,
                         importer.importBlendShapes,
                         importer.isReadable,
                         importer.optimizeMeshVertices,
+                        importer.weldVertices,
                         importer.globalScale,
-                        importer.meshCompression));
+                        importer.meshCompression,
+                        importer.skinWeights));
             }
 
             return failures;
@@ -229,13 +240,13 @@ namespace Game.EditorTooling
                 }
 
                 var box = Local(prefab);
-                var wanted = DungeonPack.HeightOf(model);
+                var wanted = ArtPacks.HeightOf(model);
 
                 failures += Assert(
                     report,
                     Math.Abs(box.size.y - wanted) <= Epsilon,
                     "the imported " + model + " mesh stands the pinned "
-                    + DungeonPack.PackHeightOf(model).ToString("0.####", CultureInfo.InvariantCulture)
+                    + ArtPacks.PackHeightOf(model).ToString("0.####", CultureInfo.InvariantCulture)
                     + " pack units tall",
                     string.Format(
                         CultureInfo.InvariantCulture,
@@ -339,7 +350,7 @@ namespace Game.EditorTooling
             IDictionary<string, Transform> byName,
             StringBuilder report)
         {
-            var expected = new Dictionary<PartModel, HashSet<Mesh>>();
+            var expected = new Dictionary<PartModel, ISet<Mesh>>();
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
@@ -349,20 +360,8 @@ namespace Game.EditorTooling
                 }
 
                 var prefab = models.Of(model);
-                var meshes = new HashSet<Mesh>();
 
-                if (prefab != null)
-                {
-                    foreach (var filter in prefab.GetComponentsInChildren<MeshFilter>(true))
-                    {
-                        if (filter.sharedMesh != null)
-                        {
-                            meshes.Add(filter.sharedMesh);
-                        }
-                    }
-                }
-
-                expected[model] = meshes;
+                expected[model] = PackMesh.Of(prefab);
             }
 
             var wanted = 0;
@@ -385,12 +384,16 @@ namespace Game.EditorTooling
                     continue;
                 }
 
-                var filters = instance.GetComponentsInChildren<MeshFilter>(true);
-                var dressed = filters.Length > 0;
+                var renderers = instance.GetComponentsInChildren<Renderer>(true);
+                var dressed = renderers.Length > 0;
+                Mesh worn = null;
 
-                foreach (var filter in filters)
+                foreach (var renderer in renderers)
                 {
-                    if (filter.sharedMesh == null || !expected[part.Model].Contains(filter.sharedMesh))
+                    var mesh = PackMesh.On(renderer);
+                    worn = worn ?? mesh;
+
+                    if (mesh == null || !expected[part.Model].Contains(mesh))
                     {
                         dressed = false;
                     }
@@ -402,10 +405,7 @@ namespace Game.EditorTooling
                 }
                 else
                 {
-                    fellBack.Add(part.Name + " wearing "
-                        + (filters.Length == 0 || filters[0].sharedMesh == null
-                            ? "nothing"
-                            : filters[0].sharedMesh.name));
+                    fellBack.Add(part.Name + " wearing " + (worn == null ? "nothing" : worn.name));
                 }
             }
 
@@ -576,12 +576,23 @@ namespace Game.EditorTooling
             var props = 0;
             var standing = 0;
             var sizes = new Dictionary<PartModel, string>();
+            var cast = new List<string>();
 
             foreach (var node in graph.Decisions.Nodes)
             {
                 WorldPart prop;
                 if (!LevelBlueprintBuilder.TryProp(node, out prop) || prop.Model == PartModel.None)
                 {
+                    continue;
+                }
+
+                if (CharacterCast.IsRole(prop.Style))
+                {
+                    if (!cast.Contains(prop.Model.ToString()))
+                    {
+                        cast.Add(prop.Model.ToString());
+                    }
+
                     continue;
                 }
 
@@ -609,6 +620,9 @@ namespace Game.EditorTooling
             var shown = new List<string>(sizes.Values);
 
             report.Append("\n  silhouettes: ").Append(string.Join(", ", shown.ToArray()));
+            report.Append("\n  footed by the player tier check instead of here, because a rigged mesh's "
+                + "bounds are padded below its feet: ")
+                .Append(cast.Count == 0 ? "no cast mesh in this world" : string.Join(", ", cast.ToArray()));
 
             return Assert(
                 report,
@@ -1078,33 +1092,7 @@ namespace Game.EditorTooling
 
         static Bounds Local(GameObject prefab)
         {
-            var box = new Bounds();
-            var first = true;
-
-            foreach (var filter in prefab.GetComponentsInChildren<MeshFilter>(true))
-            {
-                var mesh = filter.sharedMesh;
-                if (mesh == null)
-                {
-                    continue;
-                }
-
-                var offset = prefab.transform.InverseTransformPoint(
-                    filter.transform.TransformPoint(mesh.bounds.center));
-                var here = new Bounds(offset, Vector3.Scale(mesh.bounds.size, filter.transform.lossyScale));
-
-                if (first)
-                {
-                    box = here;
-                    first = false;
-                }
-                else
-                {
-                    box.Encapsulate(here);
-                }
-            }
-
-            return box;
+            return PackMesh.Bare(prefab);
         }
 
         static Bounds World(Transform instance)
