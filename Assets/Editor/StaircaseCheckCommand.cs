@@ -21,13 +21,17 @@ namespace Game.EditorTooling
 
         const float OcclusionBound = 0.5f;
 
+        const float CrestBound = 0.05f;
+
         const int Complaints = 6;
+
+        static readonly int Slices = StaircaseFlight.PackCrestFromItsOriginOnward.Count;
 
         public static void Check()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            var report = new StringBuilder("t-23 staircase steps, ship seed ")
+            var report = new StringBuilder("t-23/t-31 staircase steps, ship seed ")
                 .Append(Seed.ToString(CultureInfo.InvariantCulture))
                 .Append(':');
             var failures = 0;
@@ -39,7 +43,7 @@ namespace Game.EditorTooling
                 failures += Built(models, report);
             }
 
-            report.Append("\n  t-23: ")
+            report.Append("\n  t-23/t-31: ")
                 .Append(failures == 0
                     ? "every assertion above held"
                     : failures + (failures == 1 ? " assertion" : " assertions") + " above failed");
@@ -124,17 +128,41 @@ namespace Game.EditorTooling
                 Math.Abs(box.center.x) <= Epsilon
                 && Math.Abs(box.min.y) <= Epsilon
                 && Math.Abs(box.min.z) <= Epsilon,
-                "the staircase pivots on the centre of its base at the foot of its flight, so a tile edge "
+                "the staircase pivots on the centre of its base at the crest end of its flight, so a tile edge "
                 + "places it",
                 string.Format(
                     CultureInfo.InvariantCulture,
                     "its bounds sit at ({0:0.#####}, {1:0.#####}, {2:0.#####}) with a base at {3:0.#####} "
-                    + "and a foot at {4:0.#####}",
+                    + "and a crest end at {4:0.#####}",
                     box.center.x,
                     box.center.y,
                     box.center.z,
                     box.min.y,
                     box.min.z));
+
+            var slices = Crest(prefab, box);
+            var pinned = StaircaseFlight.PackCrestFromItsOriginOnward;
+            var drift = 0f;
+
+            for (var slice = 0; slice < Slices; slice++)
+            {
+                drift = Math.Max(drift, Math.Abs(slices[slice] - pinned[slice] * DungeonPack.ImportScale));
+            }
+
+            failures += Assert(
+                report,
+                drift <= Epsilon && slices[0] > slices[Slices - 1],
+                "the pack's flight descends along its own local forward, and the profile the pose is laid from "
+                + "is still the profile the mesh has",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "its crest over {0} slices of local z reads {1} against the pinned {2}, drifting "
+                    + "{3:0.#####} against a bound of {4:0.#####}",
+                    Slices,
+                    Sliced(slices),
+                    Sliced(Scaled(pinned)),
+                    drift,
+                    Epsilon));
 
             var fitted = box.size.y * ModelPose.ScaleOf(AStaircasePart()).Y;
 
@@ -171,6 +199,7 @@ namespace Game.EditorTooling
             report.Append(Shape(graph));
 
             failures += EveryClimbWearsAStaircase(models, graph, byName, report);
+            failures += EveryFlightCrestsAtTheHeadOfItsOwnClimb(graph, byName, report);
             failures += NoTerraceTileWearsOne(graph, byName, report);
             failures += EveryStaircaseSitsInItsDrop(graph, byName, report);
             failures += AStaircaseStaysWalkableGround(graph, byName, report);
@@ -254,7 +283,6 @@ namespace Game.EditorTooling
             var wanted = Meshes(models.Of(PartModel.Staircase));
             var climbs = 0;
             var meshed = 0;
-            var turned = 0;
             var complaint = new List<string>();
 
             foreach (var tile in graph.Tiles.Tiles)
@@ -296,35 +324,110 @@ namespace Game.EditorTooling
                             ? "nothing"
                             : filters[0].sharedMesh.name));
                 }
-
-                var ascent = StaircaseClimb.AscentOf(graph.Tiles, tile.Position);
-                var yaw = Mathf.DeltaAngle(instance.eulerAngles.y, TileSides.InwardYaw(ascent));
-
-                if (Math.Abs(yaw) <= AngleEpsilon)
-                {
-                    turned++;
-                }
-                else if (complaint.Count < Complaints)
-                {
-                    complaint.Add(name + " faces " + instance.eulerAngles.y + " rather than the "
-                        + TileSides.InwardYaw(ascent) + " its climb " + ascent + " asks for");
-                }
             }
 
-            var failures = Assert(
+            return Assert(
                 report,
                 climbs > 0 && meshed == climbs,
                 "every staircase tile carries the pack's staircase mesh",
                 meshed + " of " + climbs + " do"
                 + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+        }
 
-            failures += Assert(
+        static int EveryFlightCrestsAtTheHeadOfItsOwnClimb(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var counted = 0;
+            var atTheHead = 0;
+            var atTheFoot = 0;
+            var flat = 0;
+            var complaint = new List<string>();
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                Transform instance;
+                if (!StaircaseClimb.Climbs(tile.Position)
+                    || !byName.TryGetValue(PartNames.Stair(tile.Position), out instance))
+                {
+                    continue;
+                }
+
+                counted++;
+                var ascent = StaircaseClimb.AscentOf(graph.Tiles, tile.Position);
+                var ground = IsoProjection.Of(tile.Position);
+                var floor = ground.Y - IsoProjection.StepHeight;
+                var head = float.NaN;
+                var foot = float.NaN;
+
+                foreach (var filter in instance.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    var mesh = filter.sharedMesh;
+                    if (mesh == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var vertex in mesh.vertices)
+                    {
+                        var world = filter.transform.TransformPoint(vertex);
+                        var standing = world.y - floor;
+                        var reach = StaircaseFlight.ReachAlong(
+                            new WorldPoint(world.x, world.y, world.z), ground, ascent);
+
+                        if (reach > 0f)
+                        {
+                            head = float.IsNaN(head) ? standing : Math.Max(head, standing);
+                        }
+                        else if (reach < 0f)
+                        {
+                            foot = float.IsNaN(foot) ? standing : Math.Max(foot, standing);
+                        }
+                    }
+                }
+
+                var readable = !float.IsNaN(head) && !float.IsNaN(foot);
+
+                if (readable && head > foot + CrestBound)
+                {
+                    atTheHead++;
+                    continue;
+                }
+
+                if (readable && foot > head + CrestBound)
+                {
+                    atTheFoot++;
+                }
+                else
+                {
+                    flat++;
+                }
+
+                if (complaint.Count < Complaints)
+                {
+                    complaint.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} climbing {1} stands {2} tall at the head of its own climb and {3} at its foot",
+                        instance.name,
+                        ascent,
+                        Standing(head),
+                        Standing(foot)));
+                }
+            }
+
+            return Assert(
                 report,
-                climbs > 0 && turned == climbs,
-                "every staircase faces the way its own climb goes, the L bend included",
-                turned + " of " + climbs + " do");
-
-            return failures;
+                counted > 0 && atTheHead == counted,
+                "every flight's mass crests at the head of its own climb and sinks at its foot, so a tread "
+                + "faces the camera instead of the masonry filling the drop",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "of {0} staircase tiles, {1} crest at the head of the climb, {2} crest at its foot and "
+                    + "{3} crest level{4}",
+                    counted,
+                    atTheHead,
+                    atTheFoot,
+                    flat,
+                    complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
         }
 
         static int NoTerraceTileWearsOne(
@@ -366,7 +469,7 @@ namespace Game.EditorTooling
         {
             var climbs = 0;
             var rising = 0;
-            var footed = 0;
+            var crested = 0;
             var spanning = 0;
             var complaint = new List<string>();
             var edge = IsoProjection.TileEdge;
@@ -429,19 +532,19 @@ namespace Game.EditorTooling
                         across));
                 }
 
-                var foot = new Vector3(
-                    ground.X - along.X * edge * 0.5f,
+                var crest = new Vector3(
+                    ground.X + along.X * edge * 0.5f,
                     ground.Y - step,
-                    ground.Z - along.Z * edge * 0.5f);
+                    ground.Z + along.Z * edge * 0.5f);
                 var here = instance.position;
 
-                if ((here - foot).magnitude <= Epsilon)
+                if ((here - crest).magnitude <= Epsilon)
                 {
-                    footed++;
+                    crested++;
                 }
                 else if (complaint.Count < Complaints)
                 {
-                    complaint.Add(instance.name + " starts at " + here + " rather than " + foot);
+                    complaint.Add(instance.name + " sets its crest down at " + here + " rather than " + crest);
                 }
             }
 
@@ -459,9 +562,9 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                climbs > 0 && footed == climbs,
-                "every staircase starts on the tile edge its climb starts at",
-                footed + " of " + climbs + " do"
+                climbs > 0 && crested == climbs,
+                "every staircase sets its crest end down on the tile edge its climb ends at",
+                crested + " of " + climbs + " do"
                 + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
 
             return failures;
@@ -627,6 +730,69 @@ namespace Game.EditorTooling
             }
 
             return meshes;
+        }
+
+        static string Standing(float height)
+        {
+            return float.IsNaN(height)
+                ? "nothing"
+                : height.ToString("0.####", CultureInfo.InvariantCulture);
+        }
+
+        static float[] Crest(GameObject prefab, Bounds box)
+        {
+            var crest = new float[Slices];
+
+            for (var slice = 0; slice < Slices; slice++)
+            {
+                crest[slice] = float.MinValue;
+            }
+
+            foreach (var filter in prefab.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var mesh = filter.sharedMesh;
+                if (mesh == null)
+                {
+                    continue;
+                }
+
+                foreach (var vertex in mesh.vertices)
+                {
+                    var local = prefab.transform.InverseTransformPoint(filter.transform.TransformPoint(vertex));
+                    var reach = box.size.z <= 0f ? 0f : (local.z - box.min.z) / box.size.z;
+                    var slice = Math.Min(Slices - 1, Math.Max(0, (int)(reach * Slices)));
+                    crest[slice] = Math.Max(crest[slice], local.y);
+                }
+            }
+
+            return crest;
+        }
+
+        static float[] Scaled(IReadOnlyList<float> pack)
+        {
+            var scaled = new float[pack.Count];
+
+            for (var slice = 0; slice < pack.Count; slice++)
+            {
+                scaled[slice] = pack[slice] * DungeonPack.ImportScale;
+            }
+
+            return scaled;
+        }
+
+        static string Sliced(IReadOnlyList<float> crest)
+        {
+            var text = new StringBuilder();
+
+            for (var slice = 0; slice < crest.Count; slice++)
+            {
+                text.Append(slice == 0 ? "" : " ")
+                    .Append(crest[slice] == float.MinValue
+                        ? "-"
+                        : crest[slice].ToString("0.####", CultureInfo.InvariantCulture));
+            }
+
+            return text.ToString();
         }
 
         static Bounds Local(GameObject prefab)

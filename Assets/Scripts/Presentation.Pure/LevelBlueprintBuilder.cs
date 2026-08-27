@@ -112,7 +112,7 @@ namespace Game.Presentation.Pure
                 PartModels.Of(PartStyle.Staircase),
                 PartStyle.Staircase,
                 new WorldPoint(tile.X, tile.Y - IsoProjection.StepHeight * 0.5f, tile.Z),
-                new WorldPoint(0f, TileSides.InwardYaw(ascent), 0f),
+                new WorldPoint(0f, TileSides.InwardYaw(StaircaseFlight.LaidAgainst(ascent)), 0f),
                 new WorldPoint(IsoProjection.TileEdge, IsoProjection.StepHeight, IsoProjection.TileEdge));
         }
 

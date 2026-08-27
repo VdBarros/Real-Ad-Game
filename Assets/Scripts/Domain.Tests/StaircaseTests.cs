@@ -10,6 +10,8 @@ namespace Game.Domain.Tests
     {
         const long Seed = 20250824L;
 
+        const float Tolerance = 1e-5f;
+
         [Test]
         public void EveryStaircaseTileCarriesTheStaircaseModel()
         {
@@ -44,7 +46,7 @@ namespace Game.Domain.Tests
             {
                 if (part.Model == PartModel.Staircase)
                 {
-                    Assert.That(Terraces.IsTerrace(StandingUnder(graph, part).Elevation), Is.False, part.Name);
+                    Assert.That(Terraces.IsTerrace(StairFixture.TileUnder(graph, part).Elevation), Is.False, part.Name);
                 }
             }
 
@@ -81,7 +83,7 @@ namespace Game.Domain.Tests
 
             foreach (var part in StairsByName(graph).Values)
             {
-                var tile = StandingUnder(graph, part);
+                var tile = StairFixture.TileUnder(graph, part);
                 var ground = IsoProjection.Of(tile);
 
                 Assert.That(part.Scale.Y, Is.EqualTo(IsoProjection.StepHeight), part.Name);
@@ -94,17 +96,28 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheStaircaseFacesTheWayTheClimbGoes()
+        public void EveryFlightCrestsAtTheHeadOfItsOwnClimbAndSinksAtItsFoot()
         {
             var graph = Ship();
+            var counted = 0;
+
+            Assert.That(StaircaseFlight.PackCrestAtItsOrigin, Is.GreaterThan(StaircaseFlight.PackCrestAtItsFarEnd));
 
             foreach (var part in StairsByName(graph).Values)
             {
-                var tile = StandingUnder(graph, part);
+                var tile = StairFixture.TileUnder(graph, part);
                 var ascent = StaircaseClimb.AscentOf(graph.Tiles, tile);
+                var ground = IsoProjection.Of(tile);
+                var crest = StaircaseFlight.ReachAlong(StaircaseFlight.CrestOf(part), ground, ascent);
+                var sunk = StaircaseFlight.ReachAlong(StaircaseFlight.SinkOf(part), ground, ascent);
 
-                Assert.That(part.Rotation, Is.EqualTo(new WorldPoint(0f, TileSides.InwardYaw(ascent), 0f)), part.Name);
+                counted++;
+                Assert.That(crest, Is.GreaterThan(sunk), part.Name);
+                Assert.That(crest, Is.EqualTo(IsoProjection.TileEdge * 0.5f).Within(Tolerance), part.Name);
+                Assert.That(sunk, Is.EqualTo(IsoProjection.TileEdge * -0.5f).Within(Tolerance), part.Name);
             }
+
+            Assert.That(counted, Is.GreaterThan(0));
         }
 
         [Test]
@@ -326,17 +339,5 @@ namespace Game.Domain.Tests
                 .ToDictionary(part => part.Name);
         }
 
-        static TilePosition StandingUnder(LevelGraph graph, WorldPart part)
-        {
-            foreach (var tile in graph.Tiles.Tiles)
-            {
-                if (PartNames.Stair(tile.Position) == part.Name)
-                {
-                    return tile.Position;
-                }
-            }
-
-            throw new System.InvalidOperationException("No tile under " + part.Name + ".");
-        }
     }
 }
