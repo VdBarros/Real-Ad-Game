@@ -75,6 +75,7 @@ namespace Game.EditorTooling
             PreviewFilm.Sun();
             rig.Begin(graph);
             rig.Skip();
+            PreviewFilm.Warm(lens);
             PreviewFilm.Shoot(lens, LevelPath);
 
             var report = new StringBuilder("t-32 the player figure wears a character mesh, ship seed ")
