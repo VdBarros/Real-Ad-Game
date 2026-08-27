@@ -350,7 +350,7 @@ namespace Game.EditorTooling
             IDictionary<string, Transform> byName,
             StringBuilder report)
         {
-            var expected = new Dictionary<PartModel, HashSet<Mesh>>();
+            var expected = new Dictionary<PartModel, ISet<Mesh>>();
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {

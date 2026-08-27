@@ -70,7 +70,8 @@ namespace Game.EditorTooling
             var enemies = root.GetComponentsInChildren<EnemyFigure>(true);
             var site = DeathSite(graph);
             var worn = CharacterCast.MeshOf(PartStyle.Start);
-            var pack = PackMeshes(worn);
+            var pack = PackMesh.Of(
+                worn == PartModel.None ? null : Resources.Load<GameObject>(WorldModels.AssetPathOf(worn)));
 
             PreviewFilm.Sun();
             rig.Begin(graph);
