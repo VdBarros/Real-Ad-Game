@@ -106,7 +106,8 @@ namespace Game.EditorTooling
             var builder = new WorldBuilder();
             var root = builder.Build(level.Graph);
             PowerPump.Settle(builder.PlayerBadge, power);
-            var camera = Rig(onTheStart ? Start(level.Graph) : Centre(blueprint), distance, orthographicSize);
+            var camera = PreviewFilm.Rig(
+                onTheStart ? Start(level.Graph) : Centre(blueprint), distance, orthographicSize);
             PreviewFilm.Sun();
 
             PreviewFilm.Shoot(camera, path);
@@ -114,21 +115,6 @@ namespace Game.EditorTooling
             Report(blueprint, BadgeBlueprintBuilder.Build(level.Graph, PowerTuning.Ship.StartingPower), root, path);
 
             builder.Dispose();
-        }
-
-        static Camera Rig(Vector3 centre, float distance, float orthographicSize)
-        {
-            var camera = new GameObject("PreviewCamera").AddComponent<Camera>();
-            camera.transform.rotation = Quaternion.Euler(
-                IsoProjection.CameraPitch, IsoProjection.CameraYaw, IsoProjection.CameraRoll);
-            camera.transform.position = centre - camera.transform.forward * distance;
-            camera.orthographic = true;
-            camera.orthographicSize = orthographicSize;
-            camera.nearClipPlane = 0.03f;
-            camera.farClipPlane = distance * 3f;
-            camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.06f, 0.07f, 0.09f);
-            return camera;
         }
 
         static Vector3 Centre(LevelBlueprint blueprint)

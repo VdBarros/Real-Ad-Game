@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Text;
 using Game.Domain;
 using Game.Presentation;
@@ -28,15 +27,25 @@ namespace Game.EditorTooling
 
         const float FootprintShare = 0.3f;
 
-        const float ToneContrast = 1.6f;
+        const float ToneContrast = 1.5f;
 
         const float ShotDistance = 60f;
 
-        const int ShotThreshold = 8;
+        const int ChannelTolerance = 8;
+
+        const int AloneLayer = 31;
+
+        const int Cursed = 0;
+
+        const int Cleared = 1;
+
+        const int Rounds = 2;
 
         const string AdditiveShot = "dev/scratch/t-30-additive.png";
 
         const string MultiplierShot = "dev/scratch/t-30-multiplier.png";
+
+        const string ClearedShot = "dev/scratch/t-30-multiplier-cleared.png";
 
         const string FloorShot = "dev/scratch/t-30-floor-only.png";
 
@@ -674,16 +683,41 @@ namespace Game.EditorTooling
             GameObject root, LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
             PreviewFilm.Sun();
-            Unbadge(root);
+            var badges = Unbadge(root);
 
-            var multiplier = Photograph(
-                graph, byName, PartModels.Of(PartStyle.Multiplier), "multiplier", MultiplierShot, FloorShot);
-            var additive = Photograph(
-                graph, byName, PartModels.Of(PartStyle.Additive), "additive", AdditiveShot, null);
+            var multiplier = new Reading[Rounds];
+            var additive = new Reading[Rounds];
 
-            if (multiplier.Pixels < 0 || additive.Pixels < 0)
+            multiplier[Cursed] = Photograph(
+                graph, byName, PartStyle.Multiplier, "multiplier", MultiplierShot, FloorShot);
+            additive[Cursed] = Photograph(graph, byName, PartStyle.Additive, "additive", AdditiveShot, null);
+
+            Material cursed;
+            var repainted = Repaint(root, out cursed);
+
+            multiplier[Cleared] = Photograph(
+                graph, byName, PartStyle.Multiplier, "multiplier", ClearedShot, null);
+            additive[Cleared] = Photograph(graph, byName, PartStyle.Additive, "additive", null, null);
+
+            foreach (var renderer in repainted)
             {
-                return Assert(
+                renderer.sharedMaterial = cursed;
+            }
+
+            foreach (var group in badges)
+            {
+                group.SetActive(true);
+            }
+
+            var failures = Assert(
+                report,
+                repainted.Count > 0,
+                "the world offers a cleared floor to photograph a prop against as well as a cursed one",
+                repainted.Count + " floor renderers were repainted cleared for a second round");
+
+            if (!multiplier[Cursed].Found || !additive[Cursed].Found)
+            {
+                return failures + Assert(
                     report,
                     false,
                     "both reward props stand somewhere the gameplay camera can photograph them",
@@ -691,7 +725,6 @@ namespace Game.EditorTooling
             }
 
             var tile = ScreenFrame.TileGroundPixels(IsoProjection.OrthographicSize);
-            var failures = 0;
 
             report.Append("\n  at gameplay zoom ")
                 .Append(IsoProjection.OrthographicSize.ToString("0.#", CultureInfo.InvariantCulture))
@@ -707,8 +740,9 @@ namespace Game.EditorTooling
             return failures;
         }
 
-        static int ReadsAgainstTheFloor(StringBuilder report, Reading reading, float tile)
+        static int ReadsAgainstTheFloor(StringBuilder report, Reading[] rounds, float tile)
         {
+            var reading = rounds[Cursed];
             var failures = 0;
             var share = tile <= 0f ? 0f : reading.Pixels / tile;
 
@@ -720,26 +754,30 @@ namespace Game.EditorTooling
                 + " of a tile of ground at gameplay zoom, so it is a shape rather than a speck",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "it covers {0} pixels, {1:0.###} of a tile",
+                    "its silhouette covers {0} pixels, {1:0.###} of a tile",
                     reading.Pixels,
                     share));
 
+            var worst = Math.Min(rounds[Cursed].Contrast, rounds[Cleared].Contrast);
+
             failures += Assert(
                 report,
-                reading.Contrast >= ToneContrast,
+                worst >= ToneContrast,
                 "the " + reading.Name + " prop reads at least "
                 + ToneContrast.ToString("0.##", CultureInfo.InvariantCulture)
-                + ":1 in tone against the floor it stands on, so it is not dark on dark",
+                + ":1 in tone against the ground and masonry behind it, over a cursed floor and again "
+                + "over a cleared one, so it is never lost in what it stands on",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "its lit pixels average {0:0.####} relative luminance against the {1:0.####} of the ground "
-                    + "they hide, a contrast of {2:0.##}:1, and {3:0.####} across the rest of the frame "
-                    + "at {4:0.##}:1",
-                    reading.Prop,
-                    reading.Behind,
-                    reading.Contrast,
-                    reading.Around,
-                    ContrastOf(reading.Prop, reading.Around)));
+                    "over a cursed floor its silhouette averages {0:0.####} relative luminance against the "
+                    + "{1:0.####} of the ground it hides, {2:0.##}:1; over a cleared floor {3:0.####} against "
+                    + "{4:0.####}, {5:0.##}:1",
+                    rounds[Cursed].Prop,
+                    rounds[Cursed].Ground,
+                    rounds[Cursed].Contrast,
+                    rounds[Cleared].Prop,
+                    rounds[Cleared].Ground,
+                    rounds[Cleared].Contrast));
 
             return failures;
         }
@@ -747,55 +785,55 @@ namespace Game.EditorTooling
         static Reading Photograph(
             LevelGraph graph,
             IDictionary<string, Transform> byName,
-            PartModel model,
+            PartStyle style,
             string name,
             string path,
             string barePath)
         {
-            var reading = new Reading { Name = name, Pixels = -1 };
-            var instance = PropOf(graph, byName, model);
+            var reading = new Reading { Name = name };
+            var instance = PropOf(graph, byName, PartModels.Of(style));
 
             if (instance == null)
             {
                 return reading;
             }
 
-            var camera = Rig(instance.position);
-            UnityEngine.Object.DestroyImmediate(PreviewFilm.Frame(camera));
+            var camera = PreviewFilm.Rig(instance.position, ShotDistance, IsoProjection.OrthographicSize);
+            PreviewFilm.Warm(camera);
+
+            var silhouette = Silhouette(instance, camera);
+            PreviewFilm.Warm(camera);
 
             instance.gameObject.SetActive(false);
             var bare = PreviewFilm.Frame(camera);
             instance.gameObject.SetActive(true);
             var dressed = PreviewFilm.Frame(camera);
 
-            var before = bare.GetPixels32();
-            var after = dressed.GetPixels32();
+            var ground = bare.GetPixels32();
+            var lit = dressed.GetPixels32();
             var covered = 0;
             var prop = 0.0;
-            var behind = 0.0;
-            var elsewhere = 0.0;
+            var under = 0.0;
 
-            for (var pixel = 0; pixel < after.Length; pixel++)
+            for (var pixel = 0; pixel < silhouette.Length; pixel++)
             {
-                if (Apart(before[pixel], after[pixel]))
+                if (!silhouette[pixel])
                 {
-                    covered++;
-                    prop += Luminance(after[pixel]);
-                    behind += Luminance(before[pixel]);
+                    continue;
                 }
-                else
-                {
-                    elsewhere += Luminance(before[pixel]);
-                }
+
+                covered++;
+                prop += Luminance(lit[pixel]);
+                under += Luminance(ground[pixel]);
             }
 
+            reading.Found = true;
             reading.Pixels = covered;
             reading.Prop = covered == 0 ? 0.0 : prop / covered;
-            reading.Behind = covered == 0 ? 0.0 : behind / covered;
-            reading.Around = after.Length == covered ? 0.0 : elsewhere / (after.Length - covered);
+            reading.Ground = covered == 0 ? 0.0 : under / covered;
 
-            Write(dressed, path);
-            Write(bare, barePath);
+            PreviewFilm.Save(dressed, path);
+            PreviewFilm.Save(bare, barePath);
 
             UnityEngine.Object.DestroyImmediate(bare);
             UnityEngine.Object.DestroyImmediate(dressed);
@@ -804,11 +842,93 @@ namespace Game.EditorTooling
             return reading;
         }
 
-        static bool Apart(Color32 before, Color32 after)
+        static bool[] Silhouette(Transform instance, Camera camera)
         {
-            return Math.Abs(before.r - after.r) > ShotThreshold
-                || Math.Abs(before.g - after.g) > ShotThreshold
-                || Math.Abs(before.b - after.b) > ShotThreshold;
+            var was = new List<KeyValuePair<GameObject, int>>();
+
+            foreach (var node in instance.GetComponentsInChildren<Transform>(true))
+            {
+                was.Add(new KeyValuePair<GameObject, int>(node.gameObject, node.gameObject.layer));
+                node.gameObject.layer = AloneLayer;
+            }
+
+            var culling = camera.cullingMask;
+            var background = camera.backgroundColor;
+            camera.cullingMask = 1 << AloneLayer;
+
+            camera.backgroundColor = Color.black;
+            var onBlack = PreviewFilm.Frame(camera);
+            camera.backgroundColor = Color.white;
+            var onWhite = PreviewFilm.Frame(camera);
+
+            camera.cullingMask = culling;
+            camera.backgroundColor = background;
+
+            foreach (var node in was)
+            {
+                node.Key.layer = node.Value;
+            }
+
+            var black = onBlack.GetPixels32();
+            var white = onWhite.GetPixels32();
+            var silhouette = new bool[black.Length];
+
+            for (var pixel = 0; pixel < silhouette.Length; pixel++)
+            {
+                silhouette[pixel] = !Changed(black[pixel], white[pixel]);
+            }
+
+            UnityEngine.Object.DestroyImmediate(onBlack);
+            UnityEngine.Object.DestroyImmediate(onWhite);
+
+            return silhouette;
+        }
+
+        static List<Renderer> Repaint(GameObject root, out Material cursed)
+        {
+            var repainted = new List<Renderer>();
+            var cleared = Painted(root, PartStyle.Cleared);
+            cursed = Painted(root, PartStyle.Floor);
+
+            if (cleared == null || cursed == null)
+            {
+                return repainted;
+            }
+
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer.sharedMaterial == cursed)
+                {
+                    renderer.sharedMaterial = cleared;
+                    repainted.Add(renderer);
+                }
+            }
+
+            return repainted;
+        }
+
+        static Material Painted(GameObject root, PartStyle style)
+        {
+            var wanted = WorldMaterials.NamePrefix + style;
+
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                var material = renderer.sharedMaterial;
+
+                if (material != null && material.name == wanted)
+                {
+                    return material;
+                }
+            }
+
+            return null;
+        }
+
+        static bool Changed(Color32 before, Color32 after)
+        {
+            return Math.Abs(before.r - after.r) > ChannelTolerance
+                || Math.Abs(before.g - after.g) > ChannelTolerance
+                || Math.Abs(before.b - after.b) > ChannelTolerance;
         }
 
         static double Luminance(Color32 colour)
@@ -828,59 +948,37 @@ namespace Game.EditorTooling
             return (Math.Max(one, other) + 0.05) / (Math.Min(one, other) + 0.05);
         }
 
-        static void Write(Texture2D frame, string path)
+        static List<GameObject> Unbadge(GameObject root)
         {
-            if (string.IsNullOrEmpty(path))
-            {
-                return;
-            }
+            var hidden = new List<GameObject>();
 
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllBytes(path, frame.EncodeToPNG());
-        }
-
-        static void Unbadge(GameObject root)
-        {
             foreach (var node in root.GetComponentsInChildren<Transform>(true))
             {
-                if (node.name == PartNames.BadgesGroup)
+                if (node.name == PartNames.BadgesGroup && node.gameObject.activeSelf)
                 {
                     node.gameObject.SetActive(false);
+                    hidden.Add(node.gameObject);
                 }
             }
-        }
 
-        static Camera Rig(Vector3 centre)
-        {
-            var camera = new GameObject("DressCamera").AddComponent<Camera>();
-            camera.transform.rotation = Quaternion.Euler(
-                IsoProjection.CameraPitch, IsoProjection.CameraYaw, IsoProjection.CameraRoll);
-            camera.transform.position = centre - camera.transform.forward * ShotDistance;
-            camera.orthographic = true;
-            camera.orthographicSize = IsoProjection.OrthographicSize;
-            camera.nearClipPlane = 0.03f;
-            camera.farClipPlane = ShotDistance * 3f;
-            camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.06f, 0.07f, 0.09f);
-
-            return camera;
+            return hidden;
         }
 
         struct Reading
         {
             public string Name;
 
+            public bool Found;
+
             public int Pixels;
 
             public double Prop;
 
-            public double Behind;
-
-            public double Around;
+            public double Ground;
 
             public double Contrast
             {
-                get { return ContrastOf(Prop, Behind); }
+                get { return ContrastOf(Prop, Ground); }
             }
         }
 
