@@ -6,6 +6,7 @@ namespace Game.Presentation.Pure
         FloorTile,
         WallPanel,
         Chest,
-        Candles
+        Candles,
+        Staircase
     }
 }

@@ -29,6 +29,11 @@ namespace Game.Presentation.Pure
                 var target = tilesByTerrace[slot];
                 target.Add(FloorQuad(tile.Position));
 
+                if (StaircaseClimb.Climbs(tile.Position))
+                {
+                    target.Add(Staircase(tile.Position, StaircaseClimb.AscentOf(graph.Tiles, tile.Position)));
+                }
+
                 foreach (var side in TileSides.All)
                 {
                     var beyond = TileSides.Step(tile.Position, side);
@@ -95,6 +100,20 @@ namespace Game.Presentation.Pure
                 IsoProjection.Of(position),
                 new WorldPoint(90f, 0f, 0f),
                 new WorldPoint(IsoProjection.TileEdge, IsoProjection.TileEdge, 1f));
+        }
+
+        static WorldPart Staircase(TilePosition position, TileSide ascent)
+        {
+            var tile = IsoProjection.Of(position);
+
+            return new WorldPart(
+                PartNames.Stair(position),
+                PartShape.Cube,
+                PartModels.Of(PartStyle.Staircase),
+                PartStyle.Staircase,
+                new WorldPoint(tile.X, tile.Y - IsoProjection.StepHeight * 0.5f, tile.Z),
+                new WorldPoint(0f, TileSides.InwardYaw(ascent), 0f),
+                new WorldPoint(IsoProjection.TileEdge, IsoProjection.StepHeight, IsoProjection.TileEdge));
         }
 
         static WorldPart Wall(TilePosition position, TileSide side)

@@ -120,6 +120,8 @@ namespace Game.Presentation
                     return "chest";
                 case PartModel.Candles:
                     return "candle_triple";
+                case PartModel.Staircase:
+                    return "stairs_narrow";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(model), model, "No asset name for that part model.");
             }

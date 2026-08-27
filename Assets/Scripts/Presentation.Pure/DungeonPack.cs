@@ -18,6 +18,12 @@ namespace Game.Presentation.Pure
 
         public const float CandlesPackHeight = 0.873f;
 
+        public const float StaircasePackHeight = 5.1f;
+
+        public const float StaircasePackWidth = GridUnits;
+
+        public const float StaircasePackRun = GridUnits;
+
         public static float ImportScale
         {
             get { return IsoProjection.TileEdge / GridUnits; }
@@ -26,6 +32,16 @@ namespace Game.Presentation.Pure
         public static float WallPanelWidth
         {
             get { return WallPanelPackWidth * ImportScale; }
+        }
+
+        public static float StaircaseWidth
+        {
+            get { return StaircasePackWidth * ImportScale; }
+        }
+
+        public static float StaircaseRun
+        {
+            get { return StaircasePackRun * ImportScale; }
         }
 
         public static float PackHeightOf(PartModel model)
@@ -40,6 +56,8 @@ namespace Game.Presentation.Pure
                     return ChestPackHeight;
                 case PartModel.Candles:
                     return CandlesPackHeight;
+                case PartModel.Staircase:
+                    return StaircasePackHeight;
                 case PartModel.None:
                     throw new ArgumentOutOfRangeException(
                         nameof(model), model, "A part with no model has no mesh to measure.");
