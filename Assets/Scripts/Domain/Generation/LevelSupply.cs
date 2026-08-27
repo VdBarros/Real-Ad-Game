@@ -36,6 +36,8 @@ namespace Game.Domain
 
         public LevelGenerationReport LastReport { get; private set; }
 
+        public LevelPlan LastPlan { get; private set; }
+
         public int DrawsFailed
         {
             get { return SeedsSpent - LevelsDrawn; }
@@ -52,12 +54,21 @@ namespace Game.Domain
             return Scattered(openingSeed, levelNumber);
         }
 
+        public LevelPlan PlanOf(int levelNumber)
+        {
+            return LevelPlan.For(preset, levelNumber);
+        }
+
         public PlacedLevel Draw()
         {
             SeedsSpent++;
 
+            var plan = PlanOf(SeedsSpent);
+            LastPlan = plan;
+
             LevelGenerationReport report;
-            var level = LevelGenerator.Generate(SeedOf(SeedsSpent), preset, out report);
+            var level = LevelGenerator.Generate(
+                SeedOf(SeedsSpent), plan.Preset, plan.Recipe, plan.Tuning, out report);
 
             LevelsDrawn++;
             LastReport = report;

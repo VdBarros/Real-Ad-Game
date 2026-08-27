@@ -262,7 +262,7 @@ namespace Game.Flow
         {
             var generating = cycle.Generating();
             var graph = drawn.Graph;
-            var root = world.Build(graph);
+            var root = world.Build(graph, drawn.StartingPower);
 
             rig.Begin(graph);
 
