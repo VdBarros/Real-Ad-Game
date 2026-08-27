@@ -17,6 +17,8 @@ namespace Game.Flow
 
         ResultScreen screen;
 
+        RecentreButton button;
+
         LevelSupply supply;
 
         ICutscene cutscene;
@@ -61,6 +63,7 @@ namespace Game.Flow
             world = new WorldBuilder();
             rig = CameraRig.Raise();
             screen = ResultScreen.Raise(Next);
+            button = RecentreButton.Raise(Recentre);
             cycle = GameCycle.Booting;
         }
 
@@ -104,6 +107,11 @@ namespace Game.Flow
             get { return screen; }
         }
 
+        public RecentreButton Button
+        {
+            get { return button; }
+        }
+
         public TapInput Input
         {
             get { return input; }
@@ -139,6 +147,20 @@ namespace Game.Flow
                     Announce();
                 }
             }
+
+            Offer();
+        }
+
+        public void Recentre()
+        {
+            RequireARun();
+
+            if (input == null)
+            {
+                return;
+            }
+
+            input.LookBack();
         }
 
         public void Next()
@@ -157,6 +179,7 @@ namespace Game.Flow
             Tear();
             Raise(drawn);
             Announce();
+            Offer();
         }
 
         public void Skip()
@@ -204,6 +227,28 @@ namespace Game.Flow
             walker = null;
             level = null;
             bossHasFallen = false;
+
+            Offer();
+        }
+
+        void Offer()
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            var showing = rig != null
+                && input != null
+                && levelRoot != null
+                && RecentreCall.Showing(cycle.Phase, rig.IsAway, rig.IsBusy);
+
+            button.Offer(showing);
+
+            if (input != null)
+            {
+                input.CallShowing = showing;
+            }
         }
 
         void Step(float deltaSeconds)
@@ -328,6 +373,12 @@ namespace Game.Flow
             }
 
             Tear();
+
+            if (button != null)
+            {
+                button.Dispose();
+                button = null;
+            }
 
             if (screen != null)
             {
