@@ -75,6 +75,23 @@ namespace Game.Domain
 
         public double PocketTreasure { get; }
 
+        public PowerTuning Rebased(int startingPower)
+        {
+            if (startingPower == StartingPower)
+            {
+                return this;
+            }
+
+            return new PowerTuning(
+                startingPower,
+                (int)((long)StripTarget * startingPower / StartingPower),
+                EnemyCap,
+                Jitter,
+                BossFactor,
+                GatePreference,
+                PocketTreasure);
+        }
+
         public static PowerTuning For(MazePreset preset)
         {
             if (preset == null)

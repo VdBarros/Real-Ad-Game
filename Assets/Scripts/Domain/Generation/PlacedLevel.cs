@@ -52,10 +52,13 @@ namespace Game.Domain
             Graph = graph;
             Recipe = recipe;
             Tuning = tuning;
+            Plan = new LevelPlan(layout.Preset, recipe, tuning);
             FloorRepairPasses = floorRepairPasses;
             Envelope = envelope;
             Verdict = verdict;
         }
+
+        public LevelPlan Plan { get; }
 
         public MazeLayout Layout { get; }
 
