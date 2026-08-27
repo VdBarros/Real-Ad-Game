@@ -111,9 +111,9 @@ namespace Game.Domain.Tests
             var boss = CharacterCast.MeshOf(PartStyle.Boss);
 
             Assert.That(boss, Is.EqualTo(PartModel.SkeletonMage));
-            Assert.That(CharacterCast.Wears(PartStyle.Boss, boss), Is.True);
-            Assert.That(CharacterCast.Wears(PartStyle.Enemy, boss), Is.False);
-            Assert.That(CharacterCast.Wears(PartStyle.Start, boss), Is.False);
+            Assert.That(CharacterCast.MeshesOf(PartStyle.Boss), Has.Member(boss));
+            Assert.That(CharacterCast.MeshesOf(PartStyle.Enemy), Has.No.Member(boss));
+            Assert.That(CharacterCast.MeshesOf(PartStyle.Start), Has.No.Member(boss));
 
             for (var tier = 0; tier < VisualTier.Count; tier++)
             {
@@ -400,10 +400,12 @@ namespace Game.Domain.Tests
                     var node = placed.Graph.Decisions.Node(locked);
                     var arrival = cheapest[placed.Graph.RegionOf(locked)];
 
-                    if (arrival < 1)
-                    {
-                        continue;
-                    }
+                    Assert.That(
+                        arrival,
+                        Is.GreaterThan(0),
+                        "level " + levelNumber + " node " + locked
+                        + " stands in a region no route arrives at holding power, so no band can be "
+                        + "read against it");
 
                     doors++;
                     var band = EnemyBands.Of(node.Value, arrival);

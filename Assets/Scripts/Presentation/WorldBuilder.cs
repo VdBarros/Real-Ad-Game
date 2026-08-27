@@ -200,7 +200,12 @@ namespace Game.Presentation
         {
             var model = models.Of(part.Model);
             var raised = model != null;
-            worn[part.Name] = raised ? part.Model : PartModel.None;
+
+            if (CharacterCast.IsRole(part.Style))
+            {
+                worn[part.Name] = raised ? part.Model : PartModel.None;
+            }
+
             var instance = raised
                 ? UnityEngine.Object.Instantiate(model)
                 : GameObject.CreatePrimitive(PrimitiveOf(part.Shape));

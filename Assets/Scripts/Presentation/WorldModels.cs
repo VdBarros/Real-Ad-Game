@@ -141,11 +141,6 @@ namespace Game.Presentation
             return worn.Count > 0;
         }
 
-        public PartModel Worn(PartStyle style)
-        {
-            return Worn(PartModels.Of(style));
-        }
-
         public PartModel Worn(PartModel wanted)
         {
             return Of(wanted) == null ? PartModel.None : wanted;

@@ -85,20 +85,5 @@ namespace Game.Presentation.Pure
 
             return worn;
         }
-
-        public static bool Wears(PartStyle role, PartModel mesh)
-        {
-            var worn = MeshesOf(role);
-
-            for (var slot = 0; slot < worn.Count; slot++)
-            {
-                if (worn[slot] == mesh)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
     }
 }
