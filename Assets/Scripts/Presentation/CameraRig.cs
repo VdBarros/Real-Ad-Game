@@ -23,6 +23,11 @@ namespace Game.Presentation
             get { return staged && staging.IsBusy; }
         }
 
+        public bool IsAway
+        {
+            get { return staged && staging.IsAway; }
+        }
+
         public CameraFraming Framing
         {
             get { return applied; }
@@ -73,6 +78,12 @@ namespace Game.Presentation
         {
             RequireALevel();
             Stage(staging.Looks(offset));
+        }
+
+        public void LookHeld()
+        {
+            RequireALevel();
+            Stage(staging.LookHeld());
         }
 
         public void LookBack()
