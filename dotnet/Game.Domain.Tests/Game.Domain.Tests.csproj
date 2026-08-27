@@ -3,14 +3,17 @@
   <!-- The only runnable project in the fast loop: `dotnet test dotnet/Game.Domain.Tests`.
        A test host cannot target netstandard2.1, so this project carries a runnable
        TFM while the code under test lives in Game.Domain and Game.Presentation.Pure,
-       both pinned to Unity's netstandard2.1. Two guards cover what that TFM would
-       otherwise let through: Directory.Build.props pins the language to C# 9, and
-       Game.Domain.Tests.Conformance recompiles these same sources at netstandard2.1
-       so a BCL API Unity lacks fails here rather than in the Editor.
-       NUnit is held at 3.x because Unity 6000.5.9f1 ships nunit.framework 3.5.0.0;
-       NUnit 4 would let tests compile here and fail in the Editor. 3.14 is the
-       closest runnable match, not an exact one — it is still possible to use an
-       API added between 3.5 and 3.14. -->
+       both pinned to Unity's netstandard2.1. The NUnit here is runnable rather
+       than Editor-accurate for the same reason: Unity ships nunit.framework
+       3.5.0.0, whose assemblies are .NET Framework only and cannot load under
+       this test host at all, so the suite runs against FastLoopNUnitVersion.
+       Three guards cover what those widenings would otherwise let through:
+       Directory.Build.props pins the language to C# 9;
+       Game.Domain.Tests.Conformance recompiles these same sources at Unity's
+       netstandard2.1 against Unity's NUnit 3.5, so a BCL API Unity lacks and an
+       NUnit API added after 3.5 both fail here rather than in the Editor; and
+       NUnitApiProbe fails CI if UnityNUnitVersion ever drifts past 3.5, which
+       would leave the conformance compile guarding nothing. -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -32,7 +35,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit" Version="$(FastLoopNUnitVersion)" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
   </ItemGroup>
 
