@@ -196,6 +196,71 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void ASupplyReadsTheDifficultyOfALevelOffItsOwnCounter()
+        {
+            var supply = new LevelSupply(Opening, MazePreset.Ship);
+
+            for (var level = 1; level <= Cycles; level++)
+            {
+                Assert.That(supply.PlanOf(level).StartingPower, Is.EqualTo(LevelPlan.StartingPowerAt(level)));
+            }
+
+            Assert.That(supply.LastPlan, Is.Null);
+
+            supply.Draw();
+
+            Assert.That(supply.LastPlan, Is.Not.Null);
+            Assert.That(supply.LastPlan.StartingPower, Is.EqualTo(LevelPlan.StartingPowerAt(1)));
+
+            supply.Draw();
+
+            Assert.That(supply.LastPlan.StartingPower, Is.EqualTo(LevelPlan.StartingPowerAt(2)));
+        }
+
+        [Test]
+        public void TheFirstDrawIsTheFrozenOpeningPlan()
+        {
+            var supply = new LevelSupply(Opening, MazePreset.Ship);
+            var first = supply.Draw();
+
+            Assert.That(first.Recipe, Is.SameAs(ContentRecipe.Ship));
+            Assert.That(first.Tuning, Is.SameAs(PowerTuning.Ship));
+            Assert.That(first.Plan.Preset, Is.SameAs(MazePreset.Ship));
+        }
+
+        [Test]
+        public void TwentyDrawsOffOneOpeningSeedClimbTheCurve()
+        {
+            var supply = new LevelSupply(Opening, MazePreset.Ship);
+            var powers = new List<int>();
+
+            for (var level = 1; level <= Cycles; level++)
+            {
+                var placed = supply.Draw();
+
+                Assert.That(placed.Verdict.IsSafe, Is.True);
+                Assert.That(placed.StartingPower, Is.EqualTo(LevelPlan.StartingPowerAt(level)));
+                powers.Add(placed.StartingPower);
+            }
+
+            Assert.That(new HashSet<int>(powers).Count, Is.GreaterThan(1), "Twenty levels opened on one power.");
+            Assert.That(powers[Cycles - 1], Is.GreaterThan(powers[0]));
+        }
+
+        [Test]
+        public void APlanKeyedDrawIsStillTheSameLevelASeedKeyedOneWouldBe()
+        {
+            var supply = new LevelSupply(Opening, MazePreset.Ship);
+            var plan = supply.PlanOf(1);
+            LevelGenerationReport report;
+            var drawn = supply.Draw();
+            var direct = LevelGenerator.Generate(supply.SeedOf(1), plan.Preset, plan.Recipe, plan.Tuning, out report);
+
+            Assert.That(drawn.AttemptSeed, Is.EqualTo(direct.AttemptSeed));
+            Assert.That(drawn.BossPower, Is.EqualTo(direct.BossPower));
+        }
+
+        [Test]
         public void ADrawThatLandsCountsAsBothASeedSpentAndALevelDrawn()
         {
             var supply = new LevelSupply(Opening, MazePreset.Ship);

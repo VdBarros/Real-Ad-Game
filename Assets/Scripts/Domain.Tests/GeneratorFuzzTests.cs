@@ -11,6 +11,8 @@ namespace Game.Domain.Tests
 
         const int ShipSeeds = 5000;
 
+        const int PlanSeeds = 1000;
+
         const int MutatedLevels = 400;
 
         const int ShipOracleSample = 6;
@@ -23,6 +25,8 @@ namespace Game.Domain.Tests
 
         static readonly Dictionary<string, FuzzSweep> SweepByPreset = new Dictionary<string, FuzzSweep>();
 
+        static readonly Dictionary<int, FuzzSweep> SweepByLevel = new Dictionary<int, FuzzSweep>();
+
         static MutationSweep mutants;
 
         static IEnumerable<MazePreset> EveryPreset()
@@ -31,10 +35,88 @@ namespace Game.Domain.Tests
             yield return MazePreset.Ship;
         }
 
+        static IEnumerable<int> EveryPlanOnTheCurve()
+        {
+            yield return 1;
+            yield return 7;
+            yield return LevelPlan.PlateauLevel;
+            yield return 20;
+        }
+
         [TestCaseSource(nameof(EveryPreset))]
         public void TheValidatorClearsEveryAcceptedLevel(MazePreset preset)
         {
-            foreach (var accepted in Sweep(preset).Accepted)
+            TheValidatorClears(Sweep(preset));
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheValidatorClearsEveryLevelOnEveryPlan(int levelNumber)
+        {
+            TheValidatorClears(PlanSweep(levelNumber));
+        }
+
+        [TestCaseSource(nameof(EveryPreset))]
+        public void NoPolicyOnThePanelStrandsAnAcceptedLevel(MazePreset preset)
+        {
+            NoPolicyOnThePanelStrands(Sweep(preset));
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void NoPolicyOnThePanelStrandsALevelOnAnyPlan(int levelNumber)
+        {
+            NoPolicyOnThePanelStrands(PlanSweep(levelNumber));
+        }
+
+        [TestCaseSource(nameof(EveryPreset))]
+        public void EveryBossStaysUnderTheBoundInvariantBDerivesItFrom(MazePreset preset)
+        {
+            EveryBossStaysUnderItsBound(Sweep(preset));
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void EveryBossOnEveryPlanStaysUnderTheBoundInvariantBDerivesItFrom(int levelNumber)
+        {
+            EveryBossStaysUnderItsBound(PlanSweep(levelNumber));
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheRejectionRateOfEveryPlanStaysUnderTheBar(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            Assert.That(
+                sweep.RejectionRate,
+                Is.LessThan(RejectionBar),
+                sweep.Name + " rejected " + sweep.Rejections + " of " + sweep.Attempts + " attempts.");
+        }
+
+        [Test]
+        public void TheSeaOfOnesThinsAsTheCurveClimbs()
+        {
+            var opening = PlanSweep(1);
+            var plateau = PlanSweep(LevelPlan.PlateauLevel);
+
+            Assert.That(
+                plateau.ShareOfEnemiesAtOne(),
+                Is.LessThan(opening.ShareOfEnemiesAtOne()),
+                "opening " + opening.EnemyNumbers() + "; plateau " + plateau.EnemyNumbers());
+        }
+
+        [Test]
+        public void ThePlanSweepReportsWhatItMeasured()
+        {
+            foreach (var levelNumber in EveryPlanOnTheCurve())
+            {
+                var sweep = PlanSweep(levelNumber);
+                Console.WriteLine(sweep + ", " + sweep.Plan);
+                Console.WriteLine("  spread P_max/P_min " + sweep.Spread());
+                Console.WriteLine("  enemy numbers " + sweep.EnemyNumbers());
+            }
+        }
+
+        static void TheValidatorClears(FuzzSweep sweep)
+        {
+            foreach (var accepted in sweep.Accepted)
             {
                 Assert.That(
                     accepted.Verdict.IsSafe,
@@ -43,10 +125,9 @@ namespace Game.Domain.Tests
             }
         }
 
-        [TestCaseSource(nameof(EveryPreset))]
-        public void NoPolicyOnThePanelStrandsAnAcceptedLevel(MazePreset preset)
+        static void NoPolicyOnThePanelStrands(FuzzSweep sweep)
         {
-            foreach (var accepted in Sweep(preset).Accepted)
+            foreach (var accepted in sweep.Accepted)
             {
                 foreach (var policy in AdversaryPanel.Policies)
                 {
@@ -58,10 +139,9 @@ namespace Game.Domain.Tests
             }
         }
 
-        [TestCaseSource(nameof(EveryPreset))]
-        public void EveryBossStaysUnderTheBoundInvariantBDerivesItFrom(MazePreset preset)
+        static void EveryBossStaysUnderItsBound(FuzzSweep sweep)
         {
-            foreach (var accepted in Sweep(preset).Accepted)
+            foreach (var accepted in sweep.Accepted)
             {
                 var level = accepted.Level;
 
@@ -158,27 +238,48 @@ namespace Game.Domain.Tests
             }
 
             var seeds = preset.Name == MazePreset.Ship.Name ? ShipSeeds : TinySeeds;
-            sweep = new FuzzSweep(preset, seeds);
+            sweep = Walked(new FuzzSweep(preset.Name, LevelPlan.For(preset, 1), seeds));
+
+            SweepByPreset.Add(preset.Name, sweep);
+            return sweep;
+        }
+
+        static FuzzSweep PlanSweep(int levelNumber)
+        {
+            FuzzSweep sweep;
+            if (SweepByLevel.TryGetValue(levelNumber, out sweep))
+            {
+                return sweep;
+            }
+
+            sweep = Walked(new FuzzSweep("level " + levelNumber, LevelPlan.For(levelNumber), PlanSeeds));
+
+            SweepByLevel.Add(levelNumber, sweep);
+            return sweep;
+        }
+
+        static FuzzSweep Walked(FuzzSweep sweep)
+        {
+            var plan = sweep.Plan;
             var clock = new Stopwatch();
 
-            for (var seed = 1; seed <= seeds; seed++)
+            for (var seed = 1; seed <= sweep.Seeds; seed++)
             {
                 LevelGenerationReport report;
                 clock.Restart();
 
                 try
                 {
-                    var level = LevelGenerator.Generate(seed, preset, out report);
+                    var level = LevelGenerator.Generate(seed, plan.Preset, plan.Recipe, plan.Tuning, out report);
                     clock.Stop();
                     sweep.Took(level, report, clock.Elapsed.TotalMilliseconds);
                 }
                 catch (LevelGenerationException exhausted)
                 {
-                    Assert.Fail("Seed " + seed + " on " + preset.Name + ": " + exhausted.Message);
+                    Assert.Fail("Seed " + seed + " on " + sweep.Name + ": " + exhausted.Message);
                 }
             }
 
-            SweepByPreset.Add(preset.Name, sweep);
             return sweep;
         }
 

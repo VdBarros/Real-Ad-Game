@@ -38,7 +38,16 @@ namespace Game.Presentation
                 throw new ArgumentNullException(nameof(graph));
             }
 
-            var startingPower = PowerTuning.For(MazePreset.Named(graph.Preset)).StartingPower;
+            return Build(graph, LevelPlan.For(MazePreset.Named(graph.Preset), 1).StartingPower);
+        }
+
+        public GameObject Build(LevelGraph graph, int startingPower)
+        {
+            if (graph == null)
+            {
+                throw new ArgumentNullException(nameof(graph));
+            }
+
             var blueprint = LevelBlueprintBuilder.Build(graph);
             var badges = BadgeBlueprintBuilder.Build(graph, startingPower);
             var root = new GameObject(blueprint.RootName);
