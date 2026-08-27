@@ -1,0 +1,99 @@
+using System;
+using Game.Presentation.Pure;
+using UnityEngine;
+
+namespace Game.Presentation
+{
+    public sealed class WorldModels : IDisposable
+    {
+        public const string ResourcesFolder = "Dungeon";
+
+        const string NoMeshIsCommittedYet = null;
+
+        readonly GameObject[] byModel;
+
+        readonly bool[] looked;
+
+        bool disposed;
+
+        public WorldModels()
+        {
+            var models = Enum.GetValues(typeof(PartModel)).Length;
+            byModel = new GameObject[models];
+            looked = new bool[models];
+        }
+
+        public GameObject Of(PartModel model)
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(WorldModels));
+            }
+
+            if (model == PartModel.None)
+            {
+                return null;
+            }
+
+            var slot = (int)model;
+            if (!looked[slot])
+            {
+                looked[slot] = true;
+                byModel[slot] = Load(model);
+
+                if (byModel[slot] == null)
+                {
+                    UnityEngine.Debug.LogWarning(
+                        "Part model " + model + " resolves to nothing loadable under Resources/" + ResourcesFolder
+                        + ", so every part that wants it falls back to the primitive its part shape names.");
+                }
+            }
+
+            return byModel[slot];
+        }
+
+        public static string AssetPathOf(PartModel model)
+        {
+            var asset = AssetNameOf(model);
+
+            return string.IsNullOrEmpty(asset) ? null : ResourcesFolder + "/" + asset;
+        }
+
+        static GameObject Load(PartModel model)
+        {
+            var path = AssetPathOf(model);
+
+            return path == null ? null : Resources.Load<GameObject>(path);
+        }
+
+        static string AssetNameOf(PartModel model)
+        {
+            switch (model)
+            {
+                case PartModel.None:
+                    return null;
+                case PartModel.FloorTile:
+                    return NoMeshIsCommittedYet;
+                case PartModel.WallPanel:
+                    return NoMeshIsCommittedYet;
+                case PartModel.Chest:
+                    return NoMeshIsCommittedYet;
+                case PartModel.Candles:
+                    return NoMeshIsCommittedYet;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(model), model, "No asset name for that part model.");
+            }
+        }
+
+        public void Dispose()
+        {
+            for (var slot = 0; slot < byModel.Length; slot++)
+            {
+                byModel[slot] = null;
+                looked[slot] = false;
+            }
+
+            disposed = true;
+        }
+    }
+}
