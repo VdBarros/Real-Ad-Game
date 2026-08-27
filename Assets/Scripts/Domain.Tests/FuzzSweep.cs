@@ -107,6 +107,115 @@ namespace Game.Domain.Tests
                 + "% at 1, over " + enemies.Count + " enemies";
         }
 
+        public string SpineReach()
+        {
+            var reach = new List<double>();
+            var content = 0;
+            var onTheSpine = 0;
+            var reaching = 0;
+
+            foreach (var level in accepted)
+            {
+                var spine = Spine.Of(level.Level.Graph, level.Level.Tuning);
+                var slots = 0;
+                foreach (var node in level.Level.Graph.Decisions.Nodes)
+                {
+                    if (node.Type == NodeType.Enemy
+                        || node.Type == NodeType.Additive
+                        || node.Type == NodeType.Multiplier)
+                    {
+                        slots++;
+                    }
+                }
+
+                content += slots;
+                onTheSpine += spine.Length;
+                reach.Add(slots == 0 ? 0.0 : (double)spine.Length / slots);
+                if (spine.ReachesTheBoss)
+                {
+                    reaching++;
+                }
+            }
+
+            reach.Sort();
+            return "holds " + onTheSpine + " of " + content + " content nodes ("
+                + SweepStatistics.Round(100.0 * onTheSpine / content) + "%), p50 share "
+                + SweepStatistics.Round(SweepStatistics.Percentile(reach, 0.5))
+                + ", " + SweepStatistics.Round(100.0 * reaching / accepted.Count) + "% afford the boss";
+        }
+
+        public string Locks()
+        {
+            var perLevel = new List<double>();
+            var holding = 0;
+            foreach (var level in accepted)
+            {
+                var count = Elites.Of(level.Level.Graph, level.Level.Tuning).Count;
+                perLevel.Add(count);
+                if (count > 0)
+                {
+                    holding++;
+                }
+            }
+
+            perLevel.Sort();
+            return "p50 " + SweepStatistics.Percentile(perLevel, 0.5)
+                + " p90 " + SweepStatistics.Percentile(perLevel, 0.9)
+                + " an accepted level, " + SweepStatistics.Round(100.0 * holding / accepted.Count)
+                + "% of levels hold one, deepest lock " + DeepestLock();
+        }
+
+        public string DeepestLock()
+        {
+            var depths = new List<double>();
+            foreach (var level in accepted)
+            {
+                depths.Add(DeepestLockOn(level.Level));
+            }
+
+            depths.Sort();
+            return "p50 " + SweepStatistics.Round(SweepStatistics.Percentile(depths, 0.5))
+                + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(depths, 0.9)) + " times P_min";
+        }
+
+        public double MedianDeepestLock()
+        {
+            var depths = new List<double>();
+            foreach (var level in accepted)
+            {
+                depths.Add(DeepestLockOn(level.Level));
+            }
+
+            depths.Sort();
+            return SweepStatistics.Percentile(depths, 0.5);
+        }
+
+        static double DeepestLockOn(PlacedLevel level)
+        {
+            var cheapestEntry = new Dictionary<int, int>();
+            foreach (var region in level.Envelope.Regions)
+            {
+                cheapestEntry[region.RegionId] = region.CheapestEntry;
+            }
+
+            var deepest = 0.0;
+            foreach (var node in level.Graph.Decisions.Nodes)
+            {
+                if (node.Type != NodeType.Enemy)
+                {
+                    continue;
+                }
+
+                int entry;
+                if (cheapestEntry.TryGetValue(level.Graph.RegionOf(node.Id), out entry) && entry > 0)
+                {
+                    deepest = Math.Max(deepest, (double)node.Value / entry);
+                }
+            }
+
+            return deepest;
+        }
+
         public double ShareOfEnemiesAtOne()
         {
             var enemies = EnemyValues();

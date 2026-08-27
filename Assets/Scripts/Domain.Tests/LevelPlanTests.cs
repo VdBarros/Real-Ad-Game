@@ -33,6 +33,49 @@ namespace Game.Domain.Tests
             Assert.That(() => LevelPlan.For(0), Throws.InstanceOf<ArgumentOutOfRangeException>());
             Assert.That(() => LevelPlan.For(-1), Throws.InstanceOf<ArgumentOutOfRangeException>());
             Assert.That(() => LevelPlan.StartingPowerAt(0), Throws.InstanceOf<ArgumentOutOfRangeException>());
+            Assert.That(() => LevelPlan.EliteFractionAt(0), Throws.InstanceOf<ArgumentOutOfRangeException>());
+        }
+
+        [Test]
+        public void TheOpeningPlanAsksForNoLocksAtAll()
+        {
+            Assert.That(LevelPlan.EliteFractionAt(1), Is.EqualTo(0.0));
+            Assert.That(LevelPlan.For(1).EliteFraction, Is.EqualTo(0.0));
+        }
+
+        [Test]
+        public void TheShareOfLocksClimbsAtEveryLevelUpToThePlateau()
+        {
+            for (var level = 2; level <= LevelPlan.PlateauLevel; level++)
+            {
+                Assert.That(
+                    LevelPlan.EliteFractionAt(level),
+                    Is.GreaterThan(LevelPlan.EliteFractionAt(level - 1)),
+                    "Level " + level + " asks for no more locks than the level before it.");
+            }
+        }
+
+        [Test]
+        public void ThePlateauMintsEveryOffSpineEnemyRich()
+        {
+            Assert.That(LevelPlan.PlateauEliteFraction, Is.EqualTo(1.0));
+
+            for (var level = LevelPlan.PlateauLevel; level <= WellPastThePlateau; level++)
+            {
+                Assert.That(LevelPlan.EliteFractionAt(level), Is.EqualTo(LevelPlan.PlateauEliteFraction));
+            }
+        }
+
+        [Test]
+        public void TheShareOfLocksIsAuthoredOnThePlanRatherThanLeftToTheSeed()
+        {
+            for (var level = 1; level <= WellPastThePlateau; level++)
+            {
+                var plan = LevelPlan.For(level);
+
+                Assert.That(plan.EliteFraction, Is.EqualTo(LevelPlan.EliteFractionAt(level)));
+                Assert.That(plan.Tuning.EliteFraction, Is.EqualTo(plan.EliteFraction));
+            }
         }
 
         [Test]
@@ -126,7 +169,7 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void APlanMovesNothingButThePowerTheRunOpensWith()
+        public void APlanMovesThePowerARunOpensOnAndTheShareOfLocksAndNothingElse()
         {
             for (var level = 1; level <= WellPastThePlateau; level++)
             {
