@@ -82,10 +82,7 @@ namespace Game.EditorTooling
                 Fail("The recentre button was showing the frame play began, with nothing panned away.");
             }
 
-            if (loop.Input.CallShowing)
-            {
-                Fail("The tap reader was told to swallow presses with no button on screen.");
-            }
+            TheButtonAndTheReaderAgree(loop, "the first frame of play");
 
             var resting = LevelFraming.Play(LevelFraming.StartPoint(loop.Level.Graph));
             var settled = 0;
@@ -133,10 +130,7 @@ namespace Game.EditorTooling
                     + " and no recentre button appeared.");
             }
 
-            if (!loop.Input.CallShowing)
-            {
-                Fail("The button was on screen and the tap reader was not told to keep clear of it.");
-            }
+            TheButtonAndTheReaderAgree(loop, "a drag off the player");
 
             APressOnTheButtonLeavesTheMazeAlone(loop, report);
             TheButtonLeavesOnArrivalAndNotOnTheTap(loop, resting, report);
@@ -261,10 +255,19 @@ namespace Game.EditorTooling
                     + " frame, which is the tap and not the camera's arrival.");
             }
 
-            if (loop.Input.CallShowing)
+            TheButtonAndTheReaderAgree(loop, "the camera's arrival");
+        }
+
+        static void TheButtonAndTheReaderAgree(GameLoop loop, string moment)
+        {
+            if (loop.Button.IsShowing == loop.Input.CallShowing)
             {
-                Fail("The button was gone and the tap reader was still told to keep clear of it.");
+                return;
             }
+
+            Fail("At " + moment + " the button is " + (loop.Button.IsShowing ? "showing" : "gone")
+                + " and the tap reader was told the call is "
+                + (loop.Input.CallShowing ? "showing" : "gone") + ".");
         }
 
         static void ACommittedTapTakesTheButtonAwayUntapped(GameLoop loop, StringBuilder report)
