@@ -12,7 +12,7 @@ namespace Game.Presentation.Pure
             {
                 case PartModel.WallPanel:
                 case PartModel.Chest:
-                case PartModel.Candles:
+                case PartModel.CoinStack:
                     return new WorldPoint(
                         part.Position.X, part.Position.Y - part.Scale.Y * 0.5f, part.Position.Z);
                 case PartModel.Staircase:
@@ -36,7 +36,7 @@ namespace Game.Presentation.Pure
                     return new WorldPoint(part.Rotation.X, part.Rotation.Y + ChestFacing, part.Rotation.Z);
                 case PartModel.None:
                 case PartModel.WallPanel:
-                case PartModel.Candles:
+                case PartModel.CoinStack:
                 case PartModel.Staircase:
                     return part.Rotation;
                 default:
@@ -54,7 +54,7 @@ namespace Game.Presentation.Pure
                 case PartModel.WallPanel:
                     return Spanning(part);
                 case PartModel.Chest:
-                case PartModel.Candles:
+                case PartModel.CoinStack:
                     return Fitted(part);
                 case PartModel.Staircase:
                     return Stepped(part);

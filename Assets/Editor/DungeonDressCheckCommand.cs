@@ -25,13 +25,37 @@ namespace Game.EditorTooling
 
         const float OcclusionBound = 0.5f;
 
+        const float FootprintShare = 0.3f;
+
+        const float ToneContrast = 1.5f;
+
+        const float ShotDistance = 60f;
+
+        const int ChannelTolerance = 8;
+
+        const int AloneLayer = 31;
+
+        const int Cursed = 0;
+
+        const int Cleared = 1;
+
+        const int Rounds = 2;
+
+        const string AdditiveShot = "dev/scratch/t-30-additive.png";
+
+        const string MultiplierShot = "dev/scratch/t-30-multiplier.png";
+
+        const string ClearedShot = "dev/scratch/t-30-multiplier-cleared.png";
+
+        const string FloorShot = "dev/scratch/t-30-floor-only.png";
+
         const int Complaints = 6;
 
         public static void Check()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            var report = new StringBuilder("t-22 walls and props, ship seed ")
+            var report = new StringBuilder("t-22/t-30 walls and props, ship seed ")
                 .Append(Seed.ToString(CultureInfo.InvariantCulture))
                 .Append(':');
             var failures = 0;
@@ -44,7 +68,7 @@ namespace Game.EditorTooling
                 failures += Built(models, report);
             }
 
-            report.Append("\n  t-22: ")
+            report.Append("\n  t-22/t-30: ")
                 .Append(failures == 0
                     ? "every assertion above held"
                     : failures + (failures == 1 ? " assertion" : " assertions") + " above failed");
@@ -300,6 +324,7 @@ namespace Game.EditorTooling
             failures += EveryWallLandsOnItsTileEdge(graph, byName, report);
             failures += EveryPropStandsOnItsTile(graph, byName, report);
             failures += TheRewardsReadApart(graph, byName, report);
+            failures += TheRewardsReadAgainstTheFloor(root, graph, byName, report);
             failures += TheMaterialsStayFlat(root, report);
 
             WorldObjects.Destroy(root);
@@ -596,9 +621,9 @@ namespace Game.EditorTooling
             LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
             var chest = Footprint(graph, byName, PartModel.Chest);
-            var candles = Footprint(graph, byName, PartModel.Candles);
+            var hoard = Footprint(graph, byName, PartModels.Of(PartStyle.Multiplier));
 
-            if (chest.size == Vector3.zero || candles.size == Vector3.zero)
+            if (chest.size == Vector3.zero || hoard.size == Vector3.zero)
             {
                 return Assert(
                     report,
@@ -607,23 +632,354 @@ namespace Game.EditorTooling
                     "the world raised no pair to compare");
             }
 
-            var tall = Math.Abs(chest.size.y - candles.size.y) <= Epsilon;
-            var wide = chest.size.x >= candles.size.x * SilhouetteRatio;
+            var chestGround = chest.size.x * chest.size.z;
+            var hoardGround = hoard.size.x * hoard.size.z;
+            var tall = Math.Abs(chest.size.y - hoard.size.y) <= Epsilon;
+            var apart = Math.Min(chestGround, hoardGround) > 0f
+                && Math.Max(chestGround, hoardGround)
+                >= Math.Min(chestGround, hoardGround) * SilhouetteRatio;
+            var failures = 0;
 
-            return Assert(
+            failures += Assert(
                 report,
-                tall && wide,
-                "the two reward kinds stand the same height and read apart by width alone",
+                tall && apart,
+                "the two reward kinds stand the same height and cover different ground, so a scan tells "
+                + "an additive from a multiplier by shape",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "the chest is {0:0.###} wide and {1:0.###} tall against the candle group's "
-                    + "{2:0.###} by {3:0.###}, a width ratio of {4:0.##} against the {5:0.##} asked for",
+                    "the chest is {0:0.###} by {1:0.###} on the ground and {2:0.###} tall against the "
+                    + "multiplier prop's {3:0.###} by {4:0.###} by {5:0.###}, a ground ratio of {6:0.##} "
+                    + "against the {7:0.##} asked for",
                     chest.size.x,
+                    chest.size.z,
                     chest.size.y,
-                    candles.size.x,
-                    candles.size.y,
-                    candles.size.x <= 0f ? 0f : chest.size.x / candles.size.x,
+                    hoard.size.x,
+                    hoard.size.z,
+                    hoard.size.y,
+                    Math.Min(chestGround, hoardGround) <= 0f
+                        ? 0f
+                        : Math.Max(chestGround, hoardGround) / Math.Min(chestGround, hoardGround),
                     SilhouetteRatio));
+
+            var edge = IsoProjection.TileEdge;
+            var widest = Math.Max(
+                Math.Max(chest.size.x, chest.size.z), Math.Max(hoard.size.x, hoard.size.z));
+
+            failures += Assert(
+                report,
+                widest <= edge,
+                "neither reward prop spills off the tile it stands on once the fit-to-cube rule has "
+                + "stretched it",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the wider of the two spans {0:0.###} of a {1:0.###} tile edge",
+                    widest,
+                    edge));
+
+            return failures;
+        }
+
+        static int TheRewardsReadAgainstTheFloor(
+            GameObject root, LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            PreviewFilm.Sun();
+            var badges = Unbadge(root);
+
+            var multiplier = new Reading[Rounds];
+            var additive = new Reading[Rounds];
+
+            multiplier[Cursed] = Photograph(
+                graph, byName, PartStyle.Multiplier, "multiplier", MultiplierShot, FloorShot);
+            additive[Cursed] = Photograph(graph, byName, PartStyle.Additive, "additive", AdditiveShot, null);
+
+            Material cursed;
+            var repainted = Repaint(root, out cursed);
+
+            multiplier[Cleared] = Photograph(
+                graph, byName, PartStyle.Multiplier, "multiplier", ClearedShot, null);
+            additive[Cleared] = Photograph(graph, byName, PartStyle.Additive, "additive", null, null);
+
+            foreach (var renderer in repainted)
+            {
+                renderer.sharedMaterial = cursed;
+            }
+
+            foreach (var group in badges)
+            {
+                group.SetActive(true);
+            }
+
+            var failures = Assert(
+                report,
+                repainted.Count > 0,
+                "the world offers a cleared floor to photograph a prop against as well as a cursed one",
+                repainted.Count + " floor renderers were repainted cleared for a second round");
+
+            if (!multiplier[Cursed].Found || !additive[Cursed].Found)
+            {
+                return failures + Assert(
+                    report,
+                    false,
+                    "both reward props stand somewhere the gameplay camera can photograph them",
+                    "the ship seed raised no pair to photograph");
+            }
+
+            var tile = ScreenFrame.TileGroundPixels(IsoProjection.OrthographicSize);
+
+            report.Append("\n  at gameplay zoom ")
+                .Append(IsoProjection.OrthographicSize.ToString("0.#", CultureInfo.InvariantCulture))
+                .Append(" one tile of ground covers ")
+                .Append(tile.ToString("0", CultureInfo.InvariantCulture))
+                .Append(" of the ")
+                .Append(ScreenFrame.Width * ScreenFrame.Height)
+                .Append(" pixels in frame");
+
+            failures += ReadsAgainstTheFloor(report, multiplier, tile);
+            failures += ReadsAgainstTheFloor(report, additive, tile);
+
+            return failures;
+        }
+
+        static int ReadsAgainstTheFloor(StringBuilder report, Reading[] rounds, float tile)
+        {
+            var reading = rounds[Cursed];
+            var failures = 0;
+            var share = tile <= 0f ? 0f : reading.Pixels / tile;
+
+            failures += Assert(
+                report,
+                share >= FootprintShare,
+                "the " + reading.Name + " prop covers at least "
+                + FootprintShare.ToString("0.##", CultureInfo.InvariantCulture)
+                + " of a tile of ground at gameplay zoom, so it is a shape rather than a speck",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "its silhouette covers {0} pixels, {1:0.###} of a tile",
+                    reading.Pixels,
+                    share));
+
+            var worst = Math.Min(rounds[Cursed].Contrast, rounds[Cleared].Contrast);
+
+            failures += Assert(
+                report,
+                worst >= ToneContrast,
+                "the " + reading.Name + " prop reads at least "
+                + ToneContrast.ToString("0.##", CultureInfo.InvariantCulture)
+                + ":1 in tone against the ground and masonry behind it, over a cursed floor and again "
+                + "over a cleared one, so it is never lost in what it stands on",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "over a cursed floor its silhouette averages {0:0.####} relative luminance against the "
+                    + "{1:0.####} of the ground it hides, {2:0.##}:1; over a cleared floor {3:0.####} against "
+                    + "{4:0.####}, {5:0.##}:1",
+                    rounds[Cursed].Prop,
+                    rounds[Cursed].Ground,
+                    rounds[Cursed].Contrast,
+                    rounds[Cleared].Prop,
+                    rounds[Cleared].Ground,
+                    rounds[Cleared].Contrast));
+
+            return failures;
+        }
+
+        static Reading Photograph(
+            LevelGraph graph,
+            IDictionary<string, Transform> byName,
+            PartStyle style,
+            string name,
+            string path,
+            string barePath)
+        {
+            var reading = new Reading { Name = name };
+            var instance = PropOf(graph, byName, PartModels.Of(style));
+
+            if (instance == null)
+            {
+                return reading;
+            }
+
+            var camera = PreviewFilm.Rig(instance.position, ShotDistance, IsoProjection.OrthographicSize);
+            PreviewFilm.Warm(camera);
+
+            var silhouette = Silhouette(instance, camera);
+            PreviewFilm.Warm(camera);
+
+            instance.gameObject.SetActive(false);
+            var bare = PreviewFilm.Frame(camera);
+            instance.gameObject.SetActive(true);
+            var dressed = PreviewFilm.Frame(camera);
+
+            var ground = bare.GetPixels32();
+            var lit = dressed.GetPixels32();
+            var covered = 0;
+            var prop = 0.0;
+            var under = 0.0;
+
+            for (var pixel = 0; pixel < silhouette.Length; pixel++)
+            {
+                if (!silhouette[pixel])
+                {
+                    continue;
+                }
+
+                covered++;
+                prop += Luminance(lit[pixel]);
+                under += Luminance(ground[pixel]);
+            }
+
+            reading.Found = true;
+            reading.Pixels = covered;
+            reading.Prop = covered == 0 ? 0.0 : prop / covered;
+            reading.Ground = covered == 0 ? 0.0 : under / covered;
+
+            PreviewFilm.Save(dressed, path);
+            PreviewFilm.Save(bare, barePath);
+
+            UnityEngine.Object.DestroyImmediate(bare);
+            UnityEngine.Object.DestroyImmediate(dressed);
+            UnityEngine.Object.DestroyImmediate(camera.gameObject);
+
+            return reading;
+        }
+
+        static bool[] Silhouette(Transform instance, Camera camera)
+        {
+            var was = new List<KeyValuePair<GameObject, int>>();
+
+            foreach (var node in instance.GetComponentsInChildren<Transform>(true))
+            {
+                was.Add(new KeyValuePair<GameObject, int>(node.gameObject, node.gameObject.layer));
+                node.gameObject.layer = AloneLayer;
+            }
+
+            var culling = camera.cullingMask;
+            var background = camera.backgroundColor;
+            camera.cullingMask = 1 << AloneLayer;
+
+            camera.backgroundColor = Color.black;
+            var onBlack = PreviewFilm.Frame(camera);
+            camera.backgroundColor = Color.white;
+            var onWhite = PreviewFilm.Frame(camera);
+
+            camera.cullingMask = culling;
+            camera.backgroundColor = background;
+
+            foreach (var node in was)
+            {
+                node.Key.layer = node.Value;
+            }
+
+            var black = onBlack.GetPixels32();
+            var white = onWhite.GetPixels32();
+            var silhouette = new bool[black.Length];
+
+            for (var pixel = 0; pixel < silhouette.Length; pixel++)
+            {
+                silhouette[pixel] = !Changed(black[pixel], white[pixel]);
+            }
+
+            UnityEngine.Object.DestroyImmediate(onBlack);
+            UnityEngine.Object.DestroyImmediate(onWhite);
+
+            return silhouette;
+        }
+
+        static List<Renderer> Repaint(GameObject root, out Material cursed)
+        {
+            var repainted = new List<Renderer>();
+            var cleared = Painted(root, PartStyle.Cleared);
+            cursed = Painted(root, PartStyle.Floor);
+
+            if (cleared == null || cursed == null)
+            {
+                return repainted;
+            }
+
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer.sharedMaterial == cursed)
+                {
+                    renderer.sharedMaterial = cleared;
+                    repainted.Add(renderer);
+                }
+            }
+
+            return repainted;
+        }
+
+        static Material Painted(GameObject root, PartStyle style)
+        {
+            var wanted = WorldMaterials.NamePrefix + style;
+
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                var material = renderer.sharedMaterial;
+
+                if (material != null && material.name == wanted)
+                {
+                    return material;
+                }
+            }
+
+            return null;
+        }
+
+        static bool Changed(Color32 before, Color32 after)
+        {
+            return Math.Abs(before.r - after.r) > ChannelTolerance
+                || Math.Abs(before.g - after.g) > ChannelTolerance
+                || Math.Abs(before.b - after.b) > ChannelTolerance;
+        }
+
+        static double Luminance(Color32 colour)
+        {
+            return 0.2126 * Linear(colour.r) + 0.7152 * Linear(colour.g) + 0.0722 * Linear(colour.b);
+        }
+
+        static double Linear(byte channel)
+        {
+            var value = channel / 255.0;
+
+            return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+        }
+
+        static double ContrastOf(double one, double other)
+        {
+            return (Math.Max(one, other) + 0.05) / (Math.Min(one, other) + 0.05);
+        }
+
+        static List<GameObject> Unbadge(GameObject root)
+        {
+            var hidden = new List<GameObject>();
+
+            foreach (var node in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (node.name == PartNames.BadgesGroup && node.gameObject.activeSelf)
+                {
+                    node.gameObject.SetActive(false);
+                    hidden.Add(node.gameObject);
+                }
+            }
+
+            return hidden;
+        }
+
+        struct Reading
+        {
+            public string Name;
+
+            public bool Found;
+
+            public int Pixels;
+
+            public double Prop;
+
+            public double Ground;
+
+            public double Contrast
+            {
+                get { return ContrastOf(Prop, Ground); }
+            }
         }
 
         static int TheMaterialsStayFlat(GameObject root, StringBuilder report)
@@ -694,6 +1050,14 @@ namespace Game.EditorTooling
         static Bounds Footprint(
             LevelGraph graph, IDictionary<string, Transform> byName, PartModel model)
         {
+            var instance = PropOf(graph, byName, model);
+
+            return instance == null ? new Bounds(Vector3.zero, Vector3.zero) : World(instance);
+        }
+
+        static Transform PropOf(
+            LevelGraph graph, IDictionary<string, Transform> byName, PartModel model)
+        {
             foreach (var node in graph.Decisions.Nodes)
             {
                 WorldPart prop;
@@ -705,11 +1069,11 @@ namespace Game.EditorTooling
                 Transform instance;
                 if (byName.TryGetValue(prop.Name, out instance))
                 {
-                    return World(instance);
+                    return instance;
                 }
             }
 
-            return new Bounds(Vector3.zero, Vector3.zero);
+            return null;
         }
 
         static Bounds Local(GameObject prefab)

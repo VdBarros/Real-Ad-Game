@@ -45,13 +45,13 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AnAdditiveNodeWantsAChestAndAMultiplierWantsCandles()
+        public void AnAdditiveNodeWantsAChestAndAMultiplierWantsACoinStack()
         {
             var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             Assert.That(Prop(graph, blueprint, NodeType.Additive).Model, Is.EqualTo(PartModel.Chest));
-            Assert.That(Prop(graph, blueprint, NodeType.Multiplier).Model, Is.EqualTo(PartModel.Candles));
+            Assert.That(Prop(graph, blueprint, NodeType.Multiplier).Model, Is.EqualTo(PartModel.CoinStack));
         }
 
         [Test]

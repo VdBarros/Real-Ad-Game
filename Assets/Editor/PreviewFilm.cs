@@ -9,6 +9,47 @@ namespace Game.EditorTooling
     {
         public static void Shoot(Camera camera, string path)
         {
+            var frame = Frame(camera);
+
+            Save(frame, path);
+
+            Object.DestroyImmediate(frame);
+        }
+
+        public static void Save(Texture2D frame, string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllBytes(path, frame.EncodeToPNG());
+        }
+
+        public static void Warm(Camera camera)
+        {
+            Object.DestroyImmediate(Frame(camera));
+        }
+
+        public static Camera Rig(Vector3 centre, float distance, float orthographicSize)
+        {
+            var camera = new GameObject("PreviewCamera").AddComponent<Camera>();
+            camera.transform.rotation = Quaternion.Euler(
+                IsoProjection.CameraPitch, IsoProjection.CameraYaw, IsoProjection.CameraRoll);
+            camera.transform.position = centre - camera.transform.forward * distance;
+            camera.orthographic = true;
+            camera.orthographicSize = orthographicSize;
+            camera.nearClipPlane = 0.03f;
+            camera.farClipPlane = distance * 3f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.06f, 0.07f, 0.09f);
+
+            return camera;
+        }
+
+        public static Texture2D Frame(Camera camera)
+        {
             var aspect = camera.aspect;
             camera.aspect = (float)ScreenFrame.Width / ScreenFrame.Height;
 
@@ -28,14 +69,12 @@ namespace Game.EditorTooling
             frame.Apply();
             RenderTexture.active = previous;
 
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllBytes(path, frame.EncodeToPNG());
-
             camera.targetTexture = null;
             camera.aspect = aspect;
-            Object.DestroyImmediate(frame);
             target.Release();
             Object.DestroyImmediate(target);
+
+            return frame;
         }
 
         public static void Sun()

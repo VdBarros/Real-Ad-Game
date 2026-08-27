@@ -21,6 +21,14 @@ namespace Game.Presentation.Pure
             return Height * 0.5f / orthographicSize;
         }
 
+        public static float TileGroundPixels(float orthographicSize)
+        {
+            var perMetre = PixelsPerMetre(orthographicSize);
+            var facing = Math.Abs(IsoProjection.CameraForward.Y);
+
+            return perMetre * perMetre * IsoProjection.TileEdge * IsoProjection.TileEdge * facing;
+        }
+
         public static float PanPixels(CameraFraming from, CameraFraming to)
         {
             var delta = new WorldPoint(

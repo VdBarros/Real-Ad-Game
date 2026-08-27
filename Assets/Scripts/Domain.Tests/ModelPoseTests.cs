@@ -221,15 +221,15 @@ namespace Game.Domain.Tests
         public void TheTwoRewardPropsStandTheSameHeightAndAreFittedByDifferentAmounts()
         {
             var chest = Pickup(PartStyle.Additive);
-            var candles = Pickup(PartStyle.Multiplier);
+            var hoard = Pickup(PartStyle.Multiplier);
 
             Assert.That(chest.Model, Is.EqualTo(PartModel.Chest));
-            Assert.That(candles.Model, Is.EqualTo(PartModel.Candles));
+            Assert.That(hoard.Model, Is.EqualTo(PartModel.CoinStack));
             Assert.That(
                 ModelPose.ScaleOf(chest).Y * DungeonPack.HeightOf(PartModel.Chest),
-                Is.EqualTo(ModelPose.ScaleOf(candles).Y * DungeonPack.HeightOf(PartModel.Candles))
+                Is.EqualTo(ModelPose.ScaleOf(hoard).Y * DungeonPack.HeightOf(PartModel.CoinStack))
                     .Within(Tolerance));
-            Assert.That(ModelPose.ScaleOf(chest).Y, Is.Not.EqualTo(ModelPose.ScaleOf(candles).Y));
+            Assert.That(ModelPose.ScaleOf(chest).Y, Is.Not.EqualTo(ModelPose.ScaleOf(hoard).Y));
         }
 
         [Test]
