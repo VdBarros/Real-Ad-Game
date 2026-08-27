@@ -177,7 +177,7 @@ namespace Game.EditorTooling
 
                 var rigged = ArtPacks.IsRigged(model);
                 var settled = importer.materialImportMode == ModelImporterMaterialImportMode.None
-                    && !importer.importAnimation
+                    && importer.importAnimation == rigged
                     && importer.animationType == (rigged
                         ? CharacterArtPostprocessor.Rig
                         : ModelImporterAnimationType.None)

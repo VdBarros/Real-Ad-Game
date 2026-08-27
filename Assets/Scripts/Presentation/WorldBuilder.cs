@@ -122,9 +122,11 @@ namespace Game.Presentation
 
                     if (part.Style == BadgeStyle.Player)
                     {
+                        var worn = Worn(part.NodeId);
                         playerNumber = badge;
                         playerFigure = prop.gameObject.AddComponent<PlayerFigure>();
-                        playerFigure.Stand(badge.transform, Worn(part.NodeId));
+                        playerFigure.Stand(badge.transform, worn);
+                        FigureAnimator.Raise(playerFigure.gameObject, worn, models);
                     }
                     else if (part.Style == BadgeStyle.Enemy || part.Style == BadgeStyle.Boss)
                     {
