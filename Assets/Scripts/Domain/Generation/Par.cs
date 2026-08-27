@@ -37,20 +37,10 @@ namespace Game.Domain
                 throw new ArgumentNullException(nameof(level));
             }
 
-            var boss = level.BossPower;
-            var floor = level.ShortestPathPower + boss;
-            var bossRegion = level.Graph.RegionOf(level.BossNodeId);
-            var ceiling = floor;
+            var floor = level.ShortestPathPower + level.BossPower;
+            var richest = ParWalk.Richest(level.Graph, level.Tuning, level.BossNodeId);
 
-            foreach (var region in level.Envelope.Regions)
-            {
-                if (region.RegionId == bossRegion)
-                {
-                    ceiling = region.RichestEntry + boss;
-                }
-            }
-
-            return new Par(floor, ceiling);
+            return new Par(floor, richest.BeatsTheBoss ? richest.Finish : floor);
         }
 
         public double PositionOf(int finalPower)
