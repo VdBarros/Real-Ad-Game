@@ -13,7 +13,7 @@ namespace Game.Domain.Tests
         readonly Dictionary<TilePosition, int> valueByPosition = new Dictionary<TilePosition, int>();
         readonly List<TilePosition> joins = new List<TilePosition>();
 
-        public static readonly PowerTuning Tuning = new PowerTuning(2, 200, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1);
+        public static readonly PowerTuning Tuning = new PowerTuning(2, 200, 0.6, 0.2, 0.8, 0.8, 0.7, 0.0, 1.0, 1, false, 0);
 
         public const int StartNodeId = 0;
 

@@ -75,6 +75,66 @@ namespace Game.Domain.Tests
             }
         }
 
+        public int CountOf(LayoutRejection reason)
+        {
+            int running;
+            return layoutReasons.TryGetValue(reason, out running) ? running : 0;
+        }
+
+        public int CountOf(ContentRejection reason)
+        {
+            int running;
+            return contentReasons.TryGetValue(reason, out running) ? running : 0;
+        }
+
+        public int PickupsOffADetour()
+        {
+            var stray = 0;
+            foreach (var level in accepted)
+            {
+                var detours = Detours.Of(level.Level.Graph);
+                foreach (var node in level.Level.Graph.Decisions.Nodes)
+                {
+                    if (node.Type != NodeType.Additive && node.Type != NodeType.Multiplier)
+                    {
+                        continue;
+                    }
+
+                    if (!detours.Holds(node.Id))
+                    {
+                        stray++;
+                    }
+                }
+            }
+
+            return stray;
+        }
+
+        public string Pickups()
+        {
+            var supply = new List<double>();
+            var pickups = 0;
+            foreach (var level in accepted)
+            {
+                supply.Add(Detours.Of(level.Level.Graph).Count);
+                foreach (var node in level.Level.Graph.Decisions.Nodes)
+                {
+                    if (node.Type == NodeType.Additive || node.Type == NodeType.Multiplier)
+                    {
+                        pickups++;
+                    }
+                }
+            }
+
+            supply.Sort();
+            return PickupsOffADetour() + " of " + pickups + " off a detour, detours on offer p10 "
+                + SweepStatistics.Round(SweepStatistics.Percentile(supply, 0.1)) + " p50 "
+                + SweepStatistics.Round(SweepStatistics.Percentile(supply, 0.5)) + " p90 "
+                + SweepStatistics.Round(SweepStatistics.Percentile(supply, 0.9))
+                + ", " + Plan.MinimumOffPathSlots + " off-path slots asked of the layout, "
+                + CountOf(LayoutRejection.TooFewOffPathSlots) + " layouts turned away for holding fewer";
+        }
+
         public string Spread()
         {
             var everywhere = SpreadsEverywhere();
