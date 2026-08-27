@@ -7,6 +7,7 @@ namespace Game.Presentation.Pure
         public WorldPart(
             string name,
             PartShape shape,
+            PartModel model,
             PartStyle style,
             WorldPoint position,
             WorldPoint rotation,
@@ -19,6 +20,7 @@ namespace Game.Presentation.Pure
 
             Name = name;
             Shape = shape;
+            Model = model;
             Style = style;
             Position = position;
             Rotation = rotation;
@@ -28,6 +30,8 @@ namespace Game.Presentation.Pure
         public string Name { get; }
 
         public PartShape Shape { get; }
+
+        public PartModel Model { get; }
 
         public PartStyle Style { get; }
 
@@ -41,6 +45,7 @@ namespace Game.Presentation.Pure
         {
             return string.Equals(Name, other.Name, StringComparison.Ordinal)
                 && Shape == other.Shape
+                && Model == other.Model
                 && Style == other.Style
                 && Position.Equals(other.Position)
                 && Rotation.Equals(other.Rotation)
@@ -58,6 +63,7 @@ namespace Game.Presentation.Pure
             {
                 var hash = Name == null ? 0 : Name.GetHashCode();
                 hash = (hash * 397) ^ (int)Shape;
+                hash = (hash * 397) ^ (int)Model;
                 hash = (hash * 397) ^ (int)Style;
                 hash = (hash * 397) ^ Position.GetHashCode();
                 hash = (hash * 397) ^ Rotation.GetHashCode();
@@ -68,7 +74,8 @@ namespace Game.Presentation.Pure
 
         public override string ToString()
         {
-            return string.Concat(Name, " ", Shape.ToString(), " ", Style.ToString(), " at ", Position.ToString());
+            return string.Concat(
+                Name, " ", Model.ToString(), " ", Shape.ToString(), " ", Style.ToString(), " at ", Position.ToString());
         }
     }
 }

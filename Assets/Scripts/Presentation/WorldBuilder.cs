@@ -13,6 +13,8 @@ namespace Game.Presentation
 
         readonly WorldMaterials materials = new WorldMaterials();
 
+        readonly WorldModels models = new WorldModels();
+
         readonly BadgeAssets badgeAssets = new BadgeAssets();
 
         public PowerBadge PlayerBadge { get; private set; }
@@ -86,7 +88,7 @@ namespace Game.Presentation
                     TilePosition position;
                     if (groundByName.TryGetValue(part.Name, out position))
                     {
-                        Floor.Adopt(position, instance.GetComponent<Renderer>());
+                        Floor.Adopt(position, instance.GetComponentInChildren<Renderer>());
                     }
                 }
 
@@ -181,13 +183,13 @@ namespace Game.Presentation
 
         GameObject Raise(WorldPart part, Transform parent)
         {
-            var instance = GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
+            var instance = Body(part);
             instance.name = part.Name;
             instance.transform.SetParent(parent, worldPositionStays: false);
             instance.transform.localPosition = Vector(part.Position);
             instance.transform.localEulerAngles = Vector(part.Rotation);
             instance.transform.localScale = Vector(part.Scale);
-            instance.GetComponent<Renderer>().sharedMaterial = materials.Of(part.Style);
+            instance.GetComponentInChildren<Renderer>().sharedMaterial = materials.Of(part.Style);
 
             if (part.Style != PartStyle.Floor)
             {
@@ -195,6 +197,15 @@ namespace Game.Presentation
             }
 
             return instance;
+        }
+
+        GameObject Body(WorldPart part)
+        {
+            var model = models.Of(part.Model);
+
+            return model == null
+                ? GameObject.CreatePrimitive(PrimitiveOf(part.Shape))
+                : UnityEngine.Object.Instantiate(model);
         }
 
         static Transform Group(Transform parent, string name)
@@ -227,6 +238,7 @@ namespace Game.Presentation
         public void Dispose()
         {
             materials.Dispose();
+            models.Dispose();
             badgeAssets.Dispose();
         }
     }

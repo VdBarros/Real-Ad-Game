@@ -90,6 +90,7 @@ namespace Game.Presentation.Pure
             return new WorldPart(
                 PartNames.Tile(position),
                 PartShape.Quad,
+                PartModels.Of(PartStyle.Floor),
                 PartStyle.Floor,
                 IsoProjection.Of(position),
                 new WorldPoint(90f, 0f, 0f),
@@ -104,6 +105,7 @@ namespace Game.Presentation.Pure
             return new WorldPart(
                 PartNames.Wall(position, side),
                 PartShape.Quad,
+                PartModels.Of(PartStyle.Wall),
                 PartStyle.Wall,
                 new WorldPoint(
                     (tile.X + neighbour.X) * 0.5f,
@@ -145,6 +147,7 @@ namespace Game.Presentation.Pure
             return new WorldPart(
                 PartNames.Node(node.Id),
                 PartShape.Capsule,
+                PartModels.Of(style),
                 style,
                 new WorldPoint(tile.X, tile.Y + scale, tile.Z),
                 new WorldPoint(0f, 0f, 0f),
@@ -158,6 +161,7 @@ namespace Game.Presentation.Pure
             return new WorldPart(
                 PartNames.Node(node.Id),
                 PartShape.Cube,
+                PartModels.Of(style),
                 style,
                 new WorldPoint(tile.X, tile.Y + PickupScale * 0.5f, tile.Z),
                 new WorldPoint(0f, yaw, 0f),
