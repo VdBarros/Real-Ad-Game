@@ -77,6 +77,22 @@ namespace Game.Domain.Tests
 
         public string Spread()
         {
+            var everywhere = SpreadsEverywhere();
+            var chosen = SpreadsARouteChooses();
+
+            return "away from the start " + Percentiles(chosen)
+                + "; every region " + Percentiles(everywhere);
+        }
+
+        public double SpreadFloorReached()
+        {
+            var chosen = SpreadsARouteChooses();
+
+            return chosen.Count == 0 ? 0.0 : SweepStatistics.Percentile(chosen, 0.1);
+        }
+
+        List<double> SpreadsEverywhere()
+        {
             var spreads = new List<double>();
             foreach (var level in accepted)
             {
@@ -87,10 +103,57 @@ namespace Game.Domain.Tests
             }
 
             spreads.Sort();
-            return "p10 " + SweepStatistics.Round(SweepStatistics.Percentile(spreads, 0.1))
-                + " p50 " + SweepStatistics.Round(SweepStatistics.Percentile(spreads, 0.5))
-                + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(spreads, 0.9))
-                + " over " + spreads.Count + " regions";
+            return spreads;
+        }
+
+        List<double> SpreadsARouteChooses()
+        {
+            var spreads = new List<double>();
+            foreach (var level in accepted)
+            {
+                foreach (var region in level.Level.Envelope.Regions)
+                {
+                    if (!region.HoldsTheStart)
+                    {
+                        spreads.Add(region.Spread);
+                    }
+                }
+            }
+
+            spreads.Sort();
+            return spreads;
+        }
+
+        static string Percentiles(List<double> sorted)
+        {
+            if (sorted.Count == 0)
+            {
+                return "no regions";
+            }
+
+            return "p10 " + SweepStatistics.Round(SweepStatistics.Percentile(sorted, 0.1))
+                + " p50 " + SweepStatistics.Round(SweepStatistics.Percentile(sorted, 0.5))
+                + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(sorted, 0.9))
+                + " over " + sorted.Count + " regions";
+        }
+
+        public string Opening()
+        {
+            var choices = new List<double>();
+            var fewest = double.MaxValue;
+
+            foreach (var level in accepted)
+            {
+                var count = OpeningFrontier.Of(level.Level.Graph, level.Level.Tuning).Count;
+                choices.Add(count);
+                fewest = Math.Min(fewest, count);
+            }
+
+            choices.Sort();
+            return "p50 " + SweepStatistics.Round(SweepStatistics.Percentile(choices, 0.5))
+                + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(choices, 0.9))
+                + " affordable enemies, fewest " + SweepStatistics.Round(fewest)
+                + ", asked for " + Plan.OpeningChoices;
         }
 
         public string EnemyNumbers()
