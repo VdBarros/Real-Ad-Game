@@ -8,11 +8,15 @@ namespace Game.Presentation
     {
         Transform badge;
 
-        Renderer skin;
+        Renderer[] skins;
 
         Tint gem;
 
+        WorldPart prop;
+
         WorldPoint ground;
+
+        bool dressed;
 
         bool begun;
 
@@ -25,11 +29,13 @@ namespace Game.Presentation
             get { return Reel.IsSpent; }
         }
 
-        internal void Begin(WorldPart part, int nodeId, Transform hangingBadge)
+        internal void Begin(WorldPart part, int nodeId, Transform hangingBadge, bool wearsAMesh)
         {
-            skin = GetComponentInChildren<Renderer>();
+            skins = GetComponentsInChildren<Renderer>(true);
             badge = hangingBadge;
             NodeId = nodeId;
+            prop = part;
+            dressed = wearsAMesh;
 
             var colour = WorldPalette.Of(part.Style);
             gem = new Tint(colour.r, colour.g, colour.b);
@@ -52,21 +58,38 @@ namespace Game.Presentation
 
             var edge = reel.Edge;
             var height = reel.Height;
+            var collapsing = new WorldPart(
+                prop.Name,
+                prop.Shape,
+                prop.Model,
+                prop.Style,
+                new WorldPoint(ground.X, ground.Y + height * 0.5f, ground.Z),
+                prop.Rotation,
+                new WorldPoint(edge, height, edge));
 
-            transform.localScale = new Vector3(edge, height, edge);
-            transform.localPosition = new Vector3(ground.X, ground.Y + height * 0.5f, ground.Z);
+            transform.localScale = Vector(dressed ? ModelPose.ScaleOf(collapsing) : collapsing.Scale);
+            transform.localPosition = Vector(dressed ? ModelPose.PositionOf(collapsing) : collapsing.Position);
 
             if (!reel.IsSpent)
             {
                 return;
             }
 
-            Tints.Wash(skin, reel.Wash(gem));
+            var wash = reel.Wash(gem);
+            foreach (var skin in skins)
+            {
+                Tints.Wash(skin, wash);
+            }
 
             if (reel.IsSettled && badge != null)
             {
                 badge.gameObject.SetActive(false);
             }
+        }
+
+        static Vector3 Vector(WorldPoint point)
+        {
+            return new Vector3(point.X, point.Y, point.Z);
         }
     }
 }

@@ -62,6 +62,11 @@ namespace Game.Presentation.Pure
             get { return Up; }
         }
 
+        public static float SightReach(float height)
+        {
+            return (float)(height * Cos(CameraYaw) / Math.Tan(CameraPitch * Radians));
+        }
+
         public static WorldPoint Of(TilePosition position)
         {
             return new WorldPoint(position.X * TileEdge, position.Elevation * StepHeight, position.Y * TileEdge);
