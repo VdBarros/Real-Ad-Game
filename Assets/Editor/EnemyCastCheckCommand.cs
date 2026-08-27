@@ -286,7 +286,7 @@ namespace Game.EditorTooling
                 {
                     var mesh = PackMesh.On(renderer);
 
-                    if (mesh == null || !packs[wanted].Contains(mesh))
+                    if (mesh == null || !Pack(packs, wanted).Contains(mesh))
                     {
                         stranger++;
                     }
@@ -332,7 +332,7 @@ namespace Game.EditorTooling
             foreach (var figure in Adversaries(graph, byName))
             {
                 var box = PackMesh.Wearing(
-                    figure.Instance, packs[CharacterCast.MeshOf(figure.Style, figure.Value)]);
+                    figure.Instance, Pack(packs, CharacterCast.MeshOf(figure.Style, figure.Value)));
                 var ground = box.size.x * box.size.z;
 
                 foreach (var renderer in figure.Instance.GetComponentsInChildren<Renderer>(true))
@@ -423,7 +423,18 @@ namespace Game.EditorTooling
             {
                 figures++;
                 var model = CharacterCast.MeshOf(figure.Style, figure.Value);
-                var box = PackMesh.Wearing(figure.Instance, packs[model]);
+
+                if (model == PartModel.None)
+                {
+                    if (complaint.Count < 6)
+                    {
+                        complaint.Add(figure.Name + " wears no mesh to measure");
+                    }
+
+                    continue;
+                }
+
+                var box = PackMesh.Wearing(figure.Instance, Pack(packs, model));
                 var scale = figure.Figure.transform.localScale.x / FigureFit.ScaleOf(model);
                 var ground = figure.Figure.Ground;
                 var wanted = FigureFit.StandingHeight(model, scale);
@@ -507,7 +518,7 @@ namespace Game.EditorTooling
             {
                 figures++;
                 var model = CharacterCast.MeshOf(figure.Style, figure.Value);
-                var box = PackMesh.Wearing(figure.Instance, packs[model]);
+                var box = PackMesh.Wearing(figure.Instance, Pack(packs, model));
                 var scale = figure.Figure.transform.localScale.x / FigureFit.ScaleOf(model);
                 var depth = IsoProjection.SightReach(box.size.y);
                 var hidden = Math.Max(box.size.x, box.size.z) * depth;
@@ -711,7 +722,7 @@ namespace Game.EditorTooling
                 badges++;
                 var sprite = carrier.GetComponent<SpriteRenderer>();
                 var model = CharacterCast.MeshOf(figure.Style, figure.Value);
-                var body = PackMesh.Wearing(figure.Instance, packs[model]);
+                var body = PackMesh.Wearing(figure.Instance, Pack(packs, model));
 
                 if (sprite != null && sprite.sprite != null)
                 {
@@ -866,7 +877,7 @@ namespace Game.EditorTooling
                 }
 
                 shot.Add(model);
-                var box = PackMesh.Wearing(figure.Instance, packs[model]);
+                var box = PackMesh.Wearing(figure.Instance, Pack(packs, model));
                 var ground = figure.Figure.Ground;
                 var size = (box.size.y > 0f ? box.size.y : IsoProjection.TileEdge) * PortraitSize;
                 rig.Hold(new CameraFraming(
@@ -961,6 +972,13 @@ namespace Game.EditorTooling
             }
 
             return Color.black;
+        }
+
+        static ISet<Mesh> Pack(IDictionary<PartModel, ISet<Mesh>> packs, PartModel model)
+        {
+            ISet<Mesh> pack;
+
+            return packs.TryGetValue(model, out pack) ? pack : new HashSet<Mesh>();
         }
 
         static int Assert(StringBuilder report, bool held, string claim, string detail)
