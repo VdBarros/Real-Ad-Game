@@ -4,6 +4,8 @@ namespace Game.Domain
 {
     public sealed class PlacedLevel
     {
+        Par par;
+
         public PlacedLevel(
             MazeLayout layout,
             LevelGraph graph,
@@ -73,6 +75,11 @@ namespace Game.Domain
         public PowerEnvelope Envelope { get; }
 
         public SolvabilityVerdict Verdict { get; }
+
+        public Par Par
+        {
+            get { return par ?? (par = Par.Of(this)); }
+        }
 
         public int BossNodeId
         {

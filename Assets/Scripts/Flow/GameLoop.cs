@@ -250,7 +250,9 @@ namespace Game.Flow
 
                     input.IsLocked = true;
                     cycle = cycle.Finished(walker.Run.Power);
-                    screen.Show(cycle.FinalPower);
+                    screen.Show(
+                        cycle.FinalPower,
+                        Stars.For(level.Par, cycle.FinalPower, supply.LastLevelNumber));
                     return;
 
                 default:
