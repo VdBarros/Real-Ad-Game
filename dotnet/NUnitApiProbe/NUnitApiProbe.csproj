@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- This project is expected to FAIL to build, the same way LangVersionProbe is.
+       It compiles Does.Not.Contain(<non-string>) — ConstraintExpression.Contain
+       gained its object overload after 3.5, and this exact expression broke main
+       twice, in EliteTests and OpeningFrontierTests, with CS1503 in the Editor
+       after a green CI run. Against UnityNUnitVersion it must not compile.
+
+       The guard that actually scans the test tree is Game.Domain.Tests.Conformance,
+       which recompiles every test source against the same UnityNUnitVersion. This
+       project guards that guard: if UnityNUnitVersion is ever raised past 3.5, this
+       compiles, and CI says so instead of the conformance build silently going
+       permissive. Nothing references it; CI builds it and asserts CS1503.
+       See .github/workflows/domain-tests.yml.
+
+       NU1701 as in Game.Domain.Tests.Conformance: NUnit 3.5 has only .NET
+       Framework assemblies, and this project is compiled, never loaded. -->
+
+  <PropertyGroup>
+    <TargetFramework>$(UnityTargetFramework)</TargetFramework>
+    <AssemblyName>NUnitApiProbe</AssemblyName>
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="ContainTakesOnlyAStringInNUnit35.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="$(UnityNUnitVersion)" />
+  </ItemGroup>
+
+</Project>

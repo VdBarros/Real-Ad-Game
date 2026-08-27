@@ -20,4 +20,21 @@
     <ScriptsRoot>$(MSBuildThisFileDirectory)..\Assets\Scripts\</ScriptsRoot>
   </PropertyGroup>
 
+  <!-- Two NUnit versions, because no single one can do both jobs.
+       UnityNUnitVersion is the API ceiling: com.unity.ext.nunit 2.1.0 ships
+       nunit.framework 3.5.0.0, a Unity fork of NUnit 3.5, and 3.5.0 on NuGet is
+       the closest reproducible stand-in for its surface. Its assemblies are
+       .NET Framework only, so nothing can run against it on net10.0 — it is a
+       compile-only reference, used by Game.Domain.Tests.Conformance and by
+       NUnitApiProbe.
+       FastLoopNUnitVersion is what actually runs the suite. 3.14.0 carries a
+       netstandard2.0 build the net10.0 test host can load, which 3.5 has not, so
+       the fast loop executes against a wider surface than the Editor compiles.
+       That gap is what Game.Domain.Tests.Conformance closes. -->
+
+  <PropertyGroup>
+    <UnityNUnitVersion>3.5.0</UnityNUnitVersion>
+    <FastLoopNUnitVersion>3.14.0</FastLoopNUnitVersion>
+  </PropertyGroup>
+
 </Project>
