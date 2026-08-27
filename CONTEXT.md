@@ -151,6 +151,19 @@ on the enemy.
 An enemy in a dead end, guarding a reward and nothing else. Optional. Pockets
 control greed.
 
+## Elite
+
+An enemy nobody can afford on arrival: its number stands above the power the
+cheapest way into its region leaves the player holding. An Elite is a locked
+door rather than a threat — meeting one costs nothing, it simply does not open,
+and the way through it is to go elsewhere, come richer, and come back. Whether
+an enemy is an Elite is read off its number against its region's `P_min`
+whenever it is asked for; it is never a fact stored on the enemy, exactly as
+with a Gate Enemy. An Elite is also not a kind of content: the recipe counts
+enemies, and which of them turn out to be Elites is a reading of the finished
+level.
+_Avoid_: mini-boss, blocker, locked enemy.
+
 ## Slot
 
 A content node whose content does not exist yet. Layout decides where the slots
@@ -169,17 +182,22 @@ topology honest.
 
 ## Preset
 
-A named level size the generator can be asked for. `tiny` exists so exhaustive
-verification is tractable, `ship` is what the game ships, `stress` measures
-generation time. A preset counts content nodes; junction nodes are whatever the
-layout happens to need.
+A named level size. `tiny` exists so exhaustive verification is tractable,
+`ship` is what the game ships, `stress` measures generation time. A preset
+counts content nodes; junction nodes are whatever the layout happens to need. A
+preset says how big a level is and nothing about how hard it is: the level that
+ships is the same size at every level number, and a preset alone no longer
+decides which numbers end up on it.
 
 ## Level Graph
 
 One complete generated level: its tile grid, its decision graph, and the
 content sitting on the content nodes. It is what the generator returns and the
 only thing presentation is given. A level graph is a pure function of its seed
-and preset — the same pair always yields the same level.
+and its **plan** — the size a level number is played at, the recipe it fills,
+and the numbers generation is tuned with, taken together — and the same pair
+always yields the same level. A seed and a size are not enough to name a level:
+two levels of the same size can differ in every number on them.
 
 ## Lattice
 
@@ -235,20 +253,43 @@ The richest entry into a region: take everything outside it first, in the best
 order, and only then enter. The upper wall of the envelope, and what good
 routing is worth.
 
+## Par
+
+What routing a level well is worth, expressed as the two powers a run can
+finish it holding: the beeline to the boss at the bottom, and the richest
+possible arrival at the boss at the top. Where a finished run's power landed
+between the two is what the result reports back to the player. Par is read off
+the completed level rather than authored beside it, so it cannot drift from the
+level it belongs to, and it gates nothing — a level always leads to the next one.
+
 ## Recipe
 
-How many of each kind of content a preset's level holds: one boss, and a fixed
-count of multipliers, enemies and additives. It is a count, never a set of
-numbers — the numbers are minted per level. A recipe that does not ask for
-exactly the slots the carve offers is a rejected level, not a squashed one.
+How many of each kind of content a level holds: one boss, and a fixed count of
+multipliers, enemies and additives. It is a count, never a set of numbers — the
+numbers are minted per level. A recipe belongs to a level's plan rather than to
+its size, so levels of the same size hold different mixes at different level
+numbers; only the total is fixed, because a recipe that does not ask for exactly
+the slots the carve offers is a rejected level, not a squashed one.
 
 ## Minting
 
 Choosing a content node's number, done **during** an adversary's own walk
 rather than before it: the walk reaches for a node, and the number is chosen
-then, against the power the walk actually holds. An enemy the walk could not
-afford is therefore never minted, so a level that cannot stall is produced
-directly instead of being produced and then filtered.
+then, against the power the walk actually holds. An enemy that walk could not
+afford is therefore never minted on the Spine, so a route that always finishes
+is produced directly instead of being produced and then filtered. What the walk
+never reaches is minted afterwards, against the most a route could arrive
+holding rather than the least, which is where Elites come from.
+
+## Spine
+
+The walk a level's numbers are minted along: the poorest route anyone could
+take, followed only as far as the moment the boss becomes affordable. Every
+enemy on the Spine is affordable when the Spine reaches it, so the Spine is one
+route that finishes the level however badly it is played. It is read off the
+level rather than stored, and what it never touches is where a level's locked
+doors live.
+_Avoid_: critical path, main line, backbone.
 
 ## Floor Repair
 
