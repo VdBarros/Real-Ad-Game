@@ -31,5 +31,10 @@ namespace Game.Presentation.Pure
                     throw new ArgumentOutOfRangeException(nameof(style), style, "No model for that part style.");
             }
         }
+
+        public static PartModel Of(PartStyle style, int power)
+        {
+            return CharacterCast.IsRole(style) ? CharacterCast.MeshOf(style, power) : Of(style);
+        }
     }
 }

@@ -33,7 +33,7 @@ namespace Game.EditorTooling
 
         static readonly PartStyle[] StillPrimitive =
         {
-            PartStyle.Pillar, PartStyle.Enemy, PartStyle.Boss, PartStyle.Trail, PartStyle.Spark
+            PartStyle.Pillar, PartStyle.Trail, PartStyle.Spark
         };
 
         public static void Check()
@@ -493,7 +493,7 @@ namespace Game.EditorTooling
             }
 
             var adversaries = 0;
-            var primitive = 0;
+            var dressed = 0;
             var complaint = new List<string>();
 
             foreach (var node in graph.Decisions.Nodes)
@@ -521,21 +521,22 @@ namespace Game.EditorTooling
                 var filter = instance.GetComponent<MeshFilter>();
                 var skinned = instance.GetComponentsInChildren<SkinnedMeshRenderer>(true);
 
-                if (filter != null && filter.sharedMesh != null && skinned.Length == 0)
+                if (skinned.Length > 0 && filter == null)
                 {
-                    primitive++;
+                    dressed++;
                 }
                 else if (complaint.Count < 6)
                 {
-                    complaint.Add(prop.Name + " is not a primitive");
+                    complaint.Add(prop.Name + " still stands as a primitive");
                 }
             }
 
             failures += Assert(
                 report,
-                adversaries > 0 && primitive == adversaries,
-                "every enemy and the boss still stand as the primitive their part shape names",
-                primitive + " of " + adversaries + " do"
+                adversaries > 0 && dressed == adversaries,
+                "every enemy and the boss stands as a rigged cast mesh rather than the primitive "
+                + "their part shape names",
+                dressed + " of " + adversaries + " do"
                 + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
 
             return failures;

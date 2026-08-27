@@ -8,6 +8,10 @@ namespace Game.Presentation.Pure
         Chest,
         CoinStack,
         Staircase,
-        Knight
+        Knight,
+        SkeletonMinion,
+        SkeletonRogue,
+        SkeletonWarrior,
+        SkeletonMage
     }
 }

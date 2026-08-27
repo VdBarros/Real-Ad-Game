@@ -14,6 +14,8 @@ namespace Game.Presentation
 
         public const string CharacterAtlasAsset = "knight_texture";
 
+        public const string SkeletonAtlasAsset = "skeleton_texture";
+
         readonly GameObject[] byModel;
 
         readonly bool[] looked;
@@ -82,6 +84,8 @@ namespace Game.Presentation
                     return ResourcesFolder + "/" + AtlasAsset;
                 case ArtPack.Adventurers:
                     return CharacterFolder + "/" + CharacterAtlasAsset;
+                case ArtPack.Skeletons:
+                    return CharacterFolder + "/" + SkeletonAtlasAsset;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(pack), pack, "No atlas for that pack.");
             }
@@ -119,13 +123,31 @@ namespace Game.Presentation
 
         public bool Dresses(PartStyle style)
         {
-            return Of(PartModels.Of(style)) != null;
+            if (!CharacterCast.IsRole(style))
+            {
+                return Of(PartModels.Of(style)) != null;
+            }
+
+            var worn = CharacterCast.MeshesOf(style);
+
+            for (var slot = 0; slot < worn.Count; slot++)
+            {
+                if (Of(worn[slot]) == null)
+                {
+                    return false;
+                }
+            }
+
+            return worn.Count > 0;
         }
 
         public PartModel Worn(PartStyle style)
         {
-            var wanted = PartModels.Of(style);
+            return Worn(PartModels.Of(style));
+        }
 
+        public PartModel Worn(PartModel wanted)
+        {
             return Of(wanted) == null ? PartModel.None : wanted;
         }
 
@@ -138,9 +160,7 @@ namespace Game.Presentation
 
         public static string FolderOf(PartModel model)
         {
-            return model != PartModel.None && ArtPacks.Of(model) == ArtPack.Adventurers
-                ? CharacterFolder
-                : ResourcesFolder;
+            return ArtPacks.IsRigged(model) ? CharacterFolder : ResourcesFolder;
         }
 
         static GameObject Load(PartModel model)
@@ -168,6 +188,14 @@ namespace Game.Presentation
                     return "stairs_narrow";
                 case PartModel.Knight:
                     return "Knight";
+                case PartModel.SkeletonMinion:
+                    return "Skeleton_Minion";
+                case PartModel.SkeletonRogue:
+                    return "Skeleton_Rogue";
+                case PartModel.SkeletonWarrior:
+                    return "Skeleton_Warrior";
+                case PartModel.SkeletonMage:
+                    return "Skeleton_Mage";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(model), model, "No asset name for that part model.");
             }

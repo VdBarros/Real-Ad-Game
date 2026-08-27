@@ -15,7 +15,7 @@ namespace Game.Presentation.Pure
 
             Guard(model);
 
-            return AdventurerPack.StandingScales;
+            return ArtPacks.StandingScalesOf(model);
         }
 
         public static float ScaleOf(PartModel model)
@@ -27,7 +27,7 @@ namespace Game.Presentation.Pure
 
             Guard(model);
 
-            return StandingScalesOf(model) / AdventurerPack.HeightOf(model);
+            return StandingScalesOf(model) / ArtPacks.HeightOf(model);
         }
 
         public static float LiftOf(PartModel model)
@@ -56,7 +56,7 @@ namespace Game.Presentation.Pure
 
             Guard(model);
 
-            return AdventurerPack.WidthOf(model) * ScaleOf(model) * figureScale;
+            return ArtPacks.WidthOf(model) * ScaleOf(model) * figureScale;
         }
 
         public static float DepthOf(PartModel model, float figureScale)
@@ -68,7 +68,7 @@ namespace Game.Presentation.Pure
 
             Guard(model);
 
-            return AdventurerPack.DepthOf(model) * ScaleOf(model) * figureScale;
+            return ArtPacks.DepthOf(model) * ScaleOf(model) * figureScale;
         }
 
         public static float SpreadOf(PartModel model, float figureScale)
@@ -79,6 +79,20 @@ namespace Game.Presentation.Pure
             return model == PartModel.None
                 ? figureScale
                 : (float)Math.Sqrt(width * width + depth * depth);
+        }
+
+        public static float TileReachOf(PartModel model, float figureScale)
+        {
+            if (model == PartModel.None)
+            {
+                return figureScale;
+            }
+
+            var width = WidthOf(model, figureScale);
+            var depth = DepthOf(model, figureScale);
+            var turn = ArtPacks.FacingOf(model) * Math.PI / 180.0;
+
+            return (float)(width * Math.Abs(Math.Cos(turn)) + depth * Math.Abs(Math.Sin(turn)));
         }
 
         public static float HiddenGroundOf(PartModel model, float figureScale)
