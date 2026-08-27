@@ -16,7 +16,7 @@ namespace Game.Presentation.Pure
 
         public const float ChestPackHeight = 1.3f;
 
-        public const float CandlesPackHeight = 0.873f;
+        public const float CoinStackPackHeight = 1.157f;
 
         public const float StaircasePackHeight = 5.1f;
 
@@ -54,8 +54,8 @@ namespace Game.Presentation.Pure
                     return WallPanelPackHeight;
                 case PartModel.Chest:
                     return ChestPackHeight;
-                case PartModel.Candles:
-                    return CandlesPackHeight;
+                case PartModel.CoinStack:
+                    return CoinStackPackHeight;
                 case PartModel.Staircase:
                     return StaircasePackHeight;
                 case PartModel.None:

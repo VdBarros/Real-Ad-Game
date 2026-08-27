@@ -118,8 +118,8 @@ namespace Game.Presentation
                     return "barrier";
                 case PartModel.Chest:
                     return "chest";
-                case PartModel.Candles:
-                    return "candle_triple";
+                case PartModel.CoinStack:
+                    return "coin_stack_large";
                 case PartModel.Staircase:
                     return "stairs_narrow";
                 default:
