@@ -61,11 +61,23 @@
   and that's where the invariant-correctness risk sits — see mvp-backlog §2.
   **Those projects compile the way Unity compiles**, or domain code passes the
   fast loop and fails in the Editor: `dotnet/Directory.Build.props` pins C# 9
-  for everything under `dotnet/`, `Game.Domain` and `Game.Presentation.Pure`
-  target netstandard2.1, and NUnit is held at 3.x because Unity 6000.5.9f1
-  ships `nunit.framework` 3.5. `dotnet/LangVersionProbe/` is a project that
-  must **fail** to build — CI asserts it fails with CS8773, so the ceiling
-  cannot silently drift.
+  for everything under `dotnet/`, and `Game.Domain` and
+  `Game.Presentation.Pure` target netstandard2.1.
+  **The NUnit the fast loop runs is not the NUnit the Editor compiles.** Unity
+  6000.5.9f1 ships `com.unity.ext.nunit` 2.1.0, a fork of `nunit.framework`
+  **3.5**, whose assemblies are .NET Framework only and cannot load under the
+  net10.0 test host — so the suite *runs* against 3.14
+  (`FastLoopNUnitVersion`) and is separately *compiled* against 3.5
+  (`UnityNUnitVersion`) by `dotnet/Game.Domain.Tests.Conformance/`, which
+  globs the same test sources at Unity's TFM and runs nothing. The risk is not
+  only NUnit 4: anything added between 3.5 and 3.14 compiles in `dotnet test`
+  and fails the Editor. `Does.Not.Contain(<non-string>)` is the case that broke
+  `main` twice — write `Has.No.Member(x)` for a non-string. Do not raise
+  `UnityNUnitVersion`; raise `FastLoopNUnitVersion` only if it stays ≥ the
+  Editor's surface.
+  Two projects must **fail** to build, and CI asserts each failure so neither
+  ceiling can silently drift: `dotnet/LangVersionProbe/` with CS8773, and
+  `dotnet/NUnitApiProbe/` with CS1503.
 - **Unity-side settings are applied from code, not by hand.**
   `Assets/Editor/ProjectBootstrap.cs` owns portrait lock, bundle id, scripting
   backend and API level; `Assets/Editor/AndroidBuildCommand.cs` produces the
