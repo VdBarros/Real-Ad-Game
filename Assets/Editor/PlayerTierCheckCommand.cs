@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
 using Game.Domain;
 using Game.Presentation;
@@ -13,37 +15,722 @@ namespace Game.EditorTooling
     {
         const long Seed = 20250824L;
 
+        const float Epsilon = DungeonPack.BoundsEpsilon;
+
+        const float AngleEpsilon = 0.01f;
+
+        const float PortraitSize = 2.2f;
+
+        const string BaseColour = "_BaseColor";
+
+        const string BaseMap = "_BaseMap";
+
+        const string LevelPath = "dev/scratch/t-32-player-level.png";
+
+        const string PortraitPath = "dev/scratch/t-32-player-tier-";
+
         static readonly int[] Climb = { 9, 40, 140, 420 };
+
+        static readonly PartStyle[] StillPrimitive =
+        {
+            PartStyle.Pillar, PartStyle.Enemy, PartStyle.Boss, PartStyle.Trail, PartStyle.Spark
+        };
 
         public static void Check()
         {
+            Wipe(LevelPath);
+
+            for (var tier = 0; tier < VisualTier.Count; tier++)
+            {
+                Wipe(PortraitPath + tier + ".png");
+            }
+
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
+            var warnings = new List<string>();
+            Application.LogCallback watcher = (message, trace, type) =>
+            {
+                if (message != null && (message.Contains("falls back") || message.Contains("resolves to nothing")))
+                {
+                    warnings.Add(type + ": " + message);
+                }
+            };
+            Application.logMessageReceived += watcher;
+
             var graph = LevelGenerator.Generate(Seed, MazePreset.Ship).Graph;
+            var rig = CameraRig.Raise();
+            var lens = rig.GetComponent<Camera>();
+            lens.clearFlags = CameraClearFlags.SolidColor;
+            lens.backgroundColor = new Color(0.06f, 0.07f, 0.09f);
+
             var builder = new WorldBuilder();
             var root = builder.Build(graph);
             var power = builder.PlayerBadge;
             var player = root.GetComponentInChildren<PlayerFigure>(true);
             var enemies = root.GetComponentsInChildren<EnemyFigure>(true);
             var site = DeathSite(graph);
+            var worn = CharacterCast.MeshOf(PartStyle.Start);
+            var pack = PackMeshes(worn);
 
-            var report = new StringBuilder("tiers on ship seed ")
+            PreviewFilm.Sun();
+            rig.Begin(graph);
+            rig.Skip();
+            PreviewFilm.Shoot(lens, LevelPath);
+
+            var report = new StringBuilder("t-32 the player figure wears a character mesh, ship seed ")
                 .Append(Seed.ToString(CultureInfo.InvariantCulture))
                 .Append(", ")
                 .Append(enemies.Length.ToString(CultureInfo.InvariantCulture))
-                .Append(" enemies:")
-                .Append(Row(power, player, enemies));
+                .Append(" enemies:");
+            var failures = 0;
+
+            failures += WearsTheCastMesh(player, worn, pack, report);
+            failures += FittedToTheTile(player, worn, pack, report);
+            failures += HidesLittleGround(player, worn, pack, report);
+            failures += EverythingElseStillFallsBack(root, graph, report);
+            failures += LooksUpEachMeshOnce(report);
+
+            Portrait(rig, lens, player, pack, power.Look.Tier);
+
+            report.Append("\n  tier climb:").Append(Row(power, player, enemies, pack));
+            var heights = new List<float> { Standing(player, pack) };
+            var hides = new List<float> { Hiding(player, pack) };
+            var tints = new List<Color> { Painted(player) };
 
             foreach (var target in Climb)
             {
                 power.DropWeaponFrom(site);
-                report.Append(Walk(power, player, target)).Append(Row(power, player, enemies));
+                report.Append(Walk(power, player, target)).Append(Row(power, player, enemies, pack));
+                heights.Add(Standing(player, pack));
+                hides.Add(Hiding(player, pack));
+                tints.Add(Painted(player));
+                Portrait(rig, lens, player, pack, power.Look.Tier);
             }
+
+            failures += TheTierStillReads(worn, heights, hides, tints, report);
+
+            Application.logMessageReceived -= watcher;
+
+            failures += Assert(
+                report,
+                warnings.Count == 0,
+                "nothing fell back to a primitive while the world was built and the player climbed "
+                + "every tier, so the warn-once path stayed silent",
+                warnings.Count == 0
+                    ? "the model cache logged no fallback"
+                    : string.Join(" | ", warnings.ToArray()));
+
+            report.Append("\n  t-32: ")
+                .Append(failures == 0
+                    ? "every assertion above held"
+                    : failures + (failures == 1 ? " assertion" : " assertions") + " above failed");
 
             Debug.Log(report.ToString());
 
+            if (failures > 0)
+            {
+                Debug.LogError(
+                    "The player tier check failed " + failures + " assertions. Read the report above.");
+            }
+
             WorldObjects.Destroy(root);
             builder.Dispose();
+        }
+
+        static int WearsTheCastMesh(
+            PlayerFigure player, PartModel worn, ICollection<Mesh> pack, StringBuilder report)
+        {
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                player != null,
+                "the world raised a player figure",
+                player == null ? "it raised none" : player.name);
+
+            if (player == null)
+            {
+                return failures;
+            }
+
+            var skins = player.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            var filters = player.GetComponentsInChildren<MeshFilter>(true);
+            var bones = 0;
+            var rooted = 0;
+            var meshes = new List<string>();
+
+            foreach (var skin in skins)
+            {
+                bones += skin.bones == null ? 0 : skin.bones.Length;
+                rooted += skin.rootBone == null ? 0 : 1;
+
+                if (skin.sharedMesh != null)
+                {
+                    meshes.Add(skin.sharedMesh.name);
+                }
+            }
+
+            failures += Assert(
+                report,
+                skins.Length > 0 && meshes.Count == skins.Length,
+                "the player renders a skinned mesh rather than a primitive capsule",
+                skins.Length + " skinned renderers wearing " + string.Join(", ", meshes.ToArray())
+                + ", " + filters.Length + " mesh filters left");
+
+            failures += Assert(
+                report,
+                skins.Length > 0 && bones > 0 && rooted == skins.Length,
+                "the skinned mesh is rigged, so every skin is driven by bones from one root",
+                bones + " bone bindings across " + skins.Length + " skins, " + rooted + " rooted");
+
+            failures += Assert(
+                report,
+                CharacterDress.Bare(player.gameObject) == 0,
+                "the pack's slot accessories are stripped, so the player carries no spare swords or shields",
+                filters.Length + " static meshes remain, the helmet and cape the pack bolts to its bones");
+
+            var renderers = player.GetComponentsInChildren<Renderer>(true);
+            var wearing = 0;
+            var stranger = new List<string>();
+
+            foreach (var renderer in renderers)
+            {
+                var mesh = MeshOn(renderer);
+
+                if (mesh != null && pack.Contains(mesh))
+                {
+                    wearing++;
+                }
+                else
+                {
+                    stranger.Add(renderer.name + " wearing " + (mesh == null ? "nothing" : mesh.name));
+                }
+            }
+
+            failures += Assert(
+                report,
+                wearing > 0 && stranger.Count == 0,
+                "every mesh the player wears comes from the " + worn + " asset the model table names",
+                wearing + " of " + renderers.Length + " renderers do, from Resources/"
+                + (WorldModels.AssetPathOf(worn) ?? "nothing")
+                + (stranger.Count == 0 ? "" : "; strangers: " + string.Join(", ", stranger.ToArray())));
+
+            var dressed = 0;
+
+            foreach (var renderer in renderers)
+            {
+                var material = renderer.sharedMaterial;
+                if (material != null
+                    && material.name == WorldMaterials.NamePrefix + PartStyle.Start
+                    && material.HasProperty(BaseMap)
+                    && material.GetTexture(BaseMap) != null)
+                {
+                    dressed++;
+                }
+            }
+
+            failures += Assert(
+                report,
+                renderers.Length > 0 && dressed == renderers.Length,
+                "every mesh of the player wears the one world material bound to the adventurers atlas",
+                dressed + " of " + renderers.Length + " do");
+
+            failures += Assert(
+                report,
+                Math.Abs(Mathf.DeltaAngle(player.transform.localEulerAngles.y, AdventurerPack.Facing))
+                    <= AngleEpsilon,
+                "the figure turns its face toward the camera at the pinned yaw of "
+                + AdventurerPack.Facing.ToString("0.#", CultureInfo.InvariantCulture),
+                "it faces " + player.transform.localEulerAngles.y.ToString("0.###", CultureInfo.InvariantCulture));
+
+            return failures;
+        }
+
+        static int FittedToTheTile(
+            PlayerFigure player, PartModel worn, ICollection<Mesh> pack, StringBuilder report)
+        {
+            if (player == null)
+            {
+                return Assert(report, false, "the player mesh is fitted to the tile grid", "there is no figure");
+            }
+
+            var box = Worn(player.transform, pack);
+            var scale = LevelBlueprintBuilder.FigureScale;
+            var wanted = FigureFit.StandingHeight(worn, scale);
+            var ground = player.Ground;
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                Math.Abs(box.size.y - wanted) <= Epsilon,
+                "the imported figure stands the "
+                + AdventurerPack.PackHeightOf(worn).ToString("0.####", CultureInfo.InvariantCulture)
+                + " pinned pack units the fit asks for",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it measures {0:0.#####} against {1:0.#####}, which is {2:0.###} of the capsule's "
+                    + "{3:0.#####} at the same figure scale",
+                    box.size.y,
+                    wanted,
+                    box.size.y / FigureFit.StandingHeight(PartModel.None, scale),
+                    FigureFit.StandingHeight(PartModel.None, scale)));
+
+            failures += Assert(
+                report,
+                Math.Abs(box.min.y - (ground.Y + AdventurerPack.BaseOf(worn) * ScaleOn(player))) <= Epsilon,
+                "the figure's measured base sits where the pinned pack base puts it above the tile top",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "its bounds start {0:0.#####} above the tile top of {1:0.#####}, against the pinned "
+                    + "{2:0.#####} the pack authored below its own feet",
+                    box.min.y - ground.Y,
+                    ground.Y,
+                    AdventurerPack.BaseOf(worn) * ScaleOn(player)));
+
+            var half = IsoProjection.TileEdge * 0.5f;
+
+            failures += Assert(
+                report,
+                box.min.x >= ground.X - half - Epsilon
+                && box.max.x <= ground.X + half + Epsilon
+                && box.min.z >= ground.Z - half - Epsilon
+                && box.max.z <= ground.Z + half + Epsilon,
+                "the figure's whole footprint lies inside the square of the tile it stands on",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it covers x {0:0.#####} to {1:0.#####} and z {2:0.#####} to {3:0.#####} inside a tile "
+                    + "spanning x {4:0.#####} to {5:0.#####} and z {6:0.#####} to {7:0.#####}",
+                    box.min.x,
+                    box.max.x,
+                    box.min.z,
+                    box.max.z,
+                    ground.X - half,
+                    ground.X + half,
+                    ground.Z - half,
+                    ground.Z + half));
+
+            var spread = Math.Max(box.size.x, box.size.z);
+
+            failures += Assert(
+                report,
+                spread <= FigureFit.SpreadOf(worn, scale) + Epsilon,
+                "the figure spreads no wider than the pinned pack footprint allows it to at any yaw",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it spans {0:0.#####} by {1:0.#####} at its {2:0.#} degree yaw, inside the {3:0.#####} "
+                    + "diagonal of the pinned {4:0.#####} by {5:0.#####} footprint",
+                    box.size.x,
+                    box.size.z,
+                    AdventurerPack.Facing,
+                    FigureFit.SpreadOf(worn, scale),
+                    FigureFit.WidthOf(worn, scale),
+                    FigureFit.DepthOf(worn, scale)));
+
+            return failures;
+        }
+
+        static int HidesLittleGround(
+            PlayerFigure player, PartModel worn, ICollection<Mesh> pack, StringBuilder report)
+        {
+            if (player == null)
+            {
+                return Assert(report, false, "the player mesh hides little ground", "there is no figure");
+            }
+
+            var box = Worn(player.transform, pack);
+            var scale = LevelBlueprintBuilder.FigureScale;
+            var depth = IsoProjection.SightReach(box.size.y);
+            var hidden = box.size.x * depth;
+            var capsule = FigureFit.HiddenGroundOf(PartModel.None, scale);
+            var bound = IsoProjection.TileEdge * IsoProjection.OcclusionBound * IsoProjection.TileEdge;
+            var parapet = IsoProjection.TileEdge
+                * IsoProjection.SightReach(DungeonPack.HeightOf(PartModel.WallPanel));
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                hidden <= FigureFit.HiddenSpreadOf(worn, scale) + Epsilon,
+                "the measured ground the figure hides stays inside what the pure fit guarantees",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "measured {0:0.#####} against the {1:0.#####} the fit allows at any yaw and the "
+                    + "{2:0.#####} it predicts face on",
+                    hidden,
+                    FigureFit.HiddenSpreadOf(worn, scale),
+                    FigureFit.HiddenGroundOf(worn, scale)));
+
+            failures += Assert(
+                report,
+                hidden <= bound,
+                "the figure hides at most " + IsoProjection.OcclusionBound.ToString(
+                    "0.##", CultureInfo.InvariantCulture)
+                + " of a tile of ground, the bound the wall work set",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "standing {0:0.#####} tall and {1:0.#####} wide it hides {2:0.#####} tiles of ground "
+                    + "at the camera's {3:0.#} degree pitch, {4:0.#####} deep, against the bound of "
+                    + "{5:0.#####} and the {6:0.#####} a parapet hides across its whole edge",
+                    box.size.y,
+                    box.size.x,
+                    hidden,
+                    IsoProjection.CameraPitch,
+                    depth,
+                    bound,
+                    parapet));
+
+            failures += Assert(
+                report,
+                hidden <= capsule && depth <= IsoProjection.SightReach(
+                    FigureFit.StandingHeight(PartModel.None, scale)),
+                "the figure hides no more ground than the capsule it replaces, in depth or in area",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0:0.#####} tiles against the capsule's {1:0.#####}, reaching {2:0.#####} back "
+                    + "against the capsule's {3:0.#####}",
+                    hidden,
+                    capsule,
+                    depth,
+                    IsoProjection.SightReach(FigureFit.StandingHeight(PartModel.None, scale))));
+
+            return failures;
+        }
+
+        static int EverythingElseStillFallsBack(GameObject root, LevelGraph graph, StringBuilder report)
+        {
+            var failures = 0;
+            var named = new List<string>();
+
+            foreach (var style in StillPrimitive)
+            {
+                named.Add(style + " wants " + PartModels.Of(style));
+            }
+
+            var still = 0;
+
+            foreach (var style in StillPrimitive)
+            {
+                if (PartModels.Of(style) == PartModel.None)
+                {
+                    still++;
+                }
+            }
+
+            failures += Assert(
+                report,
+                still == StillPrimitive.Length,
+                "every style this ticket did not touch still wants no mesh",
+                string.Join(", ", named.ToArray()));
+
+            var byName = new Dictionary<string, Transform>();
+            foreach (var node in root.GetComponentsInChildren<Transform>(true))
+            {
+                byName[node.name] = node;
+            }
+
+            var adversaries = 0;
+            var primitive = 0;
+            var complaint = new List<string>();
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                if (node.Type != NodeType.Enemy && node.Type != NodeType.Boss)
+                {
+                    continue;
+                }
+
+                WorldPart prop;
+                if (!LevelBlueprintBuilder.TryProp(node, out prop))
+                {
+                    continue;
+                }
+
+                Transform instance;
+                if (!byName.TryGetValue(prop.Name, out instance))
+                {
+                    complaint.Add(prop.Name + " is not in the world");
+                    continue;
+                }
+
+                adversaries++;
+
+                var filter = instance.GetComponent<MeshFilter>();
+                var skinned = instance.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+
+                if (filter != null && filter.sharedMesh != null && skinned.Length == 0)
+                {
+                    primitive++;
+                }
+                else if (complaint.Count < 6)
+                {
+                    complaint.Add(prop.Name + " is not a primitive");
+                }
+            }
+
+            failures += Assert(
+                report,
+                adversaries > 0 && primitive == adversaries,
+                "every enemy and the boss still stand as the primitive their part shape names",
+                primitive + " of " + adversaries + " do"
+                + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+
+            return failures;
+        }
+
+        static int LooksUpEachMeshOnce(StringBuilder report)
+        {
+            var asked = new List<string>();
+            var cached = 0;
+            var models = 0;
+
+            using (var cache = new WorldModels())
+            {
+                foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+                {
+                    if (model == PartModel.None)
+                    {
+                        continue;
+                    }
+
+                    models++;
+                    var first = cache.Of(model);
+                    var second = cache.Of(model);
+
+                    if (ReferenceEquals(first, second) && first != null)
+                    {
+                        cached++;
+                    }
+                    else
+                    {
+                        asked.Add(model + " answered differently the second time");
+                    }
+                }
+            }
+
+            return Assert(
+                report,
+                models > 0 && cached == models,
+                "the model cache resolves each mesh once and hands back the same object after, "
+                + "so a missing one would warn once rather than once per part",
+                cached + " of " + models + " do"
+                + (asked.Count == 0 ? "" : "; " + string.Join("; ", asked.ToArray())));
+        }
+
+        static int TheTierStillReads(
+            PartModel worn,
+            IReadOnlyList<float> heights,
+            IReadOnlyList<float> hides,
+            IReadOnlyList<Color> tints,
+            StringBuilder report)
+        {
+            var failures = 0;
+            var grew = 0;
+            var repainted = 0;
+            var stepped = new List<string>();
+
+            for (var step = 1; step < heights.Count; step++)
+            {
+                var wanted = heights[step - 1] * PlayerLook.Growth;
+
+                if (Math.Abs(heights[step] - wanted) <= Epsilon)
+                {
+                    grew++;
+                }
+                else
+                {
+                    stepped.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} stands {1:0.#####} against {2:0.#####}",
+                        step,
+                        heights[step],
+                        wanted));
+                }
+
+                if (tints[step] != tints[step - 1])
+                {
+                    repainted++;
+                }
+            }
+
+            failures += Assert(
+                report,
+                heights.Count == VisualTier.Count && grew == heights.Count - 1,
+                "the mesh grows by the tier seam's own step of "
+                + PlayerLook.Growth.ToString("0.##", CultureInfo.InvariantCulture) + " at every tier",
+                grew + " of " + (heights.Count - 1) + " steps do"
+                + (stepped.Count == 0 ? "" : "; " + string.Join("; ", stepped.ToArray())));
+
+            failures += Assert(
+                report,
+                repainted == tints.Count - 1,
+                "the mesh takes a new tint from the tier seam's ramp at every tier",
+                repainted + " of " + (tints.Count - 1) + " steps do");
+
+            failures += Assert(
+                report,
+                Math.Abs(heights[heights.Count - 1]
+                    - FigureFit.StandingHeight(worn, PlayerLook.Of(Climb[Climb.Length - 1]).Scale)) <= Epsilon,
+                "the topmost tier stands exactly as tall as the pure fit says it should",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it measures {0:0.#####} against {1:0.#####}",
+                    heights[heights.Count - 1],
+                    FigureFit.StandingHeight(worn, PlayerLook.Of(Climb[Climb.Length - 1]).Scale)));
+
+            var kinder = 0;
+            var greedy = new List<string>();
+            var looks = new List<float> { LevelBlueprintBuilder.FigureScale };
+
+            foreach (var target in Climb)
+            {
+                looks.Add(PlayerLook.Of(target).Scale);
+            }
+
+            for (var tier = 0; tier < hides.Count && tier < looks.Count; tier++)
+            {
+                var capsule = FigureFit.HiddenGroundOf(PartModel.None, looks[tier]);
+
+                if (hides[tier] <= capsule)
+                {
+                    kinder++;
+                }
+                else
+                {
+                    greedy.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} hides {1:0.#####} against the capsule's {2:0.#####}",
+                        tier,
+                        hides[tier],
+                        capsule));
+                }
+            }
+
+            failures += Assert(
+                report,
+                hides.Count > 0 && kinder == hides.Count,
+                "the mesh hides less ground than the capsule would at every tier the seam grows it to",
+                kinder + " of " + hides.Count + " tiers do"
+                + (greedy.Count == 0 ? "" : "; " + string.Join("; ", greedy.ToArray())));
+
+            return failures;
+        }
+
+        static void Portrait(
+            CameraRig rig, Camera lens, PlayerFigure player, ICollection<Mesh> pack, int tier)
+        {
+            if (player == null)
+            {
+                return;
+            }
+
+            var ground = player.Ground;
+            var standing = Standing(player, pack);
+            var size = standing * PortraitSize;
+            rig.Hold(new CameraFraming(
+                new WorldPoint(ground.X, ground.Y + standing * 0.5f, ground.Z), size));
+            PreviewFilm.Shoot(lens, PortraitPath + tier + ".png");
+        }
+
+        static ICollection<Mesh> PackMeshes(PartModel worn)
+        {
+            var meshes = new HashSet<Mesh>();
+            var prefab = Resources.Load<GameObject>(WorldModels.AssetPathOf(worn));
+
+            if (prefab == null)
+            {
+                return meshes;
+            }
+
+            foreach (var renderer in prefab.GetComponentsInChildren<Renderer>(true))
+            {
+                var mesh = MeshOn(renderer);
+                if (mesh != null)
+                {
+                    meshes.Add(mesh);
+                }
+            }
+
+            return meshes;
+        }
+
+        static Mesh MeshOn(Renderer renderer)
+        {
+            var skinned = renderer as SkinnedMeshRenderer;
+            if (skinned != null)
+            {
+                return skinned.sharedMesh;
+            }
+
+            var filter = renderer.GetComponent<MeshFilter>();
+
+            return filter == null ? null : filter.sharedMesh;
+        }
+
+        static float Standing(PlayerFigure player, ICollection<Mesh> pack)
+        {
+            return player == null ? 0f : Worn(player.transform, pack).size.y;
+        }
+
+        static float Hiding(PlayerFigure player, ICollection<Mesh> pack)
+        {
+            if (player == null)
+            {
+                return 0f;
+            }
+
+            var box = Worn(player.transform, pack);
+
+            return Math.Max(box.size.x, box.size.z) * IsoProjection.SightReach(box.size.y);
+        }
+
+        static Color Painted(PlayerFigure player)
+        {
+            if (player == null)
+            {
+                return Color.black;
+            }
+
+            var block = new MaterialPropertyBlock();
+
+            foreach (var renderer in player.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                renderer.GetPropertyBlock(block);
+
+                return block.GetColor(BaseColour);
+            }
+
+            return Color.black;
+        }
+
+        static float ScaleOn(PlayerFigure player)
+        {
+            return player == null ? 1f : player.transform.localScale.x;
+        }
+
+        static Bounds Worn(Transform instance, ICollection<Mesh> pack)
+        {
+            var box = new Bounds();
+            var first = true;
+
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                var mesh = MeshOn(renderer);
+                if (mesh == null || !pack.Contains(mesh))
+                {
+                    continue;
+                }
+
+                if (first)
+                {
+                    box = renderer.bounds;
+                    first = false;
+                }
+                else
+                {
+                    box.Encapsulate(renderer.bounds);
+                }
+            }
+
+            return box;
         }
 
         static string Walk(PowerBadge power, PlayerFigure player, int target)
@@ -94,7 +781,11 @@ namespace Game.EditorTooling
             return "\n  " + from + " -> " + target + ": the beat never settled";
         }
 
-        static string Row(PowerBadge power, PlayerFigure player, IReadOnlyList<EnemyFigure> enemies)
+        static string Row(
+            PowerBadge power,
+            PlayerFigure player,
+            IReadOnlyList<EnemyFigure> enemies,
+            ICollection<Mesh> pack)
         {
             var counts = new int[4];
             foreach (var enemy in enemies)
@@ -105,10 +796,11 @@ namespace Game.EditorTooling
             var row = new StringBuilder();
             row.AppendFormat(
                 CultureInfo.InvariantCulture,
-                "\n  power {0} is tier {1} at scale {2:0.###} carrying {3} ->",
+                "\n  power {0} is tier {1} at scale {2:0.###} standing {3:0.###} carrying {4} ->",
                 power.Power,
                 power.Look.Tier,
                 player.transform.localScale.x,
+                Standing(player, pack),
                 player.Carrying);
 
             for (var band = 0; band < counts.Length; band++)
@@ -136,6 +828,21 @@ namespace Game.EditorTooling
             }
 
             return new WorldPoint(0f, 0f, 0f);
+        }
+
+        static int Assert(StringBuilder report, bool held, string claim, string detail)
+        {
+            report.Append("\n  ").Append(held ? "ok   " : "FAIL ").Append(claim).Append(" - ").Append(detail);
+
+            return held ? 0 : 1;
+        }
+
+        static void Wipe(string path)
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
     }
 }
