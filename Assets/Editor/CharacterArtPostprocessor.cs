@@ -121,23 +121,23 @@ namespace Game.EditorTooling
                     continue;
                 }
 
+                var loops = AdventurerClips.LoopsOf(take.name);
+
                 kept.Add(new ModelImporterClipAnimation
                 {
                     takeName = take.name,
                     name = take.name,
                     firstFrame = (float)Math.Round(take.startTime * take.sampleRate),
                     lastFrame = (float)Math.Round(take.stopTime * take.sampleRate),
-                    loopTime = AdventurerClips.LoopsOf(take.name),
-                    loopPose = AdventurerClips.LoopsOf(take.name),
+                    loopTime = loops,
+                    loopPose = loops,
                     lockRootRotation = false,
                     lockRootHeightY = false,
                     lockRootPositionXZ = false,
                     keepOriginalOrientation = true,
                     keepOriginalPositionY = true,
                     keepOriginalPositionXZ = true,
-                    wrapMode = AdventurerClips.LoopsOf(take.name)
-                        ? UnityEngine.WrapMode.Loop
-                        : UnityEngine.WrapMode.ClampForever
+                    wrapMode = loops ? UnityEngine.WrapMode.Loop : UnityEngine.WrapMode.ClampForever
                 });
             }
 

@@ -43,11 +43,6 @@ namespace Game.Presentation
             lookedForAnAtlas = new bool[packs];
         }
 
-        public int Complaints
-        {
-            get { return complaints.Said; }
-        }
-
         public Texture2D Atlas
         {
             get { return AtlasOf(ArtPack.Dungeon); }
@@ -134,12 +129,46 @@ namespace Game.Presentation
 
         public AnimationClip ClipOf(PartModel model, string clip)
         {
+            var table = Table(model);
+
+            if (table == null || string.IsNullOrEmpty(clip))
+            {
+                return null;
+            }
+
+            AnimationClip found;
+            if (table.TryGetValue(clip, out found))
+            {
+                return found;
+            }
+
+            if (complaints.ShouldSay(model + "/" + clip))
+            {
+                UnityEngine.Debug.LogWarning(
+                    "Animation clip " + clip + " resolves to nothing under Resources/" + AssetPathOf(model)
+                    + ", where " + table.Count
+                    + " clips did load, so every figure wearing that mesh holds its static pose whenever "
+                    + clip + " is called for.");
+            }
+
+            return null;
+        }
+
+        public int ClipCountOf(PartModel model)
+        {
+            var table = Table(model);
+
+            return table == null ? 0 : table.Count;
+        }
+
+        Dictionary<string, AnimationClip> Table(PartModel model)
+        {
             if (disposed)
             {
                 throw new ObjectDisposedException(nameof(WorldModels));
             }
 
-            if (model == PartModel.None || string.IsNullOrEmpty(clip))
+            if (model == PartModel.None)
             {
                 return null;
             }
@@ -150,43 +179,7 @@ namespace Game.Presentation
                 clipsByModel[slot] = Clips(model);
             }
 
-            AnimationClip found;
-            if (clipsByModel[slot].TryGetValue(clip, out found))
-            {
-                return found;
-            }
-
-            if (complaints.ShouldSay(model + "/" + clip))
-            {
-                UnityEngine.Debug.LogWarning(
-                    "Animation clip " + clip + " resolves to nothing under Resources/" + AssetPathOf(model)
-                    + ", where " + clipsByModel[slot].Count
-                    + " clips did load, so every figure wearing that mesh holds its static pose whenever "
-                    + clip + " is called for.");
-            }
-
-            return null;
-        }
-
-        public int ClipCountOf(PartModel model)
-        {
-            if (disposed)
-            {
-                throw new ObjectDisposedException(nameof(WorldModels));
-            }
-
-            if (model == PartModel.None)
-            {
-                return 0;
-            }
-
-            var slot = (int)model;
-            if (clipsByModel[slot] == null)
-            {
-                clipsByModel[slot] = Clips(model);
-            }
-
-            return clipsByModel[slot].Count;
+            return clipsByModel[slot];
         }
 
         public bool Dresses(PartStyle style)

@@ -57,14 +57,6 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void OnlyTheRiggedPackCarriesClips()
-        {
-            Assert.That(AdventurerClips.Carries(PartModel.Knight), Is.True);
-            Assert.That(AdventurerClips.Carries(PartModel.FloorTile), Is.False);
-            Assert.That(AdventurerClips.Carries(PartModel.None), Is.False);
-        }
-
-        [Test]
         public void NoActOutsideTheEnumNamesAClip()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => AdventurerClips.NameOf((FigureAct)99));
@@ -347,9 +339,6 @@ namespace Game.Domain.Tests
             Assert.That(complaints.ShouldSay("Idle"), Is.False);
             Assert.That(complaints.ShouldSay("Walking_A"), Is.True);
             Assert.That(complaints.Said, Is.EqualTo(2));
-            Assert.That(complaints.HasSaid("Idle"), Is.True);
-            Assert.That(complaints.HasSaid("PickUp"), Is.False);
-
             complaints.Forget();
 
             Assert.That(complaints.Said, Is.EqualTo(0));
@@ -364,7 +353,6 @@ namespace Game.Domain.Tests
             Assert.That(complaints.ShouldSay(null), Is.False);
             Assert.That(complaints.ShouldSay(string.Empty), Is.False);
             Assert.That(complaints.Said, Is.EqualTo(0));
-            Assert.That(complaints.HasSaid(null), Is.False);
         }
 
         [Test]

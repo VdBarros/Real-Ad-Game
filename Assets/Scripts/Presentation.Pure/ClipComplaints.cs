@@ -22,11 +22,6 @@ namespace Game.Presentation.Pure
             return said.Add(clip);
         }
 
-        public bool HasSaid(string clip)
-        {
-            return !string.IsNullOrEmpty(clip) && said.Contains(clip);
-        }
-
         public void Forget()
         {
             said.Clear();

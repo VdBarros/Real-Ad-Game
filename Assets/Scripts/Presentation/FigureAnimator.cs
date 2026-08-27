@@ -26,11 +26,6 @@ namespace Game.Presentation
 
         bool grafted;
 
-        public FigureMotion Motion
-        {
-            get { return motion; }
-        }
-
         public FigureAct Act
         {
             get { return motion.Cue.Act; }

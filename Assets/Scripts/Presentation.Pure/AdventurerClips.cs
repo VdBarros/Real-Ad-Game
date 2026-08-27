@@ -19,9 +19,34 @@ namespace Game.Presentation.Pure
 
         public const string Take = "PickUp";
 
-        static readonly string[] names = { Idle, Walk, Retreat, Strike, Clash, Recoil, Take };
+        readonly struct Playing
+        {
+            public Playing(FigureAct act, string clip, bool loops)
+            {
+                Act = act;
+                Clip = clip;
+                Loops = loops;
+            }
 
-        static readonly bool[] loops = { true, true, true, false, false, false, false };
+            public FigureAct Act { get; }
+
+            public string Clip { get; }
+
+            public bool Loops { get; }
+        }
+
+        static readonly Playing[] table =
+        {
+            new Playing(FigureAct.Idle, Idle, true),
+            new Playing(FigureAct.Walk, Walk, true),
+            new Playing(FigureAct.Retreat, Retreat, true),
+            new Playing(FigureAct.Strike, Strike, false),
+            new Playing(FigureAct.Clash, Clash, false),
+            new Playing(FigureAct.Recoil, Recoil, false),
+            new Playing(FigureAct.Take, Take, false)
+        };
+
+        static readonly string[] names = Named();
 
         public static IReadOnlyList<string> Names
         {
@@ -30,64 +55,72 @@ namespace Game.Presentation.Pure
 
         public static int Count
         {
-            get { return names.Length; }
+            get { return table.Length; }
         }
 
         public static string NameOf(FigureAct act)
         {
-            return names[Slot(act)];
+            return Of(act).Clip;
         }
 
         public static bool Loops(FigureAct act)
         {
-            return loops[Slot(act)];
+            return Of(act).Loops;
         }
 
         public static bool Wants(string clip)
         {
-            return Named(clip) >= 0;
+            return Slot(clip) >= 0;
         }
 
         public static bool LoopsOf(string clip)
         {
-            var slot = Named(clip);
+            var slot = Slot(clip);
 
-            return slot >= 0 && loops[slot];
+            return slot >= 0 && table[slot].Loops;
         }
 
-        public static bool Carries(PartModel model)
+        static string[] Named()
         {
-            return AdventurerPack.Carries(model);
+            var named = new string[table.Length];
+
+            for (var slot = 0; slot < table.Length; slot++)
+            {
+                named[slot] = table[slot].Clip;
+            }
+
+            return named;
         }
 
-        static int Named(string clip)
+        static Playing Of(FigureAct act)
+        {
+            foreach (var playing in table)
+            {
+                if (playing.Act == act)
+                {
+                    return playing;
+                }
+            }
+
+            throw new ArgumentOutOfRangeException(nameof(act), act, "No clip name for that act.");
+        }
+
+        static int Slot(string clip)
         {
             if (string.IsNullOrEmpty(clip))
             {
                 return -1;
             }
 
-            for (var slot = 0; slot < names.Length; slot++)
+            for (var slot = 0; slot < table.Length; slot++)
             {
-                if (string.Equals(names[slot], clip, StringComparison.Ordinal))
+                if (string.Equals(table[slot].Clip, clip, StringComparison.Ordinal))
                 {
                     return slot;
                 }
             }
 
             return -1;
-        }
-
-        static int Slot(FigureAct act)
-        {
-            var slot = (int)act;
-
-            if (slot < 0 || slot >= names.Length)
-            {
-                throw new ArgumentOutOfRangeException(nameof(act), act, "No clip name for that act.");
-            }
-
-            return slot;
         }
     }
 }
