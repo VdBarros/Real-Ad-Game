@@ -102,8 +102,10 @@ namespace Game.Presentation.Pure
             {
                 case ArtPack.Adventurers:
                     return AdventurerPack.PackWidthOf(model);
-                default:
+                case ArtPack.Skeletons:
                     return SkeletonPack.PackWidthOf(model);
+                default:
+                    throw Unmeasured(model);
             }
         }
 
@@ -113,8 +115,10 @@ namespace Game.Presentation.Pure
             {
                 case ArtPack.Adventurers:
                     return AdventurerPack.PackDepthOf(model);
-                default:
+                case ArtPack.Skeletons:
                     return SkeletonPack.PackDepthOf(model);
+                default:
+                    throw Unmeasured(model);
             }
         }
 
@@ -124,8 +128,10 @@ namespace Game.Presentation.Pure
             {
                 case ArtPack.Adventurers:
                     return AdventurerPack.PackBaseOf(model);
-                default:
+                case ArtPack.Skeletons:
                     return SkeletonPack.PackBaseOf(model);
+                default:
+                    throw Unmeasured(model);
             }
         }
 
@@ -135,8 +141,10 @@ namespace Game.Presentation.Pure
             {
                 case ArtPack.Adventurers:
                     return AdventurerPack.StandingScales;
-                default:
+                case ArtPack.Skeletons:
                     return SkeletonPack.StandingScales;
+                default:
+                    throw Unmeasured(model);
             }
         }
 
@@ -146,8 +154,10 @@ namespace Game.Presentation.Pure
             {
                 case ArtPack.Adventurers:
                     return AdventurerPack.Facing;
-                default:
+                case ArtPack.Skeletons:
                     return SkeletonPack.Facing;
+                default:
+                    throw Unmeasured(model);
             }
         }
 
@@ -169,6 +179,12 @@ namespace Game.Presentation.Pure
         public static float BaseOf(PartModel model)
         {
             return PackBaseOf(model) * ImportScaleFor(model);
+        }
+
+        static ArgumentOutOfRangeException Unmeasured(PartModel model)
+        {
+            return new ArgumentOutOfRangeException(
+                nameof(model), model, "That cast pack carries no measured figure footprint.");
         }
 
         static ArtPack Cast(PartModel model)
