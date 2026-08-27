@@ -17,9 +17,9 @@ namespace Game.Presentation
 
         public bool HasFallen { get; private set; }
 
-        internal void Begin(Transform badge, int nodeId, int enemyValue)
+        internal void Begin(Transform badge, PartModel mesh, int nodeId, int enemyValue)
         {
-            Stand(badge);
+            Stand(badge, mesh);
             NodeId = nodeId;
             value = enemyValue;
         }

@@ -121,12 +121,16 @@ namespace Game.Presentation
                     {
                         playerNumber = badge;
                         playerFigure = prop.gameObject.AddComponent<PlayerFigure>();
-                        playerFigure.Stand(badge.transform);
+                        playerFigure.Stand(badge.transform, models.Worn(PartStyle.Start));
                     }
                     else if (part.Style == BadgeStyle.Enemy || part.Style == BadgeStyle.Boss)
                     {
                         var enemy = prop.gameObject.AddComponent<EnemyFigure>();
-                        enemy.Begin(badge.transform, part.NodeId, part.Value);
+                        enemy.Begin(
+                            badge.transform,
+                            models.Worn(part.Style == BadgeStyle.Boss ? PartStyle.Boss : PartStyle.Enemy),
+                            part.NodeId,
+                            part.Value);
                         enemies.Add(enemy);
                     }
                     else if (part.Style == BadgeStyle.Additive || part.Style == BadgeStyle.Multiplier)
@@ -193,6 +197,11 @@ namespace Game.Presentation
             var instance = raised
                 ? UnityEngine.Object.Instantiate(model)
                 : GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
+
+            if (raised && ArtPacks.IsRigged(part.Model))
+            {
+                CharacterDress.Bare(instance);
+            }
 
             instance.name = part.Name;
             instance.transform.SetParent(parent, worldPositionStays: false);

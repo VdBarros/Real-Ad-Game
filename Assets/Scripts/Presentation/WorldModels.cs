@@ -8,15 +8,19 @@ namespace Game.Presentation
     {
         public const string ResourcesFolder = "Dungeon";
 
+        public const string CharacterFolder = "Characters";
+
         public const string AtlasAsset = "dungeon_texture";
+
+        public const string CharacterAtlasAsset = "knight_texture";
 
         readonly GameObject[] byModel;
 
         readonly bool[] looked;
 
-        Texture2D atlas;
+        readonly Texture2D[] byPack;
 
-        bool lookedForTheAtlas;
+        readonly bool[] lookedForAnAtlas;
 
         bool disposed;
 
@@ -25,37 +29,62 @@ namespace Game.Presentation
             var models = Enum.GetValues(typeof(PartModel)).Length;
             byModel = new GameObject[models];
             looked = new bool[models];
+
+            var packs = Enum.GetValues(typeof(ArtPack)).Length;
+            byPack = new Texture2D[packs];
+            lookedForAnAtlas = new bool[packs];
         }
 
         public Texture2D Atlas
         {
-            get
-            {
-                if (disposed)
-                {
-                    throw new ObjectDisposedException(nameof(WorldModels));
-                }
-
-                if (!lookedForTheAtlas)
-                {
-                    lookedForTheAtlas = true;
-                    atlas = Resources.Load<Texture2D>(AtlasPath);
-
-                    if (atlas == null)
-                    {
-                        UnityEngine.Debug.LogWarning(
-                            "The dungeon atlas resolves to nothing loadable at Resources/" + AtlasPath
-                            + ", so every mesh that resolves wears a flat tint instead of the pack's texture.");
-                    }
-                }
-
-                return atlas;
-            }
+            get { return AtlasOf(ArtPack.Dungeon); }
         }
 
         public static string AtlasPath
         {
-            get { return ResourcesFolder + "/" + AtlasAsset; }
+            get { return AtlasPathOf(ArtPack.Dungeon); }
+        }
+
+        public Texture2D AtlasOf(ArtPack pack)
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(WorldModels));
+            }
+
+            var slot = (int)pack;
+            if (!lookedForAnAtlas[slot])
+            {
+                lookedForAnAtlas[slot] = true;
+                byPack[slot] = Resources.Load<Texture2D>(AtlasPathOf(pack));
+
+                if (byPack[slot] == null)
+                {
+                    UnityEngine.Debug.LogWarning(
+                        "The " + pack + " atlas resolves to nothing loadable at Resources/" + AtlasPathOf(pack)
+                        + ", so every mesh that resolves wears a flat tint instead of the pack's texture.");
+                }
+            }
+
+            return byPack[slot];
+        }
+
+        public Texture2D AtlasFor(PartModel model)
+        {
+            return model == PartModel.None ? null : AtlasOf(ArtPacks.Of(model));
+        }
+
+        public static string AtlasPathOf(ArtPack pack)
+        {
+            switch (pack)
+            {
+                case ArtPack.Dungeon:
+                    return ResourcesFolder + "/" + AtlasAsset;
+                case ArtPack.Adventurers:
+                    return CharacterFolder + "/" + CharacterAtlasAsset;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(pack), pack, "No atlas for that pack.");
+            }
         }
 
         public GameObject Of(PartModel model)
@@ -79,7 +108,8 @@ namespace Game.Presentation
                 if (byModel[slot] == null)
                 {
                     UnityEngine.Debug.LogWarning(
-                        "Part model " + model + " resolves to nothing loadable under Resources/" + ResourcesFolder
+                        "Part model " + model + " resolves to nothing loadable under Resources/"
+                        + FolderOf(model)
                         + ", so every part that wants it falls back to the primitive its part shape names.");
                 }
             }
@@ -92,11 +122,25 @@ namespace Game.Presentation
             return Of(PartModels.Of(style)) != null;
         }
 
+        public PartModel Worn(PartStyle style)
+        {
+            var wanted = PartModels.Of(style);
+
+            return Of(wanted) == null ? PartModel.None : wanted;
+        }
+
         public static string AssetPathOf(PartModel model)
         {
             var asset = AssetNameOf(model);
 
-            return string.IsNullOrEmpty(asset) ? null : ResourcesFolder + "/" + asset;
+            return string.IsNullOrEmpty(asset) ? null : FolderOf(model) + "/" + asset;
+        }
+
+        public static string FolderOf(PartModel model)
+        {
+            return model != PartModel.None && ArtPacks.Of(model) == ArtPack.Adventurers
+                ? CharacterFolder
+                : ResourcesFolder;
         }
 
         static GameObject Load(PartModel model)
@@ -122,6 +166,8 @@ namespace Game.Presentation
                     return "coin_stack_large";
                 case PartModel.Staircase:
                     return "stairs_narrow";
+                case PartModel.Knight:
+                    return "Knight";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(model), model, "No asset name for that part model.");
             }
@@ -135,8 +181,12 @@ namespace Game.Presentation
                 looked[slot] = false;
             }
 
-            atlas = null;
-            lookedForTheAtlas = false;
+            for (var slot = 0; slot < byPack.Length; slot++)
+            {
+                byPack[slot] = null;
+                lookedForAnAtlas[slot] = false;
+            }
+
             disposed = true;
         }
     }
