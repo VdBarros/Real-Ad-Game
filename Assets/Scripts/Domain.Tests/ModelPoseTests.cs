@@ -19,6 +19,7 @@ namespace Game.Domain.Tests
                 var posed = new WorldPart(
                     part.Name, part.Shape, model, part.Style, part.Position, part.Rotation, part.Scale);
 
+                Assert.That(() => ModelPose.PositionOf(posed), Throws.Nothing, model.ToString());
                 Assert.That(() => ModelPose.RotationOf(posed), Throws.Nothing, model.ToString());
                 Assert.That(() => ModelPose.ScaleOf(posed), Throws.Nothing, model.ToString());
             }
@@ -44,6 +45,14 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void AFloorMeshStaysWhereTheQuadWasBecauseBothPivotOnTheTileTop()
+        {
+            var floor = FirstFloor();
+
+            Assert.That(ModelPose.PositionOf(floor), Is.EqualTo(floor.Position));
+        }
+
+        [Test]
         public void AFloorMeshKeepsWhateverYawItsPartAsksFor()
         {
             var floor = FirstFloor();
@@ -66,6 +75,7 @@ namespace Game.Domain.Tests
 
             foreach (var part in blueprint.AllParts.Where(candidate => candidate.Model == PartModel.None))
             {
+                Assert.That(ModelPose.PositionOf(part), Is.EqualTo(part.Position), part.Name);
                 Assert.That(ModelPose.RotationOf(part), Is.EqualTo(part.Rotation), part.Name);
                 Assert.That(ModelPose.ScaleOf(part), Is.EqualTo(part.Scale), part.Name);
             }
@@ -78,6 +88,224 @@ namespace Game.Domain.Tests
             Assert.That(
                 DungeonPack.GridUnits * DungeonPack.ImportScale,
                 Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
+        }
+
+        [Test]
+        public void AWallPanelDropsFromTheQuadsCentreOntoTheTileItGuards()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+            var walls = blueprint.AllParts.Where(part => part.Style == PartStyle.Wall).ToList();
+
+            Assert.That(walls, Is.Not.Empty);
+
+            foreach (var wall in walls)
+            {
+                var posed = ModelPose.PositionOf(wall);
+
+                Assert.That(posed.X, Is.EqualTo(wall.Position.X).Within(Tolerance), wall.Name);
+                Assert.That(posed.Z, Is.EqualTo(wall.Position.Z).Within(Tolerance), wall.Name);
+                Assert.That(
+                    posed.Y,
+                    Is.EqualTo(wall.Position.Y - IsoProjection.WallHeight * 0.5f).Within(Tolerance),
+                    wall.Name);
+            }
+        }
+
+        [Test]
+        public void AWallPanelStandsOnTheEdgeItsOwnTileTopSitsAt()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                var top = IsoProjection.Of(tile.Position);
+
+                foreach (var side in TileSides.All)
+                {
+                    var name = PartNames.Wall(tile.Position, side);
+                    var wall = blueprint.AllParts.FirstOrDefault(part => part.Name == name);
+
+                    if (wall.Name == null)
+                    {
+                        continue;
+                    }
+
+                    var posed = ModelPose.PositionOf(wall);
+                    var beyond = IsoProjection.Of(TileSides.Step(tile.Position, side));
+
+                    Assert.That(posed.Y, Is.EqualTo(top.Y).Within(Tolerance), name);
+                    Assert.That(posed.X, Is.EqualTo((top.X + beyond.X) * 0.5f).Within(Tolerance), name);
+                    Assert.That(posed.Z, Is.EqualTo((top.Z + beyond.Z) * 0.5f).Within(Tolerance), name);
+                }
+            }
+        }
+
+        [Test]
+        public void AWallPanelKeepsTheInwardYawTheQuadWasGiven()
+        {
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
+
+            foreach (var wall in blueprint.AllParts.Where(part => part.Style == PartStyle.Wall))
+            {
+                Assert.That(ModelPose.RotationOf(wall), Is.EqualTo(wall.Rotation), wall.Name);
+            }
+        }
+
+        [Test]
+        public void AWallPanelIsFittedToOneWallHeight()
+        {
+            var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
+            var wall = blueprint.AllParts.First(part => part.Style == PartStyle.Wall);
+            var scale = ModelPose.ScaleOf(wall);
+
+            Assert.That(
+                scale.Y * DungeonPack.HeightOf(PartModel.WallPanel),
+                Is.EqualTo(IsoProjection.WallHeight).Within(Tolerance));
+            Assert.That(scale.X, Is.EqualTo(scale.Y).Within(Tolerance));
+            Assert.That(scale.Z, Is.EqualTo(scale.Y).Within(Tolerance));
+        }
+
+        [Test]
+        public void AContentPropStandsOnTheTileRatherThanFloatingAtItsCubesCentre()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                WorldPart prop;
+                if (!LevelBlueprintBuilder.TryProp(node, out prop) || prop.Model == PartModel.None)
+                {
+                    continue;
+                }
+
+                var top = IsoProjection.Of(node.Position);
+
+                Assert.That(ModelPose.PositionOf(prop).Y, Is.EqualTo(top.Y).Within(Tolerance), prop.Name);
+                Assert.That(prop.Position.Y, Is.GreaterThan(top.Y), prop.Name);
+            }
+        }
+
+        [Test]
+        public void EachRewardPropIsFittedToTheCubeItReplaces()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                WorldPart prop;
+                if (!LevelBlueprintBuilder.TryProp(node, out prop) || prop.Model == PartModel.None)
+                {
+                    continue;
+                }
+
+                var scale = ModelPose.ScaleOf(prop);
+
+                Assert.That(
+                    scale.Y * DungeonPack.HeightOf(prop.Model),
+                    Is.EqualTo(LevelBlueprintBuilder.PickupScale).Within(Tolerance),
+                    prop.Name);
+            }
+        }
+
+        [Test]
+        public void TheTwoRewardPropsStandTheSameHeightAndAreFittedByDifferentAmounts()
+        {
+            var chest = Pickup(PartStyle.Additive);
+            var candles = Pickup(PartStyle.Multiplier);
+
+            Assert.That(chest.Model, Is.EqualTo(PartModel.Chest));
+            Assert.That(candles.Model, Is.EqualTo(PartModel.Candles));
+            Assert.That(
+                ModelPose.ScaleOf(chest).Y * DungeonPack.HeightOf(PartModel.Chest),
+                Is.EqualTo(ModelPose.ScaleOf(candles).Y * DungeonPack.HeightOf(PartModel.Candles))
+                    .Within(Tolerance));
+            Assert.That(ModelPose.ScaleOf(chest).Y, Is.Not.EqualTo(ModelPose.ScaleOf(candles).Y));
+        }
+
+        [Test]
+        public void ACollapsingRewardPropStaysOnTheTileWhileItFlattens()
+        {
+            var chest = Pickup(PartStyle.Additive);
+            var ground = chest.Position.Y - chest.Scale.Y * 0.5f;
+            var pedestal = new WorldPart(
+                chest.Name,
+                chest.Shape,
+                chest.Model,
+                chest.Style,
+                new WorldPoint(
+                    chest.Position.X, ground + Take.PedestalHeight * 0.5f, chest.Position.Z),
+                chest.Rotation,
+                new WorldPoint(Take.PedestalEdge, Take.PedestalHeight, Take.PedestalEdge));
+
+            Assert.That(ModelPose.PositionOf(pedestal).Y, Is.EqualTo(ground).Within(Tolerance));
+            Assert.That(
+                ModelPose.ScaleOf(pedestal).Y * DungeonPack.HeightOf(PartModel.Chest),
+                Is.EqualTo(Take.PedestalHeight).Within(Tolerance));
+            Assert.That(
+                ModelPose.ScaleOf(pedestal).X,
+                Is.GreaterThan(ModelPose.ScaleOf(chest).X));
+        }
+
+        [Test]
+        public void AChestTurnsItsFrontOutOfTheCamerasBlindSide()
+        {
+            var chest = Pickup(PartStyle.Additive);
+
+            Assert.That(ModelPose.ChestFacing, Is.EqualTo(180f));
+            Assert.That(
+                ModelPose.RotationOf(chest).Y,
+                Is.EqualTo(chest.Rotation.Y + ModelPose.ChestFacing).Within(Tolerance));
+            Assert.That(ModelPose.RotationOf(chest).X, Is.EqualTo(chest.Rotation.X).Within(Tolerance));
+            Assert.That(ModelPose.RotationOf(chest).Z, Is.EqualTo(chest.Rotation.Z).Within(Tolerance));
+        }
+
+        [Test]
+        public void EveryMeshTheTableNamesHasAMeasuredPackHeight()
+        {
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (model == PartModel.None)
+                {
+                    Assert.That(
+                        () => DungeonPack.PackHeightOf(model),
+                        Throws.InstanceOf<ArgumentOutOfRangeException>());
+                    continue;
+                }
+
+                Assert.That(DungeonPack.PackHeightOf(model), Is.GreaterThan(0f), model.ToString());
+                Assert.That(
+                    DungeonPack.HeightOf(model),
+                    Is.EqualTo(DungeonPack.PackHeightOf(model) * DungeonPack.ImportScale).Within(Tolerance),
+                    model.ToString());
+            }
+        }
+
+        [Test]
+        public void ASolidWallOfOneWallHeightHidesTheTileBehindItAtTheCamerasPitch()
+        {
+            Assert.That(IsoProjection.SightReach(0f), Is.EqualTo(0f).Within(Tolerance));
+            Assert.That(
+                IsoProjection.SightReach(IsoProjection.WallHeight),
+                Is.EqualTo(1.224745f).Within(1e-4f));
+            Assert.That(
+                IsoProjection.SightReach(IsoProjection.WallHeight),
+                Is.GreaterThan(IsoProjection.TileEdge));
+            Assert.That(
+                IsoProjection.SightReach(IsoProjection.WallHeight * 2f),
+                Is.EqualTo(IsoProjection.SightReach(IsoProjection.WallHeight) * 2f).Within(Tolerance));
+        }
+
+        static WorldPart Pickup(PartStyle style)
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+
+            return LevelBlueprintBuilder.Build(graph)
+                .AllParts
+                .First(part => part.Style == style);
         }
 
         static WorldPart FirstFloor()

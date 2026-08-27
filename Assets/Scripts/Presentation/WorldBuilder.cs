@@ -135,7 +135,7 @@ namespace Game.Presentation
                         if (LevelBlueprintBuilder.TryProp(graph.Decisions.Node(part.NodeId), out gem))
                         {
                             var pickup = prop.gameObject.AddComponent<PickupProp>();
-                            pickup.Begin(gem, part.NodeId, badge.transform);
+                            pickup.Begin(gem, part.NodeId, badge.transform, models.Of(gem.Model) != null);
                             pickups.Add(pickup);
                         }
                     }
@@ -196,10 +196,10 @@ namespace Game.Presentation
 
             instance.name = part.Name;
             instance.transform.SetParent(parent, worldPositionStays: false);
-            instance.transform.localPosition = Vector(part.Position);
+            instance.transform.localPosition = Vector(raised ? ModelPose.PositionOf(part) : part.Position);
             instance.transform.localEulerAngles = Vector(raised ? ModelPose.RotationOf(part) : part.Rotation);
             instance.transform.localScale = Vector(raised ? ModelPose.ScaleOf(part) : part.Scale);
-            instance.GetComponentInChildren<Renderer>().sharedMaterial = materials.Of(part.Style);
+            Dress(instance, materials.Of(part.Style));
 
             if (part.Style != PartStyle.Floor)
             {
@@ -211,6 +211,14 @@ namespace Game.Presentation
             }
 
             return instance;
+        }
+
+        static void Dress(GameObject instance, Material material)
+        {
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                renderer.sharedMaterial = material;
+            }
         }
 
         static void Enclose(GameObject instance)
