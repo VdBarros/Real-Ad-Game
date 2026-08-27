@@ -17,6 +17,78 @@ namespace Game.Domain.Tests
             return power + level.BossPower;
         }
 
+        public static int Best(PlacedLevel level)
+        {
+            var walk = ParWalk.Richest(level.Graph, level.Tuning);
+            if (!walk.BeatsTheBoss)
+            {
+                return -1;
+            }
+
+            var run = RunState.Begin(level.Graph, level.StartingPower);
+            foreach (var target in walk.Targets)
+            {
+                var result = ActionResolver.Resolve(run, target);
+                if (result.Outcome == ActionOutcome.Rejected)
+                {
+                    return -1;
+                }
+
+                run = result.State;
+            }
+
+            return run.IsLevelComplete ? run.Power : -1;
+        }
+
+        public static int Plodding(PlacedLevel level)
+        {
+            var decisions = level.Graph.Decisions;
+            var run = RunState.Begin(level.Graph, level.StartingPower);
+
+            while (true)
+            {
+                if (Cheapest(run, decisions, NodeType.Boss) >= 0)
+                {
+                    return Finished(run, decisions);
+                }
+
+                var take = -1;
+                var meanest = 0;
+                foreach (var nodeId in run.ReachableNodes)
+                {
+                    var node = decisions.Node(nodeId);
+                    if (run.IsConsumed(nodeId)
+                        || (node.Type != NodeType.Additive
+                            && node.Type != NodeType.Multiplier
+                            && node.Type != NodeType.Enemy))
+                    {
+                        continue;
+                    }
+
+                    var result = ActionResolver.Resolve(run, nodeId);
+                    if (result.Outcome == ActionOutcome.Rejected
+                        || result.Outcome == ActionOutcome.Loss
+                        || result.Outcome == ActionOutcome.Tie)
+                    {
+                        continue;
+                    }
+
+                    if (take < 0 || result.State.Power < meanest)
+                    {
+                        take = nodeId;
+                        meanest = result.State.Power;
+                    }
+                }
+
+                if (take < 0)
+                {
+                    return Finished(run, decisions);
+                }
+
+                run = ActionResolver.Resolve(run, take).State;
+            }
+        }
+
         public static int Routed(PlacedLevel level)
         {
             var decisions = level.Graph.Decisions;

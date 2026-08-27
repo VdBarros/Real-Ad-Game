@@ -21,8 +21,6 @@ namespace Game.Domain.Tests
 
         const double MissBar = 0.004;
 
-        const double DegenerateParBar = 0.05;
-
         const int EliteMissDivisor = 100;
 
         static readonly int[] Inflations = { 3, 10, 50 };
@@ -275,21 +273,12 @@ namespace Game.Domain.Tests
         }
 
         [TestCaseSource(nameof(EveryPlanOnTheCurve))]
-        public void TheParOfEveryAcceptedLevelStandsOnItsBeelineAndItsRichestEntry(int levelNumber)
+        public void TheParOfEveryAcceptedLevelStandsOnItsBeelineAndOnARouteThatBeatsTheBoss(int levelNumber)
         {
             foreach (var accepted in PlanSweep(levelNumber).Accepted)
             {
                 var level = accepted.Level;
-                var bossRegion = level.Graph.RegionOf(level.BossNodeId);
-                var entry = -1;
-
-                foreach (var region in level.Envelope.Regions)
-                {
-                    if (region.RegionId == bossRegion)
-                    {
-                        entry = region.RichestEntry;
-                    }
-                }
+                var walk = ParWalk.Richest(level.Graph, level.Tuning);
 
                 Assert.That(
                     level.Par.Floor,
@@ -297,10 +286,85 @@ namespace Game.Domain.Tests
                     "Seed " + level.AttemptSeed + " authored a Par floor away from its beeline.");
 
                 Assert.That(
+                    walk.BeatsTheBoss,
+                    Is.True,
+                    "Seed " + level.AttemptSeed + " left its richest walk short of the boss.");
+
+                Assert.That(
                     level.Par.Ceiling,
-                    Is.EqualTo(entry + level.BossPower),
-                    "Seed " + level.AttemptSeed + " authored a Par ceiling away from its richest entry.");
+                    Is.EqualTo(walk.Finish),
+                    "Seed " + level.AttemptSeed + " authored a Par ceiling away from its richest walk.");
             }
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheWallsOfEveryAcceptedLevelsParStandStrictlyApart(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            foreach (var accepted in sweep.Accepted)
+            {
+                var par = accepted.Level.Par;
+
+                Assert.That(
+                    par.Floor,
+                    Is.LessThan(par.Ceiling),
+                    "Seed " + accepted.Level.AttemptSeed + " shipped " + par + ".");
+
+                Assert.That(
+                    par.IsDegenerate,
+                    Is.False,
+                    "Seed " + accepted.Level.AttemptSeed + " shipped " + par + ".");
+            }
+
+            Assert.That(sweep.ParsWithTheirWallsMet(), Is.Zero, sweep.Name + " par " + sweep.Rating());
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void NoBeelineOnAnyPlanCanFinishAboveItsOwnParsCeiling(int levelNumber)
+        {
+            foreach (var accepted in PlanSweep(levelNumber).Accepted)
+            {
+                var level = accepted.Level;
+
+                Assert.That(
+                    level.BossPower,
+                    Is.GreaterThan(level.ShortestPathPower),
+                    "Seed " + level.AttemptSeed + " let a beeline take the boss.");
+
+                Assert.That(
+                    level.Par.Floor,
+                    Is.LessThan(2 * level.BossPower),
+                    "Seed " + level.AttemptSeed + " put its Par floor above what beating the boss can pay.");
+
+                Assert.That(
+                    level.Par.Ceiling,
+                    Is.GreaterThan(2 * level.BossPower),
+                    "Seed " + level.AttemptSeed + " shipped a ceiling no winning route could hold.");
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheCeilingOfEveryRatedLevelIsWhatAConstructedLegalRunActuallyHolds(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            foreach (var accepted in sweep.Rated())
+            {
+                var level = accepted.Level;
+
+                Assert.That(
+                    ReferenceRuns.Best(level),
+                    Is.EqualTo(level.Par.Ceiling),
+                    "Seed " + level.AttemptSeed + " could not be routed to its own Par ceiling.");
+
+                Assert.That(
+                    Stars.For(level.Par, ReferenceRuns.Best(level), levelNumber),
+                    Is.EqualTo(Stars.Most),
+                    "Seed " + level.AttemptSeed + " kept the third star out of reach of a legal run.");
+            }
+
+            Assert.That(sweep.CeilingsNoRouteReaches(), Is.Zero, sweep.Name + " par " + sweep.Rating());
         }
 
         [TestCaseSource(nameof(EveryPlanOnTheCurve))]
@@ -317,27 +381,11 @@ namespace Game.Domain.Tests
                     Is.EqualTo(Stars.Most),
                     "Seed " + accepted.Level.AttemptSeed + " kept the third star out of reach of " + par + ".");
 
-                if (par.IsDegenerate)
-                {
-                    continue;
-                }
-
                 Assert.That(
                     Stars.For(par, par.Floor, levelNumber),
                     Is.EqualTo(Stars.Fewest),
                     "Seed " + accepted.Level.AttemptSeed + " handed a beeline more than one star on " + par + ".");
             }
-        }
-
-        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
-        public void TheWallsOfAParStandApartOnAllButAMeasuredFewOfEveryPlansLevels(int levelNumber)
-        {
-            var sweep = PlanSweep(levelNumber);
-
-            Assert.That(
-                sweep.ShareOfParsWithTheirWallsMet(),
-                Is.LessThan(DegenerateParBar),
-                sweep.Name + " par " + sweep.Rating());
         }
 
         [TestCaseSource(nameof(EveryPlanOnTheCurve))]
@@ -365,10 +413,27 @@ namespace Game.Domain.Tests
                 "opening " + opening.Rating() + "; plateau " + plateau.Rating());
 
             Assert.That(
-                ShareAtTheTop(plateau.StingyStars()),
-                Is.LessThan(ShareAtTheTop(opening.StingyStars())),
-                "A stingy run held the third star as often at the plateau: opening "
+                ShareAtTheTop(plateau.RoutedStars()),
+                Is.LessThan(ShareAtTheTop(opening.RoutedStars())),
+                "A routed run held the third star as often at the plateau: opening "
                     + opening.Rating() + "; plateau " + plateau.Rating());
+
+            Assert.That(
+                ShareAtTheTop(plateau.PloddingStars()),
+                Is.LessThan(ShareAtTheTop(opening.PloddingStars())),
+                "A plodding run held the third star as often at the plateau: opening "
+                    + opening.Rating() + "; plateau " + plateau.Rating());
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void ARoutedRunOutScoresAPloddingOneOnEveryPlan(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            Assert.That(
+                Tallied(sweep.RoutedStars()),
+                Is.GreaterThan(Tallied(sweep.PloddingStars())),
+                sweep.Name + " rated routing no better than plodding: " + sweep.Rating());
         }
 
         static double ShareAtTheTop(IReadOnlyList<int> stars)

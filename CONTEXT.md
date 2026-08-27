@@ -253,16 +253,27 @@ The richest entry into a region: take everything outside it first, in the best
 order, and only then enter. The upper wall of the envelope, and what good
 routing is worth.
 
+## Richest walk
+
+The richest power a *route* can finish a level holding. Unlike `P_max` it obeys
+that walking to a node consumes every pickup on the way, so it cannot hoard
+multipliers to the end; it is a search over real routes, and the route it found
+is part of its answer, replayable through `ActionResolver`. It always ends by
+beating the boss. It belongs to Par alone — `P_max` is what the envelope and the
+spread floor are built on, and stays as it is.
+
 ## Par
 
 What routing a level well is worth, expressed as the two powers a run can
-finish it holding: the beeline to the boss at the bottom, and the richest entry
-into the boss's region at the top. Both walls count the boss the run had to beat
-to finish, so a Par and the number it rates are the same kind of number. Where a
-finished run's power landed between the two is what the result reports back to
-the player, and a Par whose walls meet rates nothing, because the routing on
-that level was worth nothing. Par is read off the completed level rather than
-authored beside it, so it cannot drift from the level it belongs to, and it
+finish it holding: the beeline to the boss at the bottom, and the richest walk
+that beats the boss at the top. Both walls count the boss the run had to beat to
+finish, so a Par and the number it rates are the same kind of number. Because a
+beeline cannot afford the boss on any accepted level, its floor sits below twice
+the boss's number while any winning route finishes above it, so the two walls
+stand strictly apart on every accepted level and a Par whose walls meet cannot
+be shipped. Where a finished run's power landed between the two is what the
+result reports back to the player. Par is read off the completed level rather
+than authored beside it, so it cannot drift from the level it belongs to, and it
 gates nothing — a level always leads to the next one.
 
 ## Recipe

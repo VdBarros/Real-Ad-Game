@@ -39,29 +39,65 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheCeilingOfAParIsTheRichestEntryIntoTheBossesRegionAndTheBossItself()
+        public void TheCeilingOfAParIsTheRichestRouteThatBeatsTheBoss()
         {
             var level = LevelGenerator.Generate(5, MazePreset.Ship);
-            var bossRegion = level.Graph.RegionOf(level.BossNodeId);
-            var entry = -1;
+            var walk = ParWalk.Richest(level.Graph, level.Tuning);
 
-            foreach (var region in level.Envelope.Regions)
+            Assert.That(walk.BeatsTheBoss, Is.True);
+            Assert.That(level.Par.Ceiling, Is.EqualTo(walk.Finish));
+        }
+
+        [Test]
+        public void TheRichestWalkOfALevelIsARouteARunCanActuallyTake()
+        {
+            var level = LevelGenerator.Generate(5, MazePreset.Ship);
+            var walk = ParWalk.Richest(level.Graph, level.Tuning);
+            var run = RunState.Begin(level.Graph, level.StartingPower);
+
+            Assert.That(walk.Targets, Is.Not.Empty);
+
+            foreach (var target in walk.Targets)
             {
-                if (region.RegionId == bossRegion)
-                {
-                    entry = region.RichestEntry;
-                }
+                var result = ActionResolver.Resolve(run, target);
+
+                Assert.That(result.Outcome, Is.Not.EqualTo(ActionOutcome.Rejected));
+                run = result.State;
             }
 
-            Assert.That(entry, Is.GreaterThan(0));
-            Assert.That(level.Par.Ceiling, Is.EqualTo(entry + level.BossPower));
+            Assert.That(run.IsLevelComplete, Is.True);
+            Assert.That(run.Power, Is.EqualTo(walk.Finish));
+        }
+
+        [Test]
+        public void ARichestWalkEndsOnTheBoss()
+        {
+            var level = LevelGenerator.Generate(5, MazePreset.Ship);
+            var walk = ParWalk.Richest(level.Graph, level.Tuning);
+            var run = RunState.Begin(level.Graph, level.StartingPower);
+
+            Assert.That(walk.Targets[walk.Targets.Count - 1], Is.EqualTo(level.BossNodeId));
+
+            for (var index = 0; index < walk.Targets.Count - 1; index++)
+            {
+                run = ActionResolver.Resolve(run, walk.Targets[index]).State;
+                Assert.That(run.IsLevelComplete, Is.False);
+            }
         }
 
         [Test]
         public void NothingAboutAParIsDerivedFromTheBoundInvariantBUses()
         {
             Assert.That(SourceTree.Read("Domain", "Generation", "Par.cs"), Does.Not.Contain("PowerBound"));
+            Assert.That(SourceTree.Read("Domain", "Generation", "ParWalk.cs"), Does.Not.Contain("PowerBound"));
             Assert.That(SourceTree.Read("Domain", "Generation", "Stars.cs"), Does.Not.Contain("PowerBound"));
+        }
+
+        [Test]
+        public void ARichestWalkLeavesTheEnvelopeItDoesNotUseAlone()
+        {
+            Assert.That(SourceTree.Read("Domain", "Generation", "Par.cs"), Does.Not.Contain("RichestEntry"));
+            Assert.That(SourceTree.Read("Domain", "Generation", "ParWalk.cs"), Does.Not.Contain("RichestEntry"));
         }
 
         [Test]
