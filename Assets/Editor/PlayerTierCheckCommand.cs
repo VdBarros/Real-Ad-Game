@@ -153,6 +153,12 @@ namespace Game.EditorTooling
                 return failures;
             }
 
+            failures += Assert(
+                report,
+                worn != PartModel.None,
+                "the cast names a mesh for the player rather than leaving it on its primitive",
+                PartStyle.Start + " wants " + worn);
+
             var skins = player.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             var filters = player.GetComponentsInChildren<MeshFilter>(true);
             var bones = 0;
@@ -249,9 +255,13 @@ namespace Game.EditorTooling
         static int FittedToTheTile(
             PlayerFigure player, PartModel worn, ICollection<Mesh> pack, StringBuilder report)
         {
-            if (player == null)
+            if (player == null || worn == PartModel.None)
             {
-                return Assert(report, false, "the player mesh is fitted to the tile grid", "there is no figure");
+                return Assert(
+                    report,
+                    false,
+                    "the player mesh is fitted to the tile grid",
+                    player == null ? "there is no figure" : "the figure wears no mesh to measure");
             }
 
             var box = Worn(player.transform, pack);
@@ -332,9 +342,13 @@ namespace Game.EditorTooling
         static int HidesLittleGround(
             PlayerFigure player, PartModel worn, ICollection<Mesh> pack, StringBuilder report)
         {
-            if (player == null)
+            if (player == null || worn == PartModel.None)
             {
-                return Assert(report, false, "the player mesh hides little ground", "there is no figure");
+                return Assert(
+                    report,
+                    false,
+                    "the player mesh hides little ground",
+                    player == null ? "there is no figure" : "the figure wears no mesh to measure");
             }
 
             var box = Worn(player.transform, pack);
@@ -495,13 +509,17 @@ namespace Game.EditorTooling
                     var first = cache.Of(model);
                     var second = cache.Of(model);
 
-                    if (ReferenceEquals(first, second) && first != null)
+                    if (first == null)
                     {
-                        cached++;
+                        asked.Add(model + " resolved to nothing at all");
+                    }
+                    else if (!ReferenceEquals(first, second))
+                    {
+                        asked.Add(model + " answered a different object the second time");
                     }
                     else
                     {
-                        asked.Add(model + " answered differently the second time");
+                        cached++;
                     }
                 }
             }
@@ -553,7 +571,7 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                heights.Count == VisualTier.Count && grew == heights.Count - 1,
+                heights.Count == VisualTier.Count && heights[0] > 0f && grew == heights.Count - 1,
                 "the mesh grows by the tier seam's own step of "
                 + PlayerLook.Growth.ToString("0.##", CultureInfo.InvariantCulture) + " at every tier",
                 grew + " of " + (heights.Count - 1) + " steps do"
@@ -561,13 +579,13 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                repainted == tints.Count - 1,
+                tints.Count > 1 && repainted == tints.Count - 1,
                 "the mesh takes a new tint from the tier seam's ramp at every tier",
                 repainted + " of " + (tints.Count - 1) + " steps do");
 
             failures += Assert(
                 report,
-                Math.Abs(heights[heights.Count - 1]
+                heights[heights.Count - 1] > 0f && Math.Abs(heights[heights.Count - 1]
                     - FigureFit.StandingHeight(worn, PlayerLook.Of(Climb[Climb.Length - 1]).Scale)) <= Epsilon,
                 "the topmost tier stands exactly as tall as the pure fit says it should",
                 string.Format(
@@ -606,7 +624,7 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                hides.Count > 0 && kinder == hides.Count,
+                hides.Count > 0 && hides[0] > 0f && kinder == hides.Count,
                 "the mesh hides less ground than the capsule would at every tier the seam grows it to",
                 kinder + " of " + hides.Count + " tiers do"
                 + (greedy.Count == 0 ? "" : "; " + string.Join("; ", greedy.ToArray())));
@@ -624,16 +642,17 @@ namespace Game.EditorTooling
 
             var ground = player.Ground;
             var standing = Standing(player, pack);
-            var size = standing * PortraitSize;
+            var size = (standing > 0f ? standing : IsoProjection.TileEdge) * PortraitSize;
             rig.Hold(new CameraFraming(
-                new WorldPoint(ground.X, ground.Y + standing * 0.5f, ground.Z), size));
+                new WorldPoint(ground.X, ground.Y + size * 0.25f, ground.Z), size));
             PreviewFilm.Shoot(lens, PortraitPath + tier + ".png");
         }
 
         static ICollection<Mesh> PackMeshes(PartModel worn)
         {
             var meshes = new HashSet<Mesh>();
-            var prefab = Resources.Load<GameObject>(WorldModels.AssetPathOf(worn));
+            var path = WorldModels.AssetPathOf(worn);
+            var prefab = path == null ? null : Resources.Load<GameObject>(path);
 
             if (prefab == null)
             {
