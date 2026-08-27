@@ -11,11 +11,16 @@ namespace Game.Presentation
     {
         const float CameraDrift = 0.01f;
 
-        readonly WorldMaterials materials = new WorldMaterials();
-
         readonly WorldModels models = new WorldModels();
 
+        readonly WorldMaterials materials;
+
         readonly BadgeAssets badgeAssets = new BadgeAssets();
+
+        public WorldBuilder()
+        {
+            materials = new WorldMaterials(models);
+        }
 
         public PowerBadge PlayerBadge { get; private set; }
 
@@ -174,29 +179,43 @@ namespace Game.Presentation
 
         GameObject Raise(WorldPart part, Transform parent)
         {
-            var instance = Body(part);
+            var model = models.Of(part.Model);
+            var raised = model != null;
+            var instance = raised
+                ? UnityEngine.Object.Instantiate(model)
+                : GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
+
             instance.name = part.Name;
             instance.transform.SetParent(parent, worldPositionStays: false);
             instance.transform.localPosition = Vector(part.Position);
-            instance.transform.localEulerAngles = Vector(part.Rotation);
-            instance.transform.localScale = Vector(part.Scale);
+            instance.transform.localEulerAngles = Vector(raised ? ModelPose.RotationOf(part) : part.Rotation);
+            instance.transform.localScale = Vector(raised ? ModelPose.ScaleOf(part) : part.Scale);
             instance.GetComponentInChildren<Renderer>().sharedMaterial = materials.Of(part.Style);
 
             if (part.Style != PartStyle.Floor)
             {
                 WorldObjects.Destroy(instance.GetComponent<Collider>());
             }
+            else if (raised)
+            {
+                Enclose(instance);
+            }
 
             return instance;
         }
 
-        GameObject Body(WorldPart part)
+        static void Enclose(GameObject instance)
         {
-            var model = models.Of(part.Model);
+            var filter = instance.GetComponentInChildren<MeshFilter>();
+            if (filter == null || filter.sharedMesh == null)
+            {
+                return;
+            }
 
-            return model == null
-                ? GameObject.CreatePrimitive(PrimitiveOf(part.Shape))
-                : UnityEngine.Object.Instantiate(model);
+            var bounds = filter.sharedMesh.bounds;
+            var box = filter.gameObject.AddComponent<BoxCollider>();
+            box.center = bounds.center;
+            box.size = bounds.size;
         }
 
         static Transform Group(Transform parent, string name)

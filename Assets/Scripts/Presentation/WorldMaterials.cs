@@ -13,6 +13,14 @@ namespace Game.Presentation
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
 
+        static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
+
+        static readonly int MainTexId = Shader.PropertyToID("_MainTex");
+
+        static readonly int SmoothnessId = Shader.PropertyToID("_Smoothness");
+
+        public const float Smoothness = 0f;
+
         static readonly string[] shaderNames =
         {
             "Universal Render Pipeline/Lit",
@@ -27,13 +35,21 @@ namespace Game.Presentation
 
         readonly Material[] byStyle;
 
+        readonly WorldModels models;
+
         Shader shader;
 
         bool disposed;
 
         public WorldMaterials()
+            : this(null)
+        {
+        }
+
+        public WorldMaterials(WorldModels dressing)
         {
             byStyle = new Material[Enum.GetValues(typeof(PartStyle)).Length];
+            models = dressing;
         }
 
         public Material Of(PartStyle style)
@@ -71,7 +87,38 @@ namespace Game.Presentation
                 material.SetColor(ColorId, colour);
             }
 
+            if (material.HasProperty(SmoothnessId))
+            {
+                material.SetFloat(SmoothnessId, Smoothness);
+            }
+
+            Texture(material, style);
+
             return material;
+        }
+
+        void Texture(Material material, PartStyle style)
+        {
+            if (models == null || !models.Dresses(style))
+            {
+                return;
+            }
+
+            var atlas = models.Atlas;
+            if (atlas == null)
+            {
+                return;
+            }
+
+            if (material.HasProperty(BaseMapId))
+            {
+                material.SetTexture(BaseMapId, atlas);
+            }
+
+            if (material.HasProperty(MainTexId))
+            {
+                material.SetTexture(MainTexId, atlas);
+            }
         }
 
         Shader LitShader()

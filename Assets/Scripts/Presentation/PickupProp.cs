@@ -27,7 +27,7 @@ namespace Game.Presentation
 
         internal void Begin(WorldPart part, int nodeId, Transform hangingBadge)
         {
-            skin = GetComponent<Renderer>();
+            skin = GetComponentInChildren<Renderer>();
             badge = hangingBadge;
             NodeId = nodeId;
 

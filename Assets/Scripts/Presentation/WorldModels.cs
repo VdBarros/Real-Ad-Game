@@ -8,11 +8,17 @@ namespace Game.Presentation
     {
         public const string ResourcesFolder = "Dungeon";
 
+        public const string AtlasAsset = "dungeon_texture";
+
         const string NoMeshIsCommittedYet = null;
 
         readonly GameObject[] byModel;
 
         readonly bool[] looked;
+
+        Texture2D atlas;
+
+        bool lookedForTheAtlas;
 
         bool disposed;
 
@@ -21,6 +27,37 @@ namespace Game.Presentation
             var models = Enum.GetValues(typeof(PartModel)).Length;
             byModel = new GameObject[models];
             looked = new bool[models];
+        }
+
+        public Texture2D Atlas
+        {
+            get
+            {
+                if (disposed)
+                {
+                    throw new ObjectDisposedException(nameof(WorldModels));
+                }
+
+                if (!lookedForTheAtlas)
+                {
+                    lookedForTheAtlas = true;
+                    atlas = Resources.Load<Texture2D>(AtlasPath);
+
+                    if (atlas == null)
+                    {
+                        UnityEngine.Debug.LogWarning(
+                            "The dungeon atlas resolves to nothing loadable at Resources/" + AtlasPath
+                            + ", so every mesh that resolves wears a flat tint instead of the pack's texture.");
+                    }
+                }
+
+                return atlas;
+            }
+        }
+
+        public static string AtlasPath
+        {
+            get { return ResourcesFolder + "/" + AtlasAsset; }
         }
 
         public GameObject Of(PartModel model)
@@ -52,6 +89,11 @@ namespace Game.Presentation
             return byModel[slot];
         }
 
+        public bool Dresses(PartStyle style)
+        {
+            return Of(PartModels.Of(style)) != null;
+        }
+
         public static string AssetPathOf(PartModel model)
         {
             var asset = AssetNameOf(model);
@@ -73,7 +115,7 @@ namespace Game.Presentation
                 case PartModel.None:
                     return null;
                 case PartModel.FloorTile:
-                    return NoMeshIsCommittedYet;
+                    return "floor_tile_large";
                 case PartModel.WallPanel:
                     return NoMeshIsCommittedYet;
                 case PartModel.Chest:
@@ -93,6 +135,8 @@ namespace Game.Presentation
                 looked[slot] = false;
             }
 
+            atlas = null;
+            lookedForTheAtlas = false;
             disposed = true;
         }
     }
