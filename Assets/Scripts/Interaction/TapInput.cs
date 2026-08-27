@@ -28,6 +28,8 @@ namespace Game.Interaction
 
         float reach;
 
+        bool swallowing;
+
         public event Action<TargetPreview> Aimed;
 
         public event Action<TargetPreview> Tapped;
@@ -35,6 +37,18 @@ namespace Game.Interaction
         public event Action Released;
 
         public bool IsLocked { get; set; }
+
+        public bool CallShowing { get; set; }
+
+        public bool SwallowsThePress
+        {
+            get { return swallowing; }
+        }
+
+        public bool OnTheCall(ScreenPoint finger)
+        {
+            return CallShowing && RecentreCall.Holds(FrameWidth, FrameHeight, finger);
+        }
 
         public TargetPreview Preview { get; private set; } = TargetPreview.None;
 
@@ -111,6 +125,7 @@ namespace Game.Interaction
 
             run = state;
             candidates = null;
+            swallowing = false;
             Preview = TargetPreview.None;
             board.Show(run, Preview);
         }
@@ -252,6 +267,25 @@ namespace Game.Interaction
         public void Reading(bool pressedNow, bool releasedNow, bool isPressed, bool hovers, ScreenPoint finger)
         {
             RequireARun();
+
+            var onTheCall = OnTheCall(finger);
+
+            if (pressedNow)
+            {
+                swallowing = onTheCall;
+            }
+
+            if (swallowing || (onTheCall && !hold.HoldsAPress))
+            {
+                if (releasedNow)
+                {
+                    swallowing = false;
+                }
+
+                hold = TapHold.Idle;
+                Cancel();
+                return;
+            }
 
             hold = hold.Reading(
                 pressedNow, releasedNow, isPressed, hovers, IsLocked || rig.IsBusy, finger, Reach);
