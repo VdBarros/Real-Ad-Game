@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Game.Presentation;
 using Game.Presentation.Pure;
 using UnityEditor;
@@ -15,11 +16,20 @@ namespace Game.EditorTooling
 
         public const ModelImporterSkinWeights SkinWeights = ModelImporterSkinWeights.Standard;
 
+        public const ModelImporterAnimationCompression AnimationCompression =
+            ModelImporterAnimationCompression.Optimal;
+
+        public const float RotationError = 0.5f;
+
+        public const float PositionError = 0.5f;
+
+        public const float ScaleError = 0.5f;
+
         public const int AtlasMaxSize = 1024;
 
         public override uint GetVersion()
         {
-            return 3;
+            return 4;
         }
 
         void OnPreprocessModel()
@@ -34,7 +44,13 @@ namespace Game.EditorTooling
             importer.animationType = Rig;
             importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
             importer.skinWeights = SkinWeights;
-            importer.importAnimation = false;
+            importer.importAnimation = true;
+            importer.animationCompression = AnimationCompression;
+            importer.animationRotationError = RotationError;
+            importer.animationPositionError = PositionError;
+            importer.animationScaleError = ScaleError;
+            importer.resampleCurves = true;
+            importer.removeConstantScaleCurves = true;
             importer.importAnimatedCustomProperties = false;
             importer.importCameras = false;
             importer.importLights = false;
@@ -49,6 +65,17 @@ namespace Game.EditorTooling
             importer.meshCompression = Compression;
             importer.useFileScale = true;
             importer.globalScale = ArtPacks.CastImportScale;
+        }
+
+        void OnPreprocessAnimation()
+        {
+            var importer = assetImporter as ModelImporter;
+            if (importer == null || !Ours(importer.assetPath))
+            {
+                return;
+            }
+
+            importer.clipAnimations = Narrowed(importer);
         }
 
         void OnPreprocessTexture()
@@ -74,6 +101,47 @@ namespace Game.EditorTooling
             android.maxTextureSize = AtlasMaxSize;
             android.format = TextureImporterFormat.ASTC_6x6;
             importer.SetPlatformTextureSettings(android);
+        }
+
+        static ModelImporterClipAnimation[] Narrowed(ModelImporter importer)
+        {
+            var takes = importer.importedTakeInfos;
+
+            if (takes == null || takes.Length == 0)
+            {
+                return importer.clipAnimations;
+            }
+
+            var kept = new List<ModelImporterClipAnimation>(AdventurerClips.Count);
+
+            foreach (var take in takes)
+            {
+                if (!AdventurerClips.Wants(take.name))
+                {
+                    continue;
+                }
+
+                kept.Add(new ModelImporterClipAnimation
+                {
+                    takeName = take.name,
+                    name = take.name,
+                    firstFrame = (float)Math.Round(take.startTime * take.sampleRate),
+                    lastFrame = (float)Math.Round(take.stopTime * take.sampleRate),
+                    loopTime = AdventurerClips.LoopsOf(take.name),
+                    loopPose = AdventurerClips.LoopsOf(take.name),
+                    lockRootRotation = false,
+                    lockRootHeightY = false,
+                    lockRootPositionXZ = false,
+                    keepOriginalOrientation = true,
+                    keepOriginalPositionY = true,
+                    keepOriginalPositionXZ = true,
+                    wrapMode = AdventurerClips.LoopsOf(take.name)
+                        ? UnityEngine.WrapMode.Loop
+                        : UnityEngine.WrapMode.ClampForever
+                });
+            }
+
+            return kept.ToArray();
         }
 
         static bool Ours(string path)

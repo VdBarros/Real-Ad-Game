@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Game.Presentation.Pure;
 using UnityEngine;
 
@@ -24,6 +25,10 @@ namespace Game.Presentation
 
         readonly bool[] lookedForAnAtlas;
 
+        readonly Dictionary<string, AnimationClip>[] clipsByModel;
+
+        readonly ClipComplaints complaints = new ClipComplaints();
+
         bool disposed;
 
         public WorldModels()
@@ -31,10 +36,16 @@ namespace Game.Presentation
             var models = Enum.GetValues(typeof(PartModel)).Length;
             byModel = new GameObject[models];
             looked = new bool[models];
+            clipsByModel = new Dictionary<string, AnimationClip>[models];
 
             var packs = Enum.GetValues(typeof(ArtPack)).Length;
             byPack = new Texture2D[packs];
             lookedForAnAtlas = new bool[packs];
+        }
+
+        public int Complaints
+        {
+            get { return complaints.Said; }
         }
 
         public Texture2D Atlas
@@ -121,6 +132,63 @@ namespace Game.Presentation
             return byModel[slot];
         }
 
+        public AnimationClip ClipOf(PartModel model, string clip)
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(WorldModels));
+            }
+
+            if (model == PartModel.None || string.IsNullOrEmpty(clip))
+            {
+                return null;
+            }
+
+            var slot = (int)model;
+            if (clipsByModel[slot] == null)
+            {
+                clipsByModel[slot] = Clips(model);
+            }
+
+            AnimationClip found;
+            if (clipsByModel[slot].TryGetValue(clip, out found))
+            {
+                return found;
+            }
+
+            if (complaints.ShouldSay(model + "/" + clip))
+            {
+                UnityEngine.Debug.LogWarning(
+                    "Animation clip " + clip + " resolves to nothing under Resources/" + AssetPathOf(model)
+                    + ", where " + clipsByModel[slot].Count
+                    + " clips did load, so every figure wearing that mesh holds its static pose whenever "
+                    + clip + " is called for.");
+            }
+
+            return null;
+        }
+
+        public int ClipCountOf(PartModel model)
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(WorldModels));
+            }
+
+            if (model == PartModel.None)
+            {
+                return 0;
+            }
+
+            var slot = (int)model;
+            if (clipsByModel[slot] == null)
+            {
+                clipsByModel[slot] = Clips(model);
+            }
+
+            return clipsByModel[slot].Count;
+        }
+
         public bool Dresses(PartStyle style)
         {
             if (!CharacterCast.IsRole(style))
@@ -156,6 +224,27 @@ namespace Game.Presentation
         public static string FolderOf(PartModel model)
         {
             return ArtPacks.IsRigged(model) ? CharacterFolder : ResourcesFolder;
+        }
+
+        static Dictionary<string, AnimationClip> Clips(PartModel model)
+        {
+            var table = new Dictionary<string, AnimationClip>(StringComparer.Ordinal);
+            var path = AssetPathOf(model);
+
+            if (path == null || !ArtPacks.IsRigged(model))
+            {
+                return table;
+            }
+
+            foreach (var clip in Resources.LoadAll<AnimationClip>(path))
+            {
+                if (clip != null)
+                {
+                    table[clip.name] = clip;
+                }
+            }
+
+            return table;
         }
 
         static GameObject Load(PartModel model)
@@ -202,7 +291,10 @@ namespace Game.Presentation
             {
                 byModel[slot] = null;
                 looked[slot] = false;
+                clipsByModel[slot] = null;
             }
+
+            complaints.Forget();
 
             for (var slot = 0; slot < byPack.Length; slot++)
             {

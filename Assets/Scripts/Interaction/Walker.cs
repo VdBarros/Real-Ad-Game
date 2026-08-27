@@ -14,6 +14,8 @@ namespace Game.Interaction
 
         PlayerFigure figure;
 
+        FigureAnimator acting;
+
         PowerBadge power;
 
         FloorState floor;
@@ -97,6 +99,7 @@ namespace Game.Interaction
             rig = framing;
             input = taps;
             figure = world.Player;
+            acting = figure == null ? null : figure.GetComponent<FigureAnimator>();
             power = world.PlayerBadge;
             floor = world.Floor;
             trail = world.Trail;
@@ -209,6 +212,7 @@ namespace Game.Interaction
 
             journey = journey.Resumed();
             landed = false;
+            Act();
 
             if (journey.IsOver)
             {
@@ -256,6 +260,14 @@ namespace Game.Interaction
             rig.CutTo(Run.Level.Decisions.Node(journey.Walk.ArrivedNodeId).Position);
         }
 
+        void Act()
+        {
+            if (acting != null)
+            {
+                acting.Cue(FigureCues.Of(journey));
+            }
+        }
+
         void ReleaseTheBeat()
         {
             if (power == null || power.IsSettled)
@@ -272,6 +284,8 @@ namespace Game.Interaction
             {
                 figure.StandOn(journey.Walk.Position);
             }
+
+            Act();
 
             if (fights != null)
             {
@@ -290,6 +304,11 @@ namespace Game.Interaction
         void Settle()
         {
             enabled = false;
+
+            if (acting != null)
+            {
+                acting.Cue(FigureCue.Still);
+            }
 
             if (!afoot)
             {
