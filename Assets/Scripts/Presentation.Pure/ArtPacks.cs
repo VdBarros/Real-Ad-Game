@@ -47,9 +47,7 @@ namespace Game.Presentation.Pure
 
         public static float HeightOf(PartModel model)
         {
-            return Of(model) == ArtPack.Adventurers
-                ? AdventurerPack.HeightOf(model)
-                : DungeonPack.HeightOf(model);
+            return PackHeightOf(model) * ImportScaleFor(model);
         }
     }
 }

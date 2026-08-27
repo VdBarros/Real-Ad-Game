@@ -203,7 +203,7 @@ namespace Game.EditorTooling
 
             foreach (var renderer in renderers)
             {
-                var mesh = MeshOn(renderer);
+                var mesh = PackMesh.On(renderer);
 
                 if (mesh != null && pack.Contains(mesh))
                 {
@@ -267,6 +267,7 @@ namespace Game.EditorTooling
             var path = worn == PartModel.None ? null : WorldModels.AssetPathOf(worn);
             var prefab = path == null ? null : Resources.Load<GameObject>(path);
 
+
             if (prefab == null)
             {
                 return Assert(
@@ -276,15 +277,7 @@ namespace Game.EditorTooling
                     "Resources/" + (path ?? "nothing") + " loads nothing to measure");
             }
 
-            var instance = UnityEngine.Object.Instantiate(prefab);
-            instance.transform.position = Vector3.zero;
-            instance.transform.rotation = Quaternion.identity;
-            instance.transform.localScale = Vector3.one;
-            CharacterDress.Bare(instance);
-
-            var box = Worn(instance.transform, pack);
-
-            WorldObjects.Destroy(instance);
+            var box = PackMesh.Bare(prefab);
 
             return Assert(
                 report,
@@ -320,7 +313,7 @@ namespace Game.EditorTooling
                     player == null ? "there is no figure" : "the figure wears no mesh to measure");
             }
 
-            var box = Worn(player.transform, pack);
+            var box = PackMesh.Wearing(player.transform, pack);
             var scale = LevelBlueprintBuilder.FigureScale;
             var wanted = FigureFit.StandingHeight(worn, scale);
             var ground = player.Ground;
@@ -407,7 +400,7 @@ namespace Game.EditorTooling
                     player == null ? "there is no figure" : "the figure wears no mesh to measure");
             }
 
-            var box = Worn(player.transform, pack);
+            var box = PackMesh.Wearing(player.transform, pack);
             var scale = LevelBlueprintBuilder.FigureScale;
             var depth = IsoProjection.SightReach(box.size.y);
             var hidden = box.size.x * depth;
@@ -434,7 +427,8 @@ namespace Game.EditorTooling
                 hidden <= bound,
                 "the figure hides at most " + IsoProjection.OcclusionBound.ToString(
                     "0.##", CultureInfo.InvariantCulture)
-                + " of a tile of ground, the bound the wall work set",
+                + " of a tile of ground, which is the wall work's bound read as an area rather than a "
+                + "depth, because a wall spans a whole tile edge and a figure spans a fraction of one",
                 string.Format(
                     CultureInfo.InvariantCulture,
                     "standing {0:0.#####} tall and {1:0.#####} wide it hides {2:0.#####} tiles of ground "
@@ -704,45 +698,9 @@ namespace Game.EditorTooling
             PreviewFilm.Shoot(lens, PortraitPath + tier + ".png");
         }
 
-        static ICollection<Mesh> PackMeshes(PartModel worn)
-        {
-            var meshes = new HashSet<Mesh>();
-            var path = WorldModels.AssetPathOf(worn);
-            var prefab = path == null ? null : Resources.Load<GameObject>(path);
-
-            if (prefab == null)
-            {
-                return meshes;
-            }
-
-            foreach (var renderer in prefab.GetComponentsInChildren<Renderer>(true))
-            {
-                var mesh = MeshOn(renderer);
-                if (mesh != null)
-                {
-                    meshes.Add(mesh);
-                }
-            }
-
-            return meshes;
-        }
-
-        static Mesh MeshOn(Renderer renderer)
-        {
-            var skinned = renderer as SkinnedMeshRenderer;
-            if (skinned != null)
-            {
-                return skinned.sharedMesh;
-            }
-
-            var filter = renderer.GetComponent<MeshFilter>();
-
-            return filter == null ? null : filter.sharedMesh;
-        }
-
         static float Standing(PlayerFigure player, ICollection<Mesh> pack)
         {
-            return player == null ? 0f : Worn(player.transform, pack).size.y;
+            return player == null ? 0f : PackMesh.Wearing(player.transform, pack).size.y;
         }
 
         static float Hiding(PlayerFigure player, ICollection<Mesh> pack)
@@ -752,7 +710,7 @@ namespace Game.EditorTooling
                 return 0f;
             }
 
-            var box = Worn(player.transform, pack);
+            var box = PackMesh.Wearing(player.transform, pack);
 
             return Math.Max(box.size.x, box.size.z) * IsoProjection.SightReach(box.size.y);
         }
@@ -779,33 +737,6 @@ namespace Game.EditorTooling
         static float ScaleOn(PlayerFigure player)
         {
             return player == null ? 1f : player.transform.localScale.x;
-        }
-
-        static Bounds Worn(Transform instance, ICollection<Mesh> pack)
-        {
-            var box = new Bounds();
-            var first = true;
-
-            foreach (var renderer in instance.GetComponentsInChildren<Renderer>(true))
-            {
-                var mesh = MeshOn(renderer);
-                if (mesh == null || !pack.Contains(mesh))
-                {
-                    continue;
-                }
-
-                if (first)
-                {
-                    box = renderer.bounds;
-                    first = false;
-                }
-                else
-                {
-                    box.Encapsulate(renderer.bounds);
-                }
-            }
-
-            return box;
         }
 
         static string Walk(PowerBadge power, PlayerFigure player, int target)

@@ -24,7 +24,7 @@ namespace Game.Presentation
             get { return worn; }
         }
 
-        protected float Unfitted
+        protected float CapsuleUnit
         {
             get { return 1f / FigureFit.ScaleOf(worn); }
         }
@@ -100,7 +100,7 @@ namespace Game.Presentation
             {
                 badge.localPosition = new Vector3(
                     ground.X,
-                    BadgeMetrics.AnchorAbove(ground.Y + Scale * FigureFit.TopOf(worn)),
+                    BadgeMetrics.AnchorAbove(ground.Y + FigureFit.StandingHeight(worn, Scale)),
                     ground.Z);
             }
         }

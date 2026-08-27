@@ -1,16 +1,10 @@
 using System;
-using System.Collections.Generic;
 
 namespace Game.Presentation.Pure
 {
     public static class CharacterCast
     {
         static readonly PartStyle[] roles = { PartStyle.Start, PartStyle.Enemy, PartStyle.Boss };
-
-        public static IReadOnlyList<PartStyle> Roles
-        {
-            get { return roles; }
-        }
 
         public static bool IsRole(PartStyle style)
         {
@@ -40,20 +34,5 @@ namespace Game.Presentation.Pure
             }
         }
 
-        public static PartModel MeshOfPlayer(PlayerLook look)
-        {
-            if (look.Tier < 0 || look.Tier >= VisualTier.Count)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(look), look.Tier, "A player look always names a visual tier.");
-            }
-
-            return MeshOf(PartStyle.Start);
-        }
-
-        public static bool Wears(PartStyle role)
-        {
-            return MeshOf(role) != PartModel.None;
-        }
     }
 }

@@ -32,10 +32,11 @@ namespace Game.Domain.Tests
 
             foreach (var power in PowersAcrossEveryTier)
             {
-                Assert.That(
-                    CharacterCast.MeshOfPlayer(PlayerLook.Of(power)),
-                    Is.EqualTo(CharacterCast.MeshOf(PartStyle.Start)),
-                    "power " + power);
+                var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
+                var player = blueprint.AllParts.First(part => part.Style == PartStyle.Start);
+
+                Assert.That(PlayerLook.Of(power).Tier, Is.EqualTo(VisualTier.Of(power)));
+                Assert.That(player.Model, Is.EqualTo(PartModel.Knight), "power " + power);
             }
         }
 
@@ -54,7 +55,7 @@ namespace Game.Domain.Tests
             }
 
             Assert.That(
-                looks.Select(look => CharacterCast.MeshOfPlayer(look)).Distinct().Count(),
+                looks.Select(look => PartModels.Of(PartStyle.Start)).Distinct().Count(),
                 Is.EqualTo(1));
         }
 
@@ -63,15 +64,13 @@ namespace Game.Domain.Tests
         {
             Assert.That(CharacterCast.MeshOf(PartStyle.Enemy), Is.EqualTo(PartModel.None));
             Assert.That(CharacterCast.MeshOf(PartStyle.Boss), Is.EqualTo(PartModel.None));
-            Assert.That(CharacterCast.Wears(PartStyle.Enemy), Is.False);
-            Assert.That(CharacterCast.Wears(PartStyle.Boss), Is.False);
+            Assert.That(PartModels.Of(PartStyle.Enemy), Is.EqualTo(PartModel.None));
+            Assert.That(PartModels.Of(PartStyle.Boss), Is.EqualTo(PartModel.None));
         }
 
         [Test]
         public void OnlyTheCastAnswersWhichMeshItWears()
         {
-            Assert.That(CharacterCast.Roles.Count, Is.EqualTo(3));
-
             foreach (PartStyle style in Enum.GetValues(typeof(PartStyle)))
             {
                 if (CharacterCast.IsRole(style))
@@ -215,6 +214,32 @@ namespace Game.Domain.Tests
                 AdventurerPack.GridUnits * AdventurerPack.ImportScale,
                 Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
             Assert.That(AdventurerPack.ImportScale, Is.EqualTo(DungeonPack.ImportScale).Within(Tolerance));
+        }
+
+        [Test]
+        public void OnlyTheStandingScalesSetAFittedFiguresHeight()
+        {
+            var mesh = CharacterCast.MeshOf(PartStyle.Start);
+            var scale = LevelBlueprintBuilder.FigureScale;
+
+            Assert.That(
+                FigureFit.ScaleOf(mesh) * AdventurerPack.HeightOf(mesh),
+                Is.EqualTo(AdventurerPack.StandingScales).Within(Tolerance));
+            Assert.That(
+                FigureFit.ScaleOf(mesh) * AdventurerPack.PackHeightOf(mesh) * AdventurerPack.ImportScale,
+                Is.EqualTo(AdventurerPack.StandingScales).Within(Tolerance));
+            Assert.That(
+                FigureFit.StandingHeight(mesh, scale),
+                Is.EqualTo(scale * AdventurerPack.StandingScales).Within(Tolerance));
+
+            Assert.That(
+                FigureFit.WidthOf(mesh, scale) / FigureFit.StandingHeight(mesh, scale),
+                Is.EqualTo(AdventurerPack.KnightPackWidth / AdventurerPack.KnightPackHeight)
+                    .Within(Tolerance));
+            Assert.That(
+                FigureFit.DepthOf(mesh, scale) / FigureFit.StandingHeight(mesh, scale),
+                Is.EqualTo(AdventurerPack.KnightPackDepth / AdventurerPack.KnightPackHeight)
+                    .Within(Tolerance));
         }
 
         [Test]

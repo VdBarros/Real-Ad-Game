@@ -42,11 +42,6 @@ namespace Game.Presentation.Pure
             return 0f;
         }
 
-        public static float TopOf(PartModel model)
-        {
-            return StandingScalesOf(model);
-        }
-
         public static float StandingHeight(PartModel model, float figureScale)
         {
             return figureScale * StandingScalesOf(model);

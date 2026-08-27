@@ -360,21 +360,8 @@ namespace Game.EditorTooling
                 }
 
                 var prefab = models.Of(model);
-                var meshes = new HashSet<Mesh>();
 
-                if (prefab != null)
-                {
-                    foreach (var renderer in prefab.GetComponentsInChildren<Renderer>(true))
-                    {
-                        var mesh = MeshOn(renderer);
-                        if (mesh != null)
-                        {
-                            meshes.Add(mesh);
-                        }
-                    }
-                }
-
-                expected[model] = meshes;
+                expected[model] = PackMesh.Of(prefab);
             }
 
             var wanted = 0;
@@ -403,7 +390,7 @@ namespace Game.EditorTooling
 
                 foreach (var renderer in renderers)
                 {
-                    var mesh = MeshOn(renderer);
+                    var mesh = PackMesh.On(renderer);
                     worn = worn ?? mesh;
 
                     if (mesh == null || !expected[part.Model].Contains(mesh))
@@ -589,14 +576,23 @@ namespace Game.EditorTooling
             var props = 0;
             var standing = 0;
             var sizes = new Dictionary<PartModel, string>();
+            var cast = new List<string>();
 
             foreach (var node in graph.Decisions.Nodes)
             {
                 WorldPart prop;
-                if (!LevelBlueprintBuilder.TryProp(node, out prop)
-                    || prop.Model == PartModel.None
-                    || CharacterCast.IsRole(prop.Style))
+                if (!LevelBlueprintBuilder.TryProp(node, out prop) || prop.Model == PartModel.None)
                 {
+                    continue;
+                }
+
+                if (CharacterCast.IsRole(prop.Style))
+                {
+                    if (!cast.Contains(prop.Model.ToString()))
+                    {
+                        cast.Add(prop.Model.ToString());
+                    }
+
                     continue;
                 }
 
@@ -624,6 +620,9 @@ namespace Game.EditorTooling
             var shown = new List<string>(sizes.Values);
 
             report.Append("\n  silhouettes: ").Append(string.Join(", ", shown.ToArray()));
+            report.Append("\n  footed by the player tier check instead of here, because a rigged mesh's "
+                + "bounds are padded below its feet: ")
+                .Append(cast.Count == 0 ? "no cast mesh in this world" : string.Join(", ", cast.ToArray()));
 
             return Assert(
                 report,
@@ -1093,64 +1092,7 @@ namespace Game.EditorTooling
 
         static Bounds Local(GameObject prefab)
         {
-            var instance = UnityEngine.Object.Instantiate(prefab);
-            instance.transform.position = Vector3.zero;
-            instance.transform.rotation = Quaternion.identity;
-            instance.transform.localScale = Vector3.one;
-            CharacterDress.Bare(instance);
-
-            var raised = Raised(instance);
-
-            WorldObjects.Destroy(instance);
-
-            return raised;
-        }
-
-        static Bounds Raised(GameObject prefab)
-        {
-            var box = new Bounds();
-            var first = true;
-
-            foreach (var renderer in prefab.GetComponentsInChildren<Renderer>(true))
-            {
-                var mesh = MeshOn(renderer);
-                if (mesh == null)
-                {
-                    continue;
-                }
-
-                var here = renderer is SkinnedMeshRenderer
-                    ? renderer.bounds
-                    : new Bounds(
-                        prefab.transform.InverseTransformPoint(
-                            renderer.transform.TransformPoint(mesh.bounds.center)),
-                        Vector3.Scale(mesh.bounds.size, renderer.transform.lossyScale));
-
-                if (first)
-                {
-                    box = here;
-                    first = false;
-                }
-                else
-                {
-                    box.Encapsulate(here);
-                }
-            }
-
-            return box;
-        }
-
-        static Mesh MeshOn(Renderer renderer)
-        {
-            var skinned = renderer as SkinnedMeshRenderer;
-            if (skinned != null)
-            {
-                return skinned.sharedMesh;
-            }
-
-            var filter = renderer.GetComponent<MeshFilter>();
-
-            return filter == null ? null : filter.sharedMesh;
+            return PackMesh.Bare(prefab);
         }
 
         static Bounds World(Transform instance)
