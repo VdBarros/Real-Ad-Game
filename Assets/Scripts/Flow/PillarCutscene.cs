@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Game.Presentation;
 using Game.Presentation.Pure;
 using UnityEngine;
@@ -28,11 +29,7 @@ namespace Game.Flow
 
         public const string BadgeSuffix = "_Badge";
 
-        const float PillarWidth = 1.1f;
-
-        const float GroundReach = 26f;
-
-        const float GroundDepth = 0.2f;
+        public const string MeshSuffix = "_Mesh";
 
         const float HeartSize = 0.3f;
 
@@ -42,18 +39,33 @@ namespace Game.Flow
 
         static readonly Tint HeartTint = new Tint(0.96f, 0.42f, 0.62f);
 
-        sealed class Mover
+        sealed class Costume
         {
-            public Transform Pillar;
+            public CastLook Look;
+
+            public PartModel Mesh;
 
             public Transform Figure;
 
-            public Renderer Skin;
+            public FigureAnimator Acting;
+
+            public Renderer[] Skins;
+        }
+
+        sealed class Actor
+        {
+            public PillarRole Role;
+
+            public Transform Pillar;
+
+            public Costume[] Costumes;
 
             public NumberBadge Badge;
         }
 
-        readonly WorldMaterials materials = new WorldMaterials();
+        readonly WorldModels models = new WorldModels();
+
+        readonly WorldMaterials materials;
 
         readonly BadgeAssets badges = new BadgeAssets();
 
@@ -63,11 +75,9 @@ namespace Game.Flow
 
         CameraRig rig;
 
-        Mover player;
+        Actor[] actors;
 
-        Mover girl;
-
-        Mover rival;
+        Transform ground;
 
         Transform heart;
 
@@ -76,6 +86,11 @@ namespace Game.Flow
         bool playing;
 
         bool spent;
+
+        public PillarCutscene()
+        {
+            materials = new WorldMaterials(models);
+        }
 
         public bool IsPlaying
         {
@@ -90,6 +105,46 @@ namespace Game.Flow
         public GameObject Root
         {
             get { return root; }
+        }
+
+        public Transform Ground
+        {
+            get { return ground; }
+        }
+
+        public Transform PillarOf(PillarRole role)
+        {
+            var actor = Cast(role);
+
+            return actor == null ? null : actor.Pillar;
+        }
+
+        public Transform FigureOf(PillarRole role)
+        {
+            var worn = Wearing(role);
+
+            return worn == null ? null : worn.Figure;
+        }
+
+        public FigureAnimator ActingOf(PillarRole role)
+        {
+            var worn = Wearing(role);
+
+            return worn == null ? null : worn.Acting;
+        }
+
+        public PartModel WornBy(PillarRole role)
+        {
+            var worn = Wearing(role);
+
+            return worn == null ? PartModel.None : worn.Mesh;
+        }
+
+        public NumberBadge BadgeOf(PillarRole role)
+        {
+            var actor = Cast(role);
+
+            return actor == null ? null : actor.Badge;
         }
 
         public void Play()
@@ -158,14 +213,19 @@ namespace Game.Flow
             root = new GameObject(RootName);
             rig = UnityEngine.Object.FindAnyObjectByType<CameraRig>();
 
-            var ground = Raise(PrimitiveType.Cube, GroundName, root.transform, PartStyle.Floor);
-            ground.localScale = new Vector3(GroundReach, GroundDepth, GroundReach);
-            ground.localPosition = new Vector3(0f, -GroundDepth * 0.5f, 0f);
+            ground = Slab(GroundName, root.transform, PartStyle.Floor);
+            ground.localScale = Vector(PillarDress.GroundScale);
+            ground.localPosition = new Vector3(0f, -PillarDress.GroundDepth, 0f);
 
             var plan = PillarStage.Plan;
-            player = Cast(PlayerName, reel.Player, plan);
-            girl = Cast(GirlName, reel.Girl, plan);
-            rival = Cast(RivalName, reel.Rival, plan);
+            var raised = new List<Actor>();
+
+            foreach (var role in PillarDress.Roles)
+            {
+                raised.Add(Cast(role, PillarDress.MarkOf(reel, role), plan));
+            }
+
+            actors = raised.ToArray();
 
             heart = Raise(PrimitiveType.Sphere, HeartName, root.transform, PartStyle.Spark);
             heart.localScale = new Vector3(HeartSize, HeartSize, HeartSize);
@@ -176,13 +236,35 @@ namespace Game.Flow
             portal.gameObject.SetActive(false);
         }
 
-        Mover Cast(string name, CastMark mark, BadgePlan plan)
+        static string NameOf(PillarRole role)
         {
+            switch (role)
+            {
+                case PillarRole.Player:
+                    return PlayerName;
+                case PillarRole.Girl:
+                    return GirlName;
+                case PillarRole.Rival:
+                    return RivalName;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(role), role, "Nobody stands on that pillar.");
+            }
+        }
+
+        Actor Cast(PillarRole role, CastMark mark, BadgePlan plan)
+        {
+            var name = NameOf(role);
             var group = new GameObject(name);
             group.transform.SetParent(root.transform, worldPositionStays: false);
 
-            var pillar = Raise(PrimitiveType.Cylinder, name + PillarSuffix, group.transform, PartStyle.Pillar);
-            var figure = Raise(PrimitiveType.Capsule, name + FigureSuffix, group.transform, PartStyle.Start);
+            var pillar = Slab(name + PillarSuffix, group.transform, PartStyle.Pillar);
+            var looks = PillarDress.LooksOf(role);
+            var costumes = new Costume[looks.Count];
+
+            for (var slot = 0; slot < looks.Count; slot++)
+            {
+                costumes[slot] = Dressed(looks[slot], name, group.transform);
+            }
 
             var part = new BadgePart(
                 name + BadgeSuffix,
@@ -194,13 +276,77 @@ namespace Game.Flow
                 new WorldPoint(0f, 0f, 0f),
                 IsoProjection.CameraRotation);
 
-            return new Mover
+            return new Actor
             {
+                Role = role,
                 Pillar = pillar,
-                Figure = figure,
-                Skin = figure.GetComponent<Renderer>(),
+                Costumes = costumes,
                 Badge = BadgeFactory.Raise(part, plan, badges, group.transform)
             };
+        }
+
+        Costume Dressed(CastLook look, string name, Transform parent)
+        {
+            var mesh = PillarDress.MeshOf(look);
+            var frame = new GameObject(name + FigureSuffix + "_" + look);
+            frame.transform.SetParent(parent, worldPositionStays: false);
+
+            var costume = new Costume
+            {
+                Look = look,
+                Mesh = PartModel.None,
+                Figure = frame.transform,
+                Skins = new Renderer[0]
+            };
+
+            var instance = Wear(mesh, frame.transform, name + FigureSuffix + MeshSuffix, PillarDress.StyleOf(look));
+            if (instance == null)
+            {
+                return costume;
+            }
+
+            instance.transform.localEulerAngles = new Vector3(0f, PillarDress.FacingOf(look), 0f);
+            CharacterDress.Bare(instance);
+
+            costume.Mesh = mesh;
+            costume.Skins = instance.GetComponentsInChildren<Renderer>(true);
+            costume.Acting = FigureAnimator.Raise(frame, mesh, models);
+
+            return costume;
+        }
+
+        Transform Slab(string name, Transform parent, PartStyle style)
+        {
+            var frame = new GameObject(name);
+            frame.transform.SetParent(parent, worldPositionStays: false);
+
+            var instance = Wear(PillarDress.StageModel, frame.transform, name + MeshSuffix, style);
+            if (instance != null)
+            {
+                Seat(instance.transform);
+            }
+
+            return frame.transform;
+        }
+
+        GameObject Wear(PartModel mesh, Transform parent, string name, PartStyle style)
+        {
+            var model = models.Of(mesh);
+            if (model == null)
+            {
+                Debug.LogWarning(
+                    "The cutscene wanted the " + mesh + " mesh for " + name
+                    + " and the pack resolved to nothing loadable, so that part of the stage stands empty.");
+                return null;
+            }
+
+            var instance = UnityEngine.Object.Instantiate(model);
+            instance.name = name;
+            instance.transform.SetParent(parent, worldPositionStays: false);
+            Coat(instance, materials.Of(style));
+            WorldObjects.Destroy(instance.GetComponent<Collider>());
+
+            return instance;
         }
 
         Transform Raise(PrimitiveType shape, string name, Transform parent, PartStyle style)
@@ -213,6 +359,50 @@ namespace Game.Flow
             return instance.transform;
         }
 
+        static void Coat(GameObject instance, Material material)
+        {
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                renderer.sharedMaterial = material;
+            }
+        }
+
+        static void Seat(Transform instance)
+        {
+            var seated = false;
+            var box = new Bounds();
+
+            foreach (var filter in instance.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter.sharedMesh == null)
+                {
+                    continue;
+                }
+
+                var local = filter.sharedMesh.bounds;
+                var here = new Bounds(
+                    instance.InverseTransformPoint(filter.transform.TransformPoint(local.center)),
+                    Vector3.Scale(local.size, filter.transform.lossyScale));
+
+                if (seated)
+                {
+                    box.Encapsulate(here);
+                }
+                else
+                {
+                    box = here;
+                    seated = true;
+                }
+            }
+
+            if (!seated)
+            {
+                return;
+            }
+
+            instance.localPosition = new Vector3(-box.center.x, -box.min.y, -box.center.z);
+        }
+
         void Draw()
         {
             if (rig != null)
@@ -220,9 +410,10 @@ namespace Game.Flow
                 rig.Hold(reel.Framing);
             }
 
-            Dress(player, reel.Player);
-            Dress(girl, reel.Girl);
-            Dress(rival, reel.Rival);
+            foreach (var actor in actors)
+            {
+                Dress(actor, PillarDress.MarkOf(reel, actor.Role));
+            }
 
             var flying = reel.HeartIsFlying;
             heart.gameObject.SetActive(flying);
@@ -246,24 +437,90 @@ namespace Game.Flow
             portal.localScale = new Vector3(PortalWidth * open, PortalLip, PortalWidth * open);
         }
 
-        static void Dress(Mover mover, CastMark mark)
+        void Dress(Actor actor, CastMark mark)
         {
-            var height = mark.PillarHeight;
             var seat = mark.PillarBase;
 
-            mover.Pillar.localScale = new Vector3(PillarWidth, height * 0.5f, PillarWidth);
-            mover.Pillar.localPosition = new Vector3(seat.X, height * 0.5f, seat.Z);
+            actor.Pillar.localScale = Vector(PillarDress.PillarScaleOf(mark.PillarHeight));
+            actor.Pillar.localPosition = new Vector3(seat.X, 0f, seat.Z);
 
-            var scale = mark.Scale;
             var stand = mark.Position;
+            var scale = PillarDress.FigureScaleOf(mark);
+            var lift = mark.Scale * PillarDress.LiftOf(mark.Look);
 
-            mover.Figure.localScale = new Vector3(scale, scale, scale);
-            mover.Figure.localPosition = new Vector3(stand.X, stand.Y + scale, stand.Z);
-            Tints.Wash(mover.Skin, mark.Tint);
+            foreach (var costume in actor.Costumes)
+            {
+                var shown = costume.Look == mark.Look;
+                costume.Figure.gameObject.SetActive(shown);
 
-            mover.Badge.Show(mark.Number);
-            mover.Badge.transform.localPosition = new Vector3(
-                stand.X, BadgeMetrics.AnchorAbove(stand.Y + scale * 2f), stand.Z);
+                if (!shown)
+                {
+                    continue;
+                }
+
+                costume.Figure.localScale = new Vector3(scale, scale, scale);
+                costume.Figure.localPosition = new Vector3(stand.X, stand.Y + lift, stand.Z);
+
+                foreach (var skin in costume.Skins)
+                {
+                    Tints.Wash(skin, mark.Tint);
+                }
+
+                if (costume.Acting != null)
+                {
+                    costume.Acting.Cue(PillarDress.CueOf(actor.Role, reel.Elapsed));
+                }
+            }
+
+            actor.Badge.Show(mark.Number);
+            actor.Badge.transform.localPosition = new Vector3(
+                stand.X,
+                BadgeMetrics.AnchorAbove(stand.Y + PillarDress.StandingHeightOf(mark)),
+                stand.Z);
+        }
+
+        Actor Cast(PillarRole role)
+        {
+            if (actors == null)
+            {
+                return null;
+            }
+
+            foreach (var actor in actors)
+            {
+                if (actor.Role == role)
+                {
+                    return actor;
+                }
+            }
+
+            return null;
+        }
+
+        Costume Wearing(PillarRole role)
+        {
+            var actor = Cast(role);
+            if (actor == null)
+            {
+                return null;
+            }
+
+            var look = PillarDress.MarkOf(reel, role).Look;
+
+            foreach (var costume in actor.Costumes)
+            {
+                if (costume.Look == look)
+                {
+                    return costume;
+                }
+            }
+
+            return null;
+        }
+
+        static Vector3 Vector(WorldPoint point)
+        {
+            return new Vector3(point.X, point.Y, point.Z);
         }
 
         void Close()
@@ -277,15 +534,15 @@ namespace Game.Flow
                 root = null;
             }
 
-            player = null;
-            girl = null;
-            rival = null;
+            actors = null;
+            ground = null;
             heart = null;
             portal = null;
             rig = null;
 
             materials.Dispose();
             badges.Dispose();
+            models.Dispose();
         }
     }
 }

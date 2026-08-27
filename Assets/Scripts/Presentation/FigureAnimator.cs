@@ -56,7 +56,7 @@ namespace Game.Presentation
             get { return grafted; }
         }
 
-        internal static FigureAnimator Raise(GameObject figure, PartModel mesh, WorldModels models)
+        public static FigureAnimator Raise(GameObject figure, PartModel mesh, WorldModels models)
         {
             if (figure == null || models == null || !ArtPacks.IsRigged(mesh))
             {
