@@ -1,17 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Compiles the test sources a second time, at Unity's netstandard2.1, and runs
-       nothing. Game.Domain.Tests must carry a runnable TFM to host the test
-       adapter, which leaves its sources able to bind BCL APIs Unity does not have
-       — the framework half of the gap Directory.Build.props closes for language.
-       Game.Domain.Tests takes a ReferenceOutputAssembly="false" reference to this
-       project so `dotnet test dotnet/Game.Domain.Tests` builds it without linking
-       it, and the fast loop fails on an API Unity lacks instead of the Editor. -->
+  <!-- Compiles the test sources a second time, the way the Editor compiles them,
+       and runs nothing. Game.Domain.Tests must carry a runnable TFM and a runnable
+       NUnit to host the test adapter, and both are wider than Unity's: its sources
+       can bind a BCL API Unity does not have, and an NUnit API added after 3.5.
+       This project closes both gaps by recompiling the same files at
+       UnityTargetFramework against UnityNUnitVersion, so either kind of break
+       fails `dotnet test dotnet/Game.Domain.Tests` — which builds this project
+       through a ReferenceOutputAssembly="false" reference without linking it —
+       instead of surfacing in the Editor after a green merge.
+
+       NU1701: NUnit 3.5 predates netstandard2.0 and has only .NET Framework
+       assemblies. Resolving them against netstandard2.1 is deliberate — the
+       Editor's own nunit.framework is a net472 build, and this project is never
+       loaded or run, only compiled. -->
 
   <PropertyGroup>
     <TargetFramework>$(UnityTargetFramework)</TargetFramework>
     <AssemblyName>Game.Domain.Tests.Conformance</AssemblyName>
     <RootNamespace>Game.Domain.Tests</RootNamespace>
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit" Version="$(UnityNUnitVersion)" />
   </ItemGroup>
 
 </Project>
