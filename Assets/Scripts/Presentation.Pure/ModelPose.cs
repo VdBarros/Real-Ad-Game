@@ -15,6 +15,8 @@ namespace Game.Presentation.Pure
                 case PartModel.Candles:
                     return new WorldPoint(
                         part.Position.X, part.Position.Y - part.Scale.Y * 0.5f, part.Position.Z);
+                case PartModel.Staircase:
+                    return Footed(part);
                 case PartModel.None:
                 case PartModel.FloorTile:
                     return part.Position;
@@ -35,6 +37,7 @@ namespace Game.Presentation.Pure
                 case PartModel.None:
                 case PartModel.WallPanel:
                 case PartModel.Candles:
+                case PartModel.Staircase:
                     return part.Rotation;
                 default:
                     throw new ArgumentOutOfRangeException(
@@ -53,6 +56,8 @@ namespace Game.Presentation.Pure
                 case PartModel.Chest:
                 case PartModel.Candles:
                     return Fitted(part);
+                case PartModel.Staircase:
+                    return Stepped(part);
                 case PartModel.None:
                     return part.Scale;
                 default:
@@ -66,6 +71,24 @@ namespace Game.Presentation.Pure
             var fit = 1f / DungeonPack.HeightOf(part.Model);
 
             return new WorldPoint(part.Scale.X * fit, part.Scale.Y * fit, part.Scale.Z * fit);
+        }
+
+        static WorldPoint Footed(WorldPart part)
+        {
+            var back = TileSides.Toward(TileSides.Opposite(TileSides.OfInwardYaw(part.Rotation.Y)));
+
+            return new WorldPoint(
+                part.Position.X + back.X * part.Scale.Z * 0.5f,
+                part.Position.Y - part.Scale.Y * 0.5f,
+                part.Position.Z + back.Z * part.Scale.Z * 0.5f);
+        }
+
+        static WorldPoint Stepped(WorldPart part)
+        {
+            return new WorldPoint(
+                part.Scale.X / DungeonPack.StaircaseWidth,
+                part.Scale.Y / DungeonPack.HeightOf(part.Model),
+                part.Scale.Z / DungeonPack.StaircaseRun);
         }
 
         static WorldPoint Spanning(WorldPart part)

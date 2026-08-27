@@ -11,6 +11,7 @@ namespace Game.Presentation.Pure
         Boss,
         Additive,
         Multiplier,
+        Staircase,
         Trail,
         Spark
     }

@@ -174,6 +174,7 @@ namespace Game.EditorTooling
         {
             var quads = 0;
             var walls = 0;
+            var stairs = 0;
             var props = 0;
 
             foreach (var part in blueprint.AllParts)
@@ -186,6 +187,9 @@ namespace Game.EditorTooling
                     case PartStyle.Wall:
                         walls++;
                         break;
+                    case PartStyle.Staircase:
+                        stairs++;
+                        break;
                     default:
                         props++;
                         break;
@@ -194,7 +198,7 @@ namespace Game.EditorTooling
 
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
-                "preview: {0} terraces, {1} floor quads, {2} walls, {3} props, {4} badges at "
+                "preview: {0} terraces, {1} floor quads, {2} walls, {13} staircases, {3} props, {4} badges at "
                 + "{5} glyph cells ({6:0.###} x {7:0.###} units, font {8:0.###}, ceiling {9}), "
                 + "{10} transforms under {11}, written to {12}",
                 blueprint.Terraces.Count,
@@ -209,7 +213,8 @@ namespace Game.EditorTooling
                 badges.Plan.PowerCeiling,
                 root.GetComponentsInChildren<Transform>(true).Length,
                 PartNames.Root,
-                path));
+                path,
+                stairs));
         }
     }
 }

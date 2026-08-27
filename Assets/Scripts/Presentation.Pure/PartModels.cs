@@ -17,6 +17,8 @@ namespace Game.Presentation.Pure
                     return PartModel.Chest;
                 case PartStyle.Multiplier:
                     return PartModel.Candles;
+                case PartStyle.Staircase:
+                    return PartModel.Staircase;
                 case PartStyle.Pillar:
                 case PartStyle.Start:
                 case PartStyle.Enemy:

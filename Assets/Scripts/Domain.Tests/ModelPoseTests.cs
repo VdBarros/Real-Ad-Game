@@ -320,6 +320,78 @@ namespace Game.Domain.Tests
                 Is.LessThan(IsoProjection.SightReach(IsoProjection.WallHeight)));
         }
 
+        [Test]
+        public void AStaircaseRisesExactlyTheStepTheTerracesClimbBy()
+        {
+            var stair = FirstStaircase();
+            var scale = ModelPose.ScaleOf(stair);
+
+            Assert.That(
+                DungeonPack.HeightOf(PartModel.Staircase) * scale.Y,
+                Is.EqualTo(IsoProjection.StepHeight).Within(Tolerance));
+            Assert.That(
+                DungeonPack.StaircaseWidth * scale.X,
+                Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
+            Assert.That(
+                DungeonPack.StaircaseRun * scale.Z,
+                Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
+        }
+
+        [Test]
+        public void AStaircaseNeedsNoStretchingAcrossItsTileBecauseThePackCutItToTheGrid()
+        {
+            Assert.That(DungeonPack.StaircaseWidth, Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
+            Assert.That(DungeonPack.StaircaseRun, Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
+
+            var scale = ModelPose.ScaleOf(FirstStaircase());
+
+            Assert.That(scale.X, Is.EqualTo(1f).Within(Tolerance));
+            Assert.That(scale.Z, Is.EqualTo(1f).Within(Tolerance));
+        }
+
+        [Test]
+        public void AStaircaseFootsOnTheGroundItRisesFromAtTheEdgeTheClimbStartsAt()
+        {
+            var stair = FirstStaircase();
+            var footed = ModelPose.PositionOf(stair);
+            var ascent = TileSides.OfInwardYaw(stair.Rotation.Y);
+            var back = TileSides.Toward(TileSides.Opposite(ascent));
+
+            Assert.That(footed.Y, Is.EqualTo(stair.Position.Y - IsoProjection.StepHeight * 0.5f).Within(Tolerance));
+            Assert.That(
+                footed.X,
+                Is.EqualTo(stair.Position.X + back.X * IsoProjection.TileEdge * 0.5f).Within(Tolerance));
+            Assert.That(
+                footed.Z,
+                Is.EqualTo(stair.Position.Z + back.Z * IsoProjection.TileEdge * 0.5f).Within(Tolerance));
+        }
+
+        [Test]
+        public void AStaircaseNeverRisesAboveTheGroundItLeadsToSoItHidesNothing()
+        {
+            var stair = FirstStaircase();
+            var footed = ModelPose.PositionOf(stair);
+            var top = footed.Y + DungeonPack.HeightOf(PartModel.Staircase) * ModelPose.ScaleOf(stair).Y;
+
+            Assert.That(top, Is.EqualTo(stair.Position.Y + IsoProjection.StepHeight * 0.5f).Within(Tolerance));
+            Assert.That(IsoProjection.SightReach(0f), Is.EqualTo(0f).Within(Tolerance));
+        }
+
+        [Test]
+        public void AStaircaseKeepsTheYawItsClimbAsksFor()
+        {
+            var stair = FirstStaircase();
+
+            Assert.That(ModelPose.RotationOf(stair), Is.EqualTo(stair.Rotation));
+        }
+
+        static WorldPart FirstStaircase()
+        {
+            return LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces())
+                .AllParts
+                .First(part => part.Model == PartModel.Staircase);
+        }
+
         static WorldPart Pickup(PartStyle style)
         {
             var graph = LevelGraphFixture.TwoTerraces();
