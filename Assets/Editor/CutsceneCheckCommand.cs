@@ -24,8 +24,14 @@ namespace Game.EditorTooling
 
         const string ShotPath = "dev/scratch/t-18-";
 
+        const float Drift = 0.0005f;
+
+        const float Seated = 0.05f;
+
         sealed class Run
         {
+            public readonly HashSet<string> Told = new HashSet<string>();
+
             public string Name;
             public float SkipAt;
             public bool Skips;
@@ -35,14 +41,28 @@ namespace Game.EditorTooling
             public int Carriers;
             public int BadgeTextures;
             public int WorldMaterials;
+            public int Samples;
+            public int PackWorn;
+            public int PackParts;
+            public int Slides;
             public bool Stalled;
+        }
+
+        sealed class Mark
+        {
+            public bool Seen;
+            public CastLook Look;
+            public Vector3 Stood;
         }
 
         static int findings;
 
+        static WorldModels library;
+
         public static void Check()
         {
             findings = 0;
+            library = new WorldModels();
 
             var runs = new List<Run>
             {
@@ -60,6 +80,9 @@ namespace Game.EditorTooling
             Debug.Log(findings == 0
                 ? "t-18: the pillars played and handed over clean on all " + runs.Count + " runs."
                 : "t-18: " + findings + " findings across " + runs.Count + " runs.");
+
+            library.Dispose();
+            library = null;
         }
 
         static Run Played()
@@ -101,6 +124,14 @@ namespace Game.EditorTooling
 
             var shot = false;
             var skipped = false;
+            var watched = Watching();
+            var beat = PillarBeat.Over;
+
+            Act(scene);
+            NobodySlides(run, scene, watched);
+            TheStageWearsThePack(run, scene);
+            TheCastWearsThePack(run, scene);
+            beat = scene.Reel.Beat;
 
             while (loop.Phase == GamePhase.Cutscene && run.Frames < Ceiling)
             {
@@ -121,6 +152,23 @@ namespace Game.EditorTooling
                 loop.Advance(Frame);
                 run.Frames++;
                 run.Seconds += Frame;
+
+                if (loop.Phase != GamePhase.Cutscene || scene.Root == null)
+                {
+                    continue;
+                }
+
+                Act(scene);
+                NobodySlides(run, scene, watched);
+
+                if (scene.Reel.Beat == beat)
+                {
+                    continue;
+                }
+
+                beat = scene.Reel.Beat;
+                TheStageWearsThePack(run, scene);
+                TheCastWearsThePack(run, scene);
             }
 
             if (run.Frames >= Ceiling)
@@ -143,6 +191,7 @@ namespace Game.EditorTooling
                 ThePillarsRanInsideTheBudget(run);
                 TheHandoffReachedAFreshLevel(run, loop, announced);
                 NothingTheCutsceneMadeOutlivedIt(run, mintedTexture, mintedMaterial, stage);
+                NoPackInstanceOutlivedTheCutscene(run, loop);
                 TheLevelIsTheOnlyThingLeftStanding(run, loop, persistent);
                 Measure(run);
 
@@ -240,6 +289,362 @@ namespace Game.EditorTooling
             }
 
             WorldObjects.Destroy(loop.gameObject);
+        }
+
+        static Mark[] Watching()
+        {
+            var watched = new Mark[Enum.GetValues(typeof(PillarRole)).Length];
+
+            for (var slot = 0; slot < watched.Length; slot++)
+            {
+                watched[slot] = new Mark();
+            }
+
+            return watched;
+        }
+
+        static void Act(PillarCutscene scene)
+        {
+            if (scene.Root == null)
+            {
+                return;
+            }
+
+            foreach (var acting in scene.Root.GetComponentsInChildren<FigureAnimator>(false))
+            {
+                acting.Advance(Frame);
+            }
+        }
+
+        static void NobodySlides(Run run, PillarCutscene scene, Mark[] watched)
+        {
+            foreach (var role in PillarDress.Roles)
+            {
+                var mark = watched[(int)role];
+                var look = PillarDress.MarkOf(scene.Reel, role).Look;
+                var figure = scene.FigureOf(role);
+
+                if (figure == null)
+                {
+                    mark.Seen = false;
+                    continue;
+                }
+
+                var stood = figure.position;
+
+                if (mark.Seen && mark.Look == look)
+                {
+                    var crossed = new Vector2(stood.x - mark.Stood.x, stood.z - mark.Stood.z).magnitude;
+
+                    if (crossed > Drift)
+                    {
+                        run.Slides++;
+                        var acting = scene.ActingOf(role);
+
+                        if (acting == null || acting.Act != FigureAct.Walk)
+                        {
+                            Once(
+                                run,
+                                "slid-" + role,
+                                run.Name + " slid " + role + " " + crossed.ToString("0.####", CultureInfo.InvariantCulture)
+                                + "m across the ground at " + Seconds(scene.Reel.Elapsed) + "s while playing "
+                                + (acting == null ? "no clip at all" : acting.Act.ToString()) + ".");
+                        }
+                    }
+                }
+
+                mark.Seen = true;
+                mark.Look = look;
+                mark.Stood = stood;
+            }
+        }
+
+        static void TheCastWearsThePack(Run run, PillarCutscene scene)
+        {
+            foreach (var role in PillarDress.Roles)
+            {
+                var mark = PillarDress.MarkOf(scene.Reel, role);
+                var mesh = PillarDress.MeshOf(mark.Look);
+                var figure = scene.FigureOf(role);
+                run.Samples++;
+
+                if (figure == null)
+                {
+                    Once(
+                        run,
+                        "raised-" + role,
+                        run.Name + " raised nobody for " + role + " to wear " + mark.Look + " with.");
+                    continue;
+                }
+
+                if (scene.WornBy(role) != mesh)
+                {
+                    Once(
+                        run,
+                        "worn-" + role + "-" + mark.Look,
+                        run.Name + " dressed " + role + " in " + scene.WornBy(role) + " where " + mark.Look
+                        + " wears " + mesh + ".");
+                }
+
+                var pack = PackMesh.Of(library.Of(mesh));
+                var worn = 0;
+
+                foreach (var renderer in figure.GetComponentsInChildren<Renderer>(true))
+                {
+                    var skin = PackMesh.On(renderer);
+
+                    if (skin == null)
+                    {
+                        continue;
+                    }
+
+                    if (pack.Contains(skin))
+                    {
+                        worn++;
+                    }
+                    else
+                    {
+                        Once(
+                            run,
+                            "stranger-" + role + "-" + mark.Look,
+                            run.Name + " has " + role + " wearing " + skin.name + ", which the " + mesh
+                            + " pack does not carry.");
+                    }
+                }
+
+                if (worn == 0)
+                {
+                    Once(
+                        run,
+                        "pack-" + role + "-" + mark.Look,
+                        run.Name + " has " + role + " wearing nothing the " + mesh + " pack carries at "
+                        + scene.Reel.Beat + ", so the cast is not dressed in the pack.");
+                }
+                else
+                {
+                    run.PackWorn++;
+                }
+
+                TheCastPlaysWhatItIsCued(run, scene, role, mark, mesh);
+                TheBadgeSitsAboveTheHead(run, scene, role, mark);
+            }
+        }
+
+        static void TheCastPlaysWhatItIsCued(
+            Run run, PillarCutscene scene, PillarRole role, CastMark mark, PartModel mesh)
+        {
+            var acting = scene.ActingOf(role);
+            var cue = PillarDress.CueOf(role, scene.Reel.Elapsed);
+
+            if (acting == null || !acting.IsRigged)
+            {
+                Once(
+                    run,
+                    "rig-" + role + "-" + mark.Look,
+                    run.Name + " has " + role + " wearing " + mesh + " with no rig to move it.");
+                return;
+            }
+
+            if (!acting.HasClipsToPlay || acting.Playing == null)
+            {
+                Once(
+                    run,
+                    "clip-" + role + "-" + mark.Look,
+                    run.Name + " has " + role + " holding a static pose where " + cue.Clip + " was cued.");
+                return;
+            }
+
+            if (acting.Act == cue.Act || (!cue.Loops && acting.Act == FigureAct.Idle))
+            {
+                return;
+            }
+
+            Once(
+                run,
+                "act-" + role + "-" + scene.Reel.Beat,
+                run.Name + " has " + role + " playing " + acting.Act + " on " + scene.Reel.Beat + " where "
+                + cue.Act + " was cued.");
+        }
+
+        static void TheBadgeSitsAboveTheHead(
+            Run run, PillarCutscene scene, PillarRole role, CastMark mark)
+        {
+            var badge = scene.BadgeOf(role);
+
+            if (badge == null)
+            {
+                Once(run, "badge-" + role, run.Name + " hung no badge over " + role + ".");
+                return;
+            }
+
+            if (badge.Value != mark.Number)
+            {
+                Once(
+                    run,
+                    "number-" + role + "-" + scene.Reel.Beat,
+                    run.Name + " shows " + badge.Value + " over " + role + " on " + scene.Reel.Beat
+                    + " where the reel asks for " + mark.Number + ".");
+            }
+
+            if (badge.Style != mark.Badge)
+            {
+                Once(
+                    run,
+                    "tier-" + role,
+                    run.Name + " draws " + role + "'s badge as " + badge.Style + " where the reel asks for "
+                    + mark.Badge + ".");
+            }
+
+            var head = mark.Position.Y + PillarDress.StandingHeightOf(mark);
+
+            if (badge.transform.localPosition.y >= head)
+            {
+                return;
+            }
+
+            Once(
+                run,
+                "above-" + role + "-" + scene.Reel.Beat,
+                run.Name + " hangs " + role + "'s badge at "
+                + badge.transform.localPosition.y.ToString("0.###", CultureInfo.InvariantCulture)
+                + " where the head it labels reaches " + head.ToString("0.###", CultureInfo.InvariantCulture)
+                + " on " + scene.Reel.Beat + ".");
+        }
+
+        static void TheStageWearsThePack(Run run, PillarCutscene scene)
+        {
+            var pack = PackMesh.Of(library.Of(PillarDress.StageModel));
+            run.PackParts++;
+
+            if (Bare(run, "the ground", scene.Ground, pack))
+            {
+                var box = PackMesh.Wearing(scene.Ground, pack);
+
+                if (Math.Abs(box.max.y) > Seated)
+                {
+                    Fail(
+                        run.Name + " lays the ground with its top face at "
+                        + box.max.y.ToString("0.###", CultureInfo.InvariantCulture) + " rather than underfoot.");
+                }
+
+                if (Math.Abs(box.size.x - PillarDress.GroundReach) > Seated)
+                {
+                    Fail(
+                        run.Name + " lays a ground " + box.size.x.ToString("0.###", CultureInfo.InvariantCulture)
+                        + "m across where the stage reaches " + PillarDress.GroundReach + "m.");
+                }
+            }
+
+            foreach (var role in PillarDress.Roles)
+            {
+                var pillar = scene.PillarOf(role);
+
+                if (!Bare(run, role + "'s pillar", pillar, pack))
+                {
+                    continue;
+                }
+
+                var height = PillarDress.MarkOf(scene.Reel, role).PillarHeight;
+                var box = PackMesh.Wearing(pillar, pack);
+
+                if (Math.Abs(box.min.y) > Seated)
+                {
+                    Once(
+                        run,
+                        "seated-" + role,
+                        run.Name + " seats " + role + "'s pillar at "
+                        + box.min.y.ToString("0.###", CultureInfo.InvariantCulture) + " rather than on the ground.");
+                }
+
+                if (Math.Abs(box.size.y - height) > Seated)
+                {
+                    Once(
+                        run,
+                        "tall-" + role,
+                        run.Name + " stands " + role + "'s pillar "
+                        + box.size.y.ToString("0.###", CultureInfo.InvariantCulture) + "m tall on "
+                        + scene.Reel.Beat + " where the reel asks for "
+                        + height.ToString("0.###", CultureInfo.InvariantCulture) + "m.");
+                }
+            }
+        }
+
+        static bool Bare(Run run, string what, Transform part, ISet<Mesh> pack)
+        {
+            if (part == null)
+            {
+                Once(run, "part-" + what, run.Name + " raised nothing at all for " + what + ".");
+                return false;
+            }
+
+            var worn = 0;
+
+            foreach (var renderer in part.GetComponentsInChildren<Renderer>(true))
+            {
+                var skin = PackMesh.On(renderer);
+
+                if (skin == null)
+                {
+                    continue;
+                }
+
+                if (pack.Contains(skin))
+                {
+                    worn++;
+                }
+                else
+                {
+                    Once(
+                        run,
+                        "strange-" + what,
+                        run.Name + " built " + what + " out of " + skin.name + ", which the "
+                        + PillarDress.StageModel + " pack mesh does not carry.");
+                }
+            }
+
+            if (worn > 0)
+            {
+                return true;
+            }
+
+            Once(
+                run,
+                "bare-" + what,
+                run.Name + " built " + what + " out of no pack mesh at all, so the stage is still primitives.");
+            return false;
+        }
+
+        static void NoPackInstanceOutlivedTheCutscene(Run run, GameLoop loop)
+        {
+            foreach (var acting in Resources.FindObjectsOfTypeAll<FigureAnimator>())
+            {
+                if (loop.LevelRoot != null && acting.transform.root.gameObject == loop.LevelRoot)
+                {
+                    continue;
+                }
+
+                Fail(run.Name + " left " + Trail(acting.gameObject) + " animating a pack mesh after the handoff.");
+            }
+
+            foreach (var carrier in Resources.FindObjectsOfTypeAll<GameObject>())
+            {
+                if (!carrier.name.EndsWith(PillarCutscene.MeshSuffix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                Fail(run.Name + " left the pack instance " + Trail(carrier) + " standing after the handoff.");
+            }
+        }
+
+        static void Once(Run run, string key, string finding)
+        {
+            if (!run.Told.Add(key))
+            {
+                return;
+            }
+
+            Fail(finding);
         }
 
         static void TheGameOpensOnThePillars(Run run, GameLoop loop, PillarCutscene scene)
@@ -474,7 +879,8 @@ namespace Game.EditorTooling
             var report = new StringBuilder("the pillar cutscene, ")
                 .Append(Seconds(PillarStage.Total))
                 .Append("s scripted, four ways in and one way out:")
-                .Append("\n  run                        skipAt  reelAt  frames  seconds  carriers  badgeTex  world");
+                .Append("\n  run                        skipAt  reelAt  frames  seconds  carriers  badgeTex  world"
+                    + "  cast  packWorn  stage  slides");
 
             foreach (var run in runs)
             {
@@ -486,7 +892,11 @@ namespace Game.EditorTooling
                     .Append(Column(Seconds(run.Seconds), 9))
                     .Append(Column(run.Carriers.ToString(CultureInfo.InvariantCulture), 10))
                     .Append(Column(run.BadgeTextures.ToString(CultureInfo.InvariantCulture), 10))
-                    .Append(run.WorldMaterials.ToString(CultureInfo.InvariantCulture));
+                    .Append(Column(run.WorldMaterials.ToString(CultureInfo.InvariantCulture), 7))
+                    .Append(Column(run.Samples.ToString(CultureInfo.InvariantCulture), 6))
+                    .Append(Column(run.PackWorn.ToString(CultureInfo.InvariantCulture), 10))
+                    .Append(Column(run.PackParts.ToString(CultureInfo.InvariantCulture), 7))
+                    .Append(run.Slides.ToString(CultureInfo.InvariantCulture));
             }
 
             return report.ToString();
