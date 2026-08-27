@@ -186,6 +186,8 @@ namespace Game.Interaction
                 return;
             }
 
+            LookBack();
+
             var tapped = Tapped;
             if (tapped != null)
             {
@@ -204,6 +206,18 @@ namespace Game.Interaction
             }
 
             rig.Look(ScreenProjection.Drag(rig.Framing.OrthographicSize, hold.Origin, finger, FrameHeight));
+        }
+
+        public void LookHeld()
+        {
+            RequireARun();
+
+            if (rig.IsBusy)
+            {
+                return;
+            }
+
+            rig.LookHeld();
         }
 
         public void LookBack()
@@ -254,7 +268,7 @@ namespace Game.Interaction
                     }
                     else
                     {
-                        LookBack();
+                        LookHeld();
                     }
 
                     return;
