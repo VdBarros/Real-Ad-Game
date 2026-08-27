@@ -44,6 +44,16 @@ namespace Game.Domain
         public static bool TryGenerate(
             long seed, MazePreset preset, out MazeLayout layout, out LayoutRejection rejection)
         {
+            return TryGenerate(seed, preset, 1, out layout, out rejection);
+        }
+
+        public static bool TryGenerate(
+            long seed,
+            MazePreset preset,
+            int waysOutOfTheStart,
+            out MazeLayout layout,
+            out LayoutRejection rejection)
+        {
             if (preset == null)
             {
                 throw new ArgumentNullException(nameof(preset));
@@ -56,7 +66,7 @@ namespace Game.Domain
             var geometry = new TileGrid(Unpainted(carved.Tiles));
             var topology = new TileTopology(geometry);
 
-            var start = ChooseStart(StageRandom.ForStage(seed, "start"), topology);
+            var start = ChooseStart(StageRandom.ForStage(seed, "start"), topology, waysOutOfTheStart);
             if (topology.ReachedFrom(start) != topology.Count)
             {
                 rejection = LayoutRejection.TilesDisconnected;
@@ -116,19 +126,19 @@ namespace Game.Domain
             return tiles;
         }
 
-        static int ChooseStart(StageRandom random, TileTopology topology)
+        static int ChooseStart(StageRandom random, TileTopology topology, int waysOutOfTheStart)
         {
             var ground = topology.TilesAtElevation(0);
-            var rim = new List<int>();
+            var mouths = new List<int>();
             foreach (var tile in ground)
             {
-                if (topology.Degree(tile) == 1)
+                if (topology.Degree(tile) == waysOutOfTheStart)
                 {
-                    rim.Add(tile);
+                    mouths.Add(tile);
                 }
             }
 
-            return rim.Count > 0 ? random.Pick(rim) : ground[0];
+            return mouths.Count > 0 ? random.Pick(mouths) : ground[0];
         }
 
         static LevelGraph Assemble(

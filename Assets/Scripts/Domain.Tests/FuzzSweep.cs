@@ -137,6 +137,25 @@ namespace Game.Domain.Tests
                 + " over " + sorted.Count + " regions";
         }
 
+        public string Opening()
+        {
+            var choices = new List<double>();
+            var fewest = double.MaxValue;
+
+            foreach (var level in accepted)
+            {
+                var count = OpeningFrontier.Of(level.Level.Graph, level.Level.Tuning).Count;
+                choices.Add(count);
+                fewest = Math.Min(fewest, count);
+            }
+
+            choices.Sort();
+            return "p50 " + SweepStatistics.Round(SweepStatistics.Percentile(choices, 0.5))
+                + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(choices, 0.9))
+                + " affordable enemies, fewest " + SweepStatistics.Round(fewest)
+                + ", asked for " + Plan.OpeningChoices;
+        }
+
         public string EnemyNumbers()
         {
             var enemies = EnemyValues();

@@ -116,8 +116,34 @@ namespace Game.Domain.Tests
             }
         }
 
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void EveryAcceptedLevelOpensOnTheChoicesItsPlanAsksFor(int levelNumber)
+        {
+            var sweep = PlanSweep(levelNumber);
+
+            foreach (var accepted in sweep.Accepted)
+            {
+                Assert.That(
+                    OpeningFrontier.Of(accepted.Level.Graph, accepted.Level.Tuning).Count,
+                    Is.GreaterThanOrEqualTo(sweep.Plan.OpeningChoices),
+                    "Seed " + accepted.Level.AttemptSeed + " opened on a corridor.");
+            }
+        }
+
         [TestCaseSource(nameof(EveryPlanAboveTheOpeningOne))]
-        public void TheSpreadOfEveryPlanAboveTheOpeningOneLeavesOneBehind(int levelNumber)
+        public void EveryLevelAboveTheOpeningPlanOpensOnMoreThanOneFight(int levelNumber)
+        {
+            foreach (var accepted in PlanSweep(levelNumber).Accepted)
+            {
+                Assert.That(
+                    OpeningFrontier.Of(accepted.Level.Graph, accepted.Level.Tuning).Count,
+                    Is.GreaterThan(1),
+                    "Seed " + accepted.Level.AttemptSeed + " left the first tap without a choice.");
+            }
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void TheSpreadOfEveryPlanLeavesOneBehind(int levelNumber)
         {
             var sweep = PlanSweep(levelNumber);
 
@@ -211,6 +237,7 @@ namespace Game.Domain.Tests
                 Console.WriteLine("  enemy numbers " + sweep.EnemyNumbers());
                 Console.WriteLine("  elites " + sweep.Locks());
                 Console.WriteLine("  spine " + sweep.SpineReach());
+                Console.WriteLine("  opening " + sweep.Opening());
             }
         }
 

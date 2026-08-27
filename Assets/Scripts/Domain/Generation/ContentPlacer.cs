@@ -74,6 +74,12 @@ namespace Game.Domain
                 return false;
             }
 
+            if (OpeningFrontier.Of(board, tuning).Count < tuning.OpeningChoices)
+            {
+                rejection = ContentRejection.OpeningWithoutAChoice;
+                return false;
+            }
+
             var graph = board.Rebuild();
             var verdict = SolvabilityValidator.Validate(graph, tuning);
             if (!verdict.IsSafe)
