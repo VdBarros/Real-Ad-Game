@@ -166,7 +166,7 @@ namespace Game.Presentation.Pure
             return new WorldPart(
                 PartNames.Node(node.Id),
                 PartShape.Capsule,
-                PartModels.Of(style),
+                PartModels.Of(style, node.Value),
                 style,
                 new WorldPoint(tile.X, tile.Y + scale, tile.Z),
                 new WorldPoint(0f, 0f, 0f),

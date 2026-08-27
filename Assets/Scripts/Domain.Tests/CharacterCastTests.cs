@@ -60,12 +60,18 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AdversariesWearNoMeshUntilTheirOwnTicket()
+        public void EveryRoleInTheCastWearsARiggedMeshFromACharacterPack()
         {
-            Assert.That(CharacterCast.MeshOf(PartStyle.Enemy), Is.EqualTo(PartModel.None));
-            Assert.That(CharacterCast.MeshOf(PartStyle.Boss), Is.EqualTo(PartModel.None));
-            Assert.That(PartModels.Of(PartStyle.Enemy), Is.EqualTo(PartModel.None));
-            Assert.That(PartModels.Of(PartStyle.Boss), Is.EqualTo(PartModel.None));
+            foreach (var role in CharacterCast.Roles)
+            {
+                Assert.That(PartModels.Of(role), Is.Not.EqualTo(PartModel.None), role.ToString());
+
+                foreach (var mesh in CharacterCast.MeshesOf(role))
+                {
+                    Assert.That(mesh, Is.Not.EqualTo(PartModel.None), role.ToString());
+                    Assert.That(ArtPacks.IsRigged(mesh), Is.True, role + " wears " + mesh);
+                }
+            }
         }
 
         [Test]

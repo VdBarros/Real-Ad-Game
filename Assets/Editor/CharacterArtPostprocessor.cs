@@ -19,7 +19,7 @@ namespace Game.EditorTooling
 
         public override uint GetVersion()
         {
-            return 2;
+            return 3;
         }
 
         void OnPreprocessModel()
@@ -48,7 +48,7 @@ namespace Game.EditorTooling
             importer.weldVertices = false;
             importer.meshCompression = Compression;
             importer.useFileScale = true;
-            importer.globalScale = AdventurerPack.ImportScale;
+            importer.globalScale = ArtPacks.CastImportScale;
         }
 
         void OnPreprocessTexture()

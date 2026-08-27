@@ -18,6 +18,10 @@ namespace Game.Presentation.Pure
                 case PartModel.Staircase:
                     return Crested(part);
                 case PartModel.Knight:
+                case PartModel.SkeletonMinion:
+                case PartModel.SkeletonRogue:
+                case PartModel.SkeletonWarrior:
+                case PartModel.SkeletonMage:
                     return Standing(part);
                 case PartModel.None:
                 case PartModel.FloorTile:
@@ -37,8 +41,14 @@ namespace Game.Presentation.Pure
                 case PartModel.Chest:
                     return new WorldPoint(part.Rotation.X, part.Rotation.Y + ChestFacing, part.Rotation.Z);
                 case PartModel.Knight:
+                case PartModel.SkeletonMinion:
+                case PartModel.SkeletonRogue:
+                case PartModel.SkeletonWarrior:
+                case PartModel.SkeletonMage:
                     return new WorldPoint(
-                        part.Rotation.X, part.Rotation.Y + AdventurerPack.Facing, part.Rotation.Z);
+                        part.Rotation.X,
+                        part.Rotation.Y + ArtPacks.FacingOf(part.Model),
+                        part.Rotation.Z);
                 case PartModel.None:
                 case PartModel.WallPanel:
                 case PartModel.CoinStack:
@@ -64,6 +74,10 @@ namespace Game.Presentation.Pure
                 case PartModel.Staircase:
                     return Stepped(part);
                 case PartModel.Knight:
+                case PartModel.SkeletonMinion:
+                case PartModel.SkeletonRogue:
+                case PartModel.SkeletonWarrior:
+                case PartModel.SkeletonMage:
                     return Sized(part);
                 case PartModel.None:
                     return part.Scale;

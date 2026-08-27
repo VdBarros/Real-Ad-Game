@@ -18,7 +18,7 @@ namespace Game.Presentation
 
             foreach (var node in instance.GetComponentsInChildren<Transform>(true))
             {
-                if (!node.name.StartsWith(AdventurerPack.SlotNode, StringComparison.Ordinal))
+                if (!node.name.StartsWith(ArtPacks.CastSlotNode, StringComparison.Ordinal))
                 {
                     continue;
                 }

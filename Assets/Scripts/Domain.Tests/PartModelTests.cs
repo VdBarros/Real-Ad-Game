@@ -73,16 +73,20 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AdversariesStillWantNoModelAndKeepTheirPrimitive()
+        public void AdversariesWantACastMeshAndKeepTheCapsuleAsTheirFallbackShape()
         {
             var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             foreach (var type in new[] { NodeType.Enemy, NodeType.Boss })
             {
+                var node = graph.Decisions.Nodes.First(candidate => candidate.Type == type);
                 var figure = Prop(graph, blueprint, type);
+                var style = type == NodeType.Boss ? PartStyle.Boss : PartStyle.Enemy;
 
-                Assert.That(figure.Model, Is.EqualTo(PartModel.None), type.ToString());
+                Assert.That(figure.Model, Is.Not.EqualTo(PartModel.None), type.ToString());
+                Assert.That(
+                    figure.Model, Is.EqualTo(CharacterCast.MeshOf(style, node.Value)), type.ToString());
                 Assert.That(figure.Shape, Is.EqualTo(PartShape.Capsule), type.ToString());
             }
         }
@@ -97,14 +101,30 @@ namespace Game.Domain.Tests
         [Test]
         public void EveryPartTheBlueprintEmitsCarriesTheModelItsStyleWants()
         {
-            var blueprint = LevelBlueprintBuilder.Build(
-                LevelGenerator.Generate(20250824L, MazePreset.Ship).Graph);
+            var graph = LevelGenerator.Generate(20250824L, MazePreset.Ship).Graph;
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+            var valueByName = new Dictionary<string, int>();
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                valueByName[PartNames.Node(node.Id)] = node.Value;
+            }
 
             Assert.That(blueprint.AllParts, Is.Not.Empty);
 
             foreach (var part in blueprint.AllParts)
             {
-                Assert.That(part.Model, Is.EqualTo(PartModels.Of(part.Style)), part.Name);
+                int value;
+                var known = valueByName.TryGetValue(part.Name, out value);
+
+                Assert.That(
+                    part.Model,
+                    Is.EqualTo(known ? PartModels.Of(part.Style, value) : PartModels.Of(part.Style)),
+                    part.Name);
+                Assert.That(
+                    CharacterCast.IsRole(part.Style) || part.Model == PartModels.Of(part.Style),
+                    Is.True,
+                    part.Name + ": only a cast role's mesh is read off its own number");
             }
         }
 

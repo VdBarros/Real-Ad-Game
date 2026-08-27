@@ -17,6 +17,8 @@ namespace Game.Presentation
 
         readonly BadgeAssets badgeAssets = new BadgeAssets();
 
+        readonly Dictionary<string, PartModel> worn = new Dictionary<string, PartModel>();
+
         public WorldBuilder()
         {
             materials = new WorldMaterials(models);
@@ -73,6 +75,7 @@ namespace Game.Presentation
             var enemies = new List<EnemyFigure>();
             var pickups = new List<PickupProp>();
             var groundByName = new Dictionary<string, TilePosition>(graph.Tiles.Tiles.Count);
+            worn.Clear();
             WarnIfTheCameraHasTurned();
 
             foreach (var tile in graph.Tiles.Tiles)
@@ -121,16 +124,12 @@ namespace Game.Presentation
                     {
                         playerNumber = badge;
                         playerFigure = prop.gameObject.AddComponent<PlayerFigure>();
-                        playerFigure.Stand(badge.transform, models.Worn(PartStyle.Start));
+                        playerFigure.Stand(badge.transform, Worn(part.NodeId));
                     }
                     else if (part.Style == BadgeStyle.Enemy || part.Style == BadgeStyle.Boss)
                     {
                         var enemy = prop.gameObject.AddComponent<EnemyFigure>();
-                        enemy.Begin(
-                            badge.transform,
-                            models.Worn(part.Style == BadgeStyle.Boss ? PartStyle.Boss : PartStyle.Enemy),
-                            part.NodeId,
-                            part.Value);
+                        enemy.Begin(badge.transform, Worn(part.NodeId), part.NodeId, part.Value);
                         enemies.Add(enemy);
                     }
                     else if (part.Style == BadgeStyle.Additive || part.Style == BadgeStyle.Multiplier)
@@ -190,10 +189,23 @@ namespace Game.Presentation
                 + "Badges do not billboard, so they will face the wrong way until the rig stops rotating.");
         }
 
+        PartModel Worn(int nodeId)
+        {
+            PartModel mesh;
+
+            return worn.TryGetValue(PartNames.Node(nodeId), out mesh) ? mesh : PartModel.None;
+        }
+
         GameObject Raise(WorldPart part, Transform parent)
         {
             var model = models.Of(part.Model);
             var raised = model != null;
+
+            if (CharacterCast.IsRole(part.Style))
+            {
+                worn[part.Name] = raised ? part.Model : PartModel.None;
+            }
+
             var instance = raised
                 ? UnityEngine.Object.Instantiate(model)
                 : GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
