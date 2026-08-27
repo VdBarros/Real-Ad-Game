@@ -242,13 +242,20 @@ namespace Game.EditorTooling
                 "every mesh of the player wears the one world material bound to the adventurers atlas",
                 dressed + " of " + renderers.Length + " do");
 
+            var forward = IsoProjection.CameraForward;
+            var toward = (float)((Math.Atan2(-forward.X, -forward.Z) * 180.0 / Math.PI + 360.0) % 360.0);
+
             failures += Assert(
                 report,
-                Math.Abs(Mathf.DeltaAngle(player.transform.localEulerAngles.y, AdventurerPack.Facing))
-                    <= AngleEpsilon,
-                "the figure turns its face toward the camera at the pinned yaw of "
-                + AdventurerPack.Facing.ToString("0.#", CultureInfo.InvariantCulture),
-                "it faces " + player.transform.localEulerAngles.y.ToString("0.###", CultureInfo.InvariantCulture));
+                Math.Abs(Mathf.DeltaAngle(player.transform.localEulerAngles.y, toward)) <= AngleEpsilon
+                && Math.Abs(Mathf.DeltaAngle(AdventurerPack.Facing, toward)) <= AngleEpsilon,
+                "the figure turns its face along the line back to the camera the projection puts it on",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it faces {0:0.###} at a pinned {1:0.###} against the {2:0.###} the camera sits on",
+                    player.transform.localEulerAngles.y,
+                    AdventurerPack.Facing,
+                    toward));
 
             return failures;
         }
