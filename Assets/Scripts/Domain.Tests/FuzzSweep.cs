@@ -26,8 +26,11 @@ namespace Game.Domain.Tests
         double milliseconds;
         List<int> enemyValues;
         List<int> stingyStars;
+        List<int> ploddingStars;
         List<int> routedStars;
         List<double> routedPositions;
+        List<double> ploddingPositions;
+        List<AcceptedLevel> rated;
 
         public FuzzSweep(string name, LevelPlan plan, int seeds, int levelNumber)
         {
@@ -219,30 +222,36 @@ namespace Game.Domain.Tests
             return met;
         }
 
-        public int BossesSharingTheStartsRegion()
+        public int CeilingsNoRouteReaches()
         {
-            var sharing = 0;
-            foreach (var level in accepted)
+            var missed = 0;
+            foreach (var level in Rated())
             {
-                var graph = level.Level.Graph;
-                if (graph.RegionOf(level.Level.BossNodeId) == graph.RegionOf(level.Level.StartNodeId))
+                if (ReferenceRuns.Best(level.Level) != level.Level.Par.Ceiling)
                 {
-                    sharing++;
+                    missed++;
                 }
             }
 
-            return sharing;
-        }
-
-        public double ShareOfParsWithTheirWallsMet()
-        {
-            return accepted.Count == 0 ? 0.0 : (double)ParsWithTheirWallsMet() / accepted.Count;
+            return missed;
         }
 
         public IReadOnlyList<int> StingyStars()
         {
             Rate();
             return stingyStars;
+        }
+
+        public IReadOnlyList<int> PloddingStars()
+        {
+            Rate();
+            return ploddingStars;
+        }
+
+        public IReadOnlyList<double> PloddingPositions()
+        {
+            Rate();
+            return ploddingPositions;
         }
 
         public IReadOnlyList<int> RoutedStars()
@@ -257,11 +266,9 @@ namespace Game.Domain.Tests
             return routedPositions;
         }
 
-        public double MedianRoutedPosition()
+        public List<AcceptedLevel> Rated()
         {
-            var sorted = new List<double>(RoutedPositions());
-            sorted.Sort();
-            return sorted.Count == 0 ? 0.0 : SweepStatistics.Percentile(sorted, 0.5);
+            return rated ?? (rated = accepted.GetRange(0, Math.Min(accepted.Count, RatedLevels)));
         }
 
         void Rate()
@@ -271,10 +278,12 @@ namespace Game.Domain.Tests
                 return;
             }
 
-            var sample = accepted.GetRange(0, Math.Min(accepted.Count, RatedLevels));
+            var sample = Rated();
             stingyStars = StarsOver(sample, ReferenceRuns.Stingy);
+            ploddingStars = StarsOver(sample, ReferenceRuns.Plodding);
             routedStars = StarsOver(sample, ReferenceRuns.Routed);
             routedPositions = PositionsOver(sample, ReferenceRuns.Routed);
+            ploddingPositions = PositionsOver(sample, ReferenceRuns.Plodding);
         }
 
         public string Rating()
@@ -289,24 +298,29 @@ namespace Game.Domain.Tests
             }
 
             spans.Sort();
-            var positions = new List<double>(RoutedPositions());
-            positions.Sort();
 
-            return "boss shares the start's region on " + BossesSharingTheStartsRegion()
-                + " of " + accepted.Count + "; walls met on " + ParsWithTheirWallsMet()
-                + " of " + accepted.Count + " ("
-                + SweepStatistics.Round(100.0 * ShareOfParsWithTheirWallsMet()) + "%), span p10 "
+            return "walls met on " + ParsWithTheirWallsMet() + " of " + accepted.Count
+                + ", ceilings no constructed route reaches " + CeilingsNoRouteReaches()
+                + " of " + Rated().Count + ", span p10 "
                 + SweepStatistics.Round(SweepStatistics.Percentile(spans, 0.1))
                 + " p50 " + SweepStatistics.Round(SweepStatistics.Percentile(spans, 0.5))
                 + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(spans, 0.9))
                 + "; second star at " + SweepStatistics.Round(LevelPlan.SecondStarAt(LevelNumber))
                 + " third at " + SweepStatistics.Round(LevelPlan.ThirdStarAt(LevelNumber))
                 + "; stingy " + Tally(StingyStars())
-                + "; routed " + Tally(RoutedStars())
-                + " at position p10 " + SweepStatistics.Round(SweepStatistics.Percentile(positions, 0.1))
-                + " p50 " + SweepStatistics.Round(SweepStatistics.Percentile(positions, 0.5))
-                + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(positions, 0.9))
-                + " over " + positions.Count + " levels";
+                + "; plodding " + Tally(PloddingStars()) + " at " + Places(PloddingPositions())
+                + "; routed " + Tally(RoutedStars()) + " at " + Places(RoutedPositions());
+        }
+
+        static string Places(IReadOnlyList<double> positions)
+        {
+            var sorted = new List<double>(positions);
+            sorted.Sort();
+
+            return "position p10 " + SweepStatistics.Round(SweepStatistics.Percentile(sorted, 0.1))
+                + " p50 " + SweepStatistics.Round(SweepStatistics.Percentile(sorted, 0.5))
+                + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(sorted, 0.9))
+                + " over " + sorted.Count + " levels";
         }
 
         static string Tally(IReadOnlyList<int> stars)
