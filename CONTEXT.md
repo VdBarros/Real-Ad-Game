@@ -59,8 +59,12 @@ terrace's near edge, one step up at each end and level in between. It bends into
 an L where the two terraces' columns do not line up, running through the space
 that is beside the terrace above and beyond the terrace below, so that it is
 never beside anything but its own two ends. A staircase is ordinary walkable
-corridor — no adjacency of its own, never a slot, and never a decision node,
-since its tiles have corridor-degree two like any other corridor tile.
+corridor — no adjacency of its own, never a slot, and never a decision node.
+That is enforced rather than inferred: slot selection refuses a climbing tile at
+each of the three places it collects candidates — dead ends, junctions and
+corridor runs — and the fuzz sweep asserts over every generated level that no
+decision node stands on one. Reading the rule off corridor-degree two instead
+would leave the L-bend to break it.
 _Avoid_: stair, stair link, ramp.
 
 ## Footing
