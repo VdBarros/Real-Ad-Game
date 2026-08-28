@@ -81,7 +81,7 @@ namespace Game.Presentation.Pure
                 flown,
                 followed,
                 beat.Advanced(deltaSeconds),
-                followed.IsSettled ? pan.Arrived() : pan);
+                pan);
         }
 
         public CameraStaging Follows(WorldPoint subject)
@@ -110,7 +110,7 @@ namespace Game.Presentation.Pure
 
         public CameraStaging LooksBack()
         {
-            return new CameraStaging(flight, follow.LookingBack(), beat, pan.Recalled());
+            return new CameraStaging(flight, follow.LookingBack(), beat, pan.GivenUp());
         }
 
         public CameraStaging CutTo(TilePosition position)
@@ -123,7 +123,7 @@ namespace Game.Presentation.Pure
             }
 
             return new CameraStaging(
-                flight, follow.LookingBack(), ZoomBeat.On(LevelFraming.CloseUp(position)), pan.Dropped());
+                flight, follow.LookingBack(), ZoomBeat.On(LevelFraming.CloseUp(position)), pan.GivenUp());
         }
 
         public CameraStaging Released()

@@ -41,6 +41,14 @@ namespace Game.Domain.Tests
             return new WorldPoint(direction.X * metres, direction.Y * metres, direction.Z * metres);
         }
 
+        static WorldPoint Walking(LevelGraph graph, int frame)
+        {
+            var start = LevelFraming.StartPoint(graph);
+            var step = frame * 0.02f;
+
+            return new WorldPoint(start.X + step, start.Y, start.Z + step);
+        }
+
         static IEnumerable<WorldPoint> Compass(float metres)
         {
             var right = IsoProjection.CameraRight;
@@ -334,6 +342,64 @@ namespace Game.Domain.Tests
             staging = staging.Advanced(ZoomBeat.CapSeconds).LooksBack();
 
             Assert.That(Rested(staging).Framing, Is.EqualTo(LevelFraming.Play(standing)));
+        }
+
+        [Test]
+        public void ARecallGivesThePanUpOnItsOwnFrameWhileTheSubjectIsStillMoving()
+        {
+            var graph = Graph();
+            var staging = Playing(graph).Looks(Up(4f)).LookHeld();
+
+            Assert.That(staging.IsAway, Is.True, "A held drag did not read as away from the player.");
+
+            var parked = staging.Framing;
+            staging = staging.LooksBack();
+
+            Assert.That(
+                staging.IsAway,
+                Is.False,
+                "The recall did not give the pan up on the frame it was asked for.");
+            Assert.That(staging.Framing, Is.EqualTo(parked), "The recall cut the camera home rather than easing it.");
+
+            var apart = ScreenFrame.PanPixels(staging.Framing, LevelFraming.Play(staging.Subject));
+
+            Assert.That(apart, Is.GreaterThan(0f));
+
+            for (var frame = 1; frame <= 240; frame++)
+            {
+                staging = staging.Follows(Walking(graph, frame)).Advanced(Frame);
+
+                Assert.That(
+                    staging.IsAway,
+                    Is.False,
+                    "The camera read as away again on frame " + frame + " of a walk it was already coming home for.");
+            }
+
+            Assert.That(
+                ScreenFrame.PanPixels(staging.Framing, LevelFraming.Play(staging.Subject)),
+                Is.LessThan(apart * 0.1f),
+                "The camera never closed on the walking player it was recalled to.");
+        }
+
+        [Test]
+        public void OnlyAFreshDragTakesTheCameraAwayAgainOnceItHasBeenRecalled()
+        {
+            var graph = Graph();
+            var recalled = Playing(graph).Looks(Up(4f)).LookHeld().LooksBack();
+
+            Assert.That(recalled.IsAway, Is.False);
+            Assert.That(Rested(recalled).IsAway, Is.False, "The ease home handed the pan back.");
+            Assert.That(Rested(recalled).Looks(Up(4f)).IsAway, Is.True, "A fresh drag left the camera on the player.");
+        }
+
+        [Test]
+        public void ARecallOfADragStillUnderTheFingerAlsoGivesThePanUpAtOnce()
+        {
+            var graph = Graph();
+            var staging = Playing(graph).Looks(Up(4f));
+
+            Assert.That(staging.IsAway, Is.True);
+            Assert.That(staging.LooksBack().IsAway, Is.False);
         }
 
         [Test]
