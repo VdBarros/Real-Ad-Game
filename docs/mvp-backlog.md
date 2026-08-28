@@ -89,12 +89,16 @@ Decision 20 replaces the pedestal the take used to leave — a crushed, widened,
 stone-tinted slab that read as the chest falling through the floor and staying
 there. The ad shows a chest that *opens* and is then gone, and the tile alone
 carries on saying a node was here. Two consequences are load-bearing. A mesh
-prop may **never** carry a non-uniform scale: `ModelPose` sizes it from its
-height alone and squares that across all three axes, because a lid hinged
-inside a squashed parent shears instead of swinging, and because the fit factor
-only means anything while the mesh keeps its authored proportions. And a level
-resumed onto an already-consumed node snaps to the end of the take, so the
-chest is gone from the first frame rather than fading again on every reload.
+prop **fitted** to a tile may never carry a non-uniform scale: `ModelPose.Fitted`
+sizes the chest and the coin stack from height alone and squares that across all
+three axes, because a lid hinged inside a squashed parent shears instead of
+swinging, and because the fit factor only means anything while the mesh keeps
+its authored proportions. The rule is about fitting, not about mesh props at
+large — a part sized to *span* a cell is stretched to the grid on purpose and
+stays non-uniform: the staircase, the foundation, the wall panel and the floor
+quad. And a level resumed onto an already-consumed node snaps to the end of the
+take, so the chest is gone from the first frame rather than fading again on
+every reload.
 
 Decision 21 settles what a tile stands on. The floor quad used to be
 unconditional, so a tile footed with a flight carried two surfaces: the quad at
@@ -109,7 +113,6 @@ and it is the one part of a tile that keeps its collider, so a tap on a climbing
 tile lands on the treads instead of on air a step above them. The consequence to
 watch is that `PartStyle.Staircase`'s own material never survives a built level
 — the floor state paints every flight as ground the moment the run opens.
-
 
 [#2]: https://github.com/VdBarros/Real-Ad-Game/issues/2
 [#3]: https://github.com/VdBarros/Real-Ad-Game/issues/3
@@ -127,6 +130,7 @@ watch is that `PartStyle.Staircase`'s own material never survives a built level
 [#16]: https://github.com/VdBarros/Real-Ad-Game/issues/16
 [#61]: https://github.com/VdBarros/Real-Ad-Game/issues/61
 [#113]: https://github.com/VdBarros/Real-Ad-Game/issues/113
+[#114]: https://github.com/VdBarros/Real-Ad-Game/issues/114
 [#117]: https://github.com/VdBarros/Real-Ad-Game/issues/117
 
 ### Calls I made — override any of these if you disagree
@@ -418,11 +422,16 @@ choice. Measured: confining them costs 6 points of layout acceptance
 (839/1000 against 902/1000) and lifts the mean gate ratio to 0.42, where the L
 holds it at 0.35 against 0.31 before terracing.
 
-Staircase tiles must be **excluded from slot candidacy explicitly**.
-`SlotSelector` draws candidates from every second tile of a corridor run, and a
-staircase is a corridor run — without the exclusion, content is minted standing
-halfway up a flight of stairs. A staircase belongs to the region of the terrace
-it **leaves**, so the region boundary sits at the top of the climb.
+Staircase tiles must be **excluded from slot candidacy explicitly**, at every
+source of candidates rather than only at the corridor run. `SlotSelector` draws
+from three: corridor runs, dead ends and junctions. A staircase is a corridor
+run, so the run needs the exclusion or content is minted standing halfway up a
+flight of stairs — but an L-bend can also give a climbing tile corridor-degree
+one or three, which makes it a dead end or a junction and reaches the other two
+sources. All three go through one gate, and the fuzz sweep asserts no decision
+node on any generated level stands on a climbing tile ([#114]). A staircase
+belongs to the region of the terrace it **leaves**, so the region boundary sits
+at the top of the climb.
 
 ---
 

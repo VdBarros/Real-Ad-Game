@@ -237,12 +237,28 @@ namespace Game.EditorTooling
             var meshed = 0;
             var collided = 0;
             var flat = 0;
+            var quadded = 0;
+            var absent = new List<string>();
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                Transform node;
-                if (!byName.TryGetValue(PartNames.Tile(tile.Position), out node))
+                var name = PartNames.Tile(tile.Position);
+                var walksOnItsQuad =
+                    LevelBlueprintBuilder.WalkingSurfaceOf(graph.Tiles, tile.Position) == name;
+
+                if (walksOnItsQuad)
                 {
+                    quadded++;
+                }
+
+                Transform node;
+                if (!byName.TryGetValue(name, out node))
+                {
+                    if (walksOnItsQuad)
+                    {
+                        absent.Add(name);
+                    }
+
                     continue;
                 }
 
@@ -267,19 +283,27 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
+                quadded > 0 && floors == quadded && absent.Count == 0,
+                "every tile that walks on its own floor quad has one in the built world, and the tiles "
+                + "without one are exactly those footed with a flight",
+                floors + " of " + quadded + " quad-walking tiles of " + graph.Tiles.Tiles.Count
+                + " carry a quad, " + (graph.Tiles.Tiles.Count - quadded) + " walk on a flight"
+                + (absent.Count == 0 ? "" : "; missing " + string.Join(", ", absent.ToArray())));
+            failures += Assert(
+                report,
                 floors > 0 && meshed == floors,
-                "every floor tile in the built world carries the pack mesh",
-                meshed + " of " + floors + " tiles do");
+                "every floor quad in the built world carries the pack mesh",
+                meshed + " of " + floors + " quads do");
             failures += Assert(
                 report,
                 floors > 0 && flat == floors,
-                "every floor tile lies flat rather than wearing the quad's tilt",
-                flat + " of " + floors + " tiles do");
+                "every floor quad lies flat rather than wearing the quad's tilt",
+                flat + " of " + floors + " quads do");
             failures += Assert(
                 report,
                 floors > 0 && collided == floors,
-                "every floor tile keeps a collider",
-                collided + " of " + floors + " tiles do");
+                "every floor quad keeps a collider",
+                collided + " of " + floors + " quads do");
 
             var ceiling = Enum.GetValues(typeof(PartStyle)).Length;
 
