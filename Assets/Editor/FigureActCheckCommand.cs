@@ -48,6 +48,11 @@ namespace Game.EditorTooling
 
         const int Limbs = 16;
 
+        static readonly ActionOutcome[] FoughtOutcomes =
+        {
+            ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss
+        };
+
         public static void Check()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -60,7 +65,9 @@ namespace Game.EditorTooling
             using (var models = new WorldModels())
             {
                 failures += Imported(models, report);
+                failures += TheWholeCastCarriesTheSameClips(models, report);
                 failures += Cut(models, report);
+                failures += Answered(models, report);
                 failures += Degrades(models, report);
                 failures += Walked(models, report);
             }
@@ -254,7 +261,7 @@ namespace Game.EditorTooling
             var failures = 0;
             var rows = new List<string>();
 
-            foreach (var outcome in new[] { ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss })
+            foreach (var outcome in FoughtOutcomes)
             {
                 var fight = Fight.Of(outcome);
                 failures += Fits(models, report, worn, FigureCues.Striking(fight), fight.Seconds, outcome + " fight");
@@ -331,7 +338,7 @@ namespace Game.EditorTooling
 
         static int Degrades(WorldModels models, StringBuilder report)
         {
-            var worn = PartModels.Of(PartStyle.Start);
+            var meshes = Rigged();
             var warnings = 0;
             Application.LogCallback watch = (message, trace, type) =>
             {
@@ -343,12 +350,19 @@ namespace Game.EditorTooling
 
             Application.logMessageReceived += watch;
 
-            AnimationClip first;
-            AnimationClip second;
+            var nothing = 0;
             try
             {
-                first = models.ClipOf(worn, AbsentClip);
-                second = models.ClipOf(worn, AbsentClip);
+                foreach (var mesh in meshes)
+                {
+                    var first = models.ClipOf(mesh, AbsentClip);
+                    var second = models.ClipOf(mesh, AbsentClip);
+
+                    if (first == null && second == null)
+                    {
+                        nothing++;
+                    }
+                }
             }
             finally
             {
@@ -357,15 +371,148 @@ namespace Game.EditorTooling
 
             return Assert(
                 report,
-                first == null && second == null && warnings == 1,
-                "a clip the pack does not carry resolves to nothing and warns once rather than once a frame, so "
-                + "a figure that wants it holds its static pose instead of throwing",
+                meshes.Count > 0 && nothing == meshes.Count && warnings == meshes.Count,
+                "a clip the pack does not carry resolves to nothing and warns once per mesh rather than once a "
+                + "frame, on every mesh the cast wears rather than the player's alone, so any figure that wants "
+                + "it holds its static pose instead of throwing",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "two lookups of {0} both resolved to nothing and the log carried {1} warning{2}",
+                    "two lookups of {0} on each of the {1} rigged meshes all resolved to nothing and the log "
+                    + "carried {2} warning{3}",
                     AbsentClip,
+                    meshes.Count,
                     warnings,
                     warnings == 1 ? string.Empty : "s"));
+        }
+
+        static int TheWholeCastCarriesTheSameClips(WorldModels models, StringBuilder report)
+        {
+            var meshes = Rigged();
+            var complete = 0;
+            var complaint = new List<string>();
+            var census = new List<string>();
+
+            foreach (var mesh in meshes)
+            {
+                var missing = new List<string>();
+
+                foreach (var name in AdventurerClips.Names)
+                {
+                    var clip = models.ClipOf(mesh, name);
+
+                    if (clip == null || clip.length <= 0f)
+                    {
+                        missing.Add(name);
+                    }
+                }
+
+                if (missing.Count == 0 && models.ClipCountOf(mesh) == AdventurerClips.Count)
+                {
+                    complete++;
+                }
+                else if (complaint.Count < 6)
+                {
+                    complaint.Add(mesh + " is missing " + string.Join(", ", missing.ToArray()));
+                }
+
+                census.Add(mesh + " " + models.ClipCountOf(mesh));
+            }
+
+            return Assert(
+                report,
+                meshes.Count > 0 && complete == meshes.Count,
+                "every rigged mesh in the cast, the four skeletons as well as the player's knight, carries "
+                + "exactly the clips the pure table names, so an enemy animates off the same table the player "
+                + "does with no branch per pack",
+                complete + " of " + meshes.Count + " do (" + string.Join(", ", census.ToArray()) + ")"
+                + (complaint.Count == 0 ? string.Empty : "; " + string.Join("; ", complaint.ToArray())));
+        }
+
+        static int Answered(WorldModels models, StringBuilder report)
+        {
+            var meshes = Rigged();
+            var pairs = 0;
+            var fitted = 0;
+            var mirrored = 0;
+            var complaint = new List<string>();
+            var rows = new List<string>();
+
+            foreach (var outcome in FoughtOutcomes)
+            {
+                var fight = Fight.Of(outcome);
+                var blow = FigureCues.Striking(fight);
+                var reply = FigureCues.Answering(fight);
+
+                if (reply.Act == FigureCues.Answered(blow.Act)
+                    && Math.Abs(reply.Beat - fight.Seconds) <= Epsilon
+                    && (reply.Act == FigureAct.Clash) == (blow.Act == FigureAct.Clash))
+                {
+                    mirrored++;
+                }
+
+                rows.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "a {0} is {1} on the player and {2} on the enemy over the same {3:0.###}s",
+                    outcome,
+                    blow.Act,
+                    reply.Act,
+                    fight.Seconds));
+
+                foreach (var mesh in meshes)
+                {
+                    pairs++;
+                    var clip = models.ClipOf(mesh, reply.Clip);
+                    var seconds = clip == null ? 0f : clip.length;
+
+                    if (clip != null
+                        && reply.EndsWithin(seconds)
+                        && Math.Abs(reply.TimeIn(seconds, fight.Seconds) - seconds) <= Epsilon)
+                    {
+                        fitted++;
+                    }
+                    else if (complaint.Count < 6)
+                    {
+                        complaint.Add(
+                            mesh + " answering a " + outcome + " with " + reply.Clip + " runs "
+                            + seconds.ToString("0.###", CultureInfo.InvariantCulture) + "s against a beat of "
+                            + fight.Seconds.ToString("0.###", CultureInfo.InvariantCulture) + "s");
+                    }
+                }
+            }
+
+            var failures = Assert(
+                report,
+                mirrored == FoughtOutcomes.Length,
+                "the enemy's cue is the mirror of the player's over the same beat - a win is answered by a "
+                + "recoil, a loss by a strike, a tie by a clash on both sides - and that mirroring is a pure "
+                + "decision the Unity side only plays",
+                mirrored + " of " + FoughtOutcomes.Length + " outcomes mirror: "
+                + string.Join("; ", rows.ToArray()));
+
+            failures += Assert(
+                report,
+                pairs > 0 && fitted == pairs,
+                "every answering clip ends inside the fight's own beat on every mesh in the cast, which is the "
+                + "clip being cut to the beat rather than the beat to the clip",
+                fitted + " of " + pairs + " mesh and outcome pairs do"
+                + (complaint.Count == 0 ? string.Empty : "; " + string.Join("; ", complaint.ToArray())));
+
+            return failures;
+        }
+
+        static List<PartModel> Rigged()
+        {
+            var meshes = new List<PartModel>();
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (ArtPacks.IsRigged(model))
+                {
+                    meshes.Add(model);
+                }
+            }
+
+            return meshes;
         }
 
         static int Walked(WorldModels models, StringBuilder report)
