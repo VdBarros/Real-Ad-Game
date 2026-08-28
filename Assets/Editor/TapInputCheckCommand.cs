@@ -302,11 +302,24 @@ namespace Game.EditorTooling
 
             input.LookBack();
 
+            if (rig.IsAway)
+            {
+                Debug.LogError(
+                    "Asking for the camera back left it reading as away from the player at " + rig.Framing + ".");
+            }
+
             var homed = 0;
-            while (rig.IsAway && homed < 400)
+            while (!rig.Framing.Equals(player) && homed < 400)
             {
                 rig.Advance(1f / 60f);
                 homed++;
+
+                if (rig.IsAway)
+                {
+                    Debug.LogError(
+                        "The camera read as away again on frame " + homed + " of easing home to the player.");
+                    break;
+                }
             }
 
             if (homed <= 1)
@@ -364,11 +377,25 @@ namespace Game.EditorTooling
                 Debug.LogError("Committing node " + target + " cut the camera back rather than easing it.");
             }
 
+            if (rig.IsAway)
+            {
+                Debug.LogError(
+                    "Committing node " + target + " left the camera reading as away from the player at "
+                    + rig.Framing + ".");
+            }
+
             var came = 0;
-            while (rig.IsAway && came < 400)
+            while (!rig.Framing.Equals(player) && came < 400)
             {
                 rig.Advance(1f / 60f);
                 came++;
+
+                if (rig.IsAway)
+                {
+                    Debug.LogError(
+                        "The camera read as away again on frame " + came + " of easing home after a commit.");
+                    break;
+                }
             }
 
             input.Tapped -= count;

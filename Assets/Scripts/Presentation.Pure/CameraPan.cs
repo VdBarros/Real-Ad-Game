@@ -9,8 +9,7 @@ namespace Game.Presentation.Pure
         {
             OnTheSubject,
             UnderTheFinger,
-            Held,
-            OnItsWayBack
+            Held
         }
 
         readonly CameraBounds bounds;
@@ -47,16 +46,11 @@ namespace Game.Presentation.Pure
             get { return stance != Stance.OnTheSubject; }
         }
 
-        public bool HoldsTheCamera
-        {
-            get { return stance == Stance.UnderTheFinger || stance == Stance.Held; }
-        }
-
         public WorldPoint Look
         {
             get
             {
-                if (!HoldsTheCamera)
+                if (!IsAway)
                 {
                     throw new InvalidOperationException(
                         "Only a pan the finger put somewhere says where to look. This one is " + this + ".");
@@ -87,19 +81,9 @@ namespace Game.Presentation.Pure
                 : this;
         }
 
-        public CameraPan Recalled()
+        public CameraPan GivenUp()
         {
-            return HoldsTheCamera ? new CameraPan(bounds, anchor, look, Stance.OnItsWayBack) : this;
-        }
-
-        public CameraPan Arrived()
-        {
-            return stance == Stance.OnItsWayBack ? Resting() : this;
-        }
-
-        public CameraPan Dropped()
-        {
-            return stance == Stance.OnTheSubject ? this : Resting();
+            return IsAway ? Resting() : this;
         }
 
         public bool Equals(CameraPan other)
@@ -135,8 +119,6 @@ namespace Game.Presentation.Pure
                     return "dragged from " + anchor + " to " + look;
                 case Stance.Held:
                     return "held at " + look;
-                case Stance.OnItsWayBack:
-                    return "on its way back from " + look;
                 default:
                     return "on the player";
             }
