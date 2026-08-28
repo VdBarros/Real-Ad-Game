@@ -126,6 +126,7 @@ namespace Game.Presentation
             if (joined != null && !joined.HasFallen)
             {
                 joined.StandOn(Along(enemyPost, fight.Recoil));
+                joined.Answer(FigureCues.Answering(fight));
                 joined.Dissolve(fight.Fade);
             }
 

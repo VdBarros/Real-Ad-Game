@@ -30,7 +30,7 @@ namespace Game.EditorTooling
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             var loop = GameLoop.Raise(Seed, MazePreset.Ship, null);
-            var report = new StringBuilder("t-38: recentre button on ship seed ")
+            var report = new StringBuilder("t-42: recentre button on ship seed ")
                 .Append(Seed.ToString(CultureInfo.InvariantCulture))
                 .Append(':');
 
@@ -133,8 +133,8 @@ namespace Game.EditorTooling
             TheButtonAndTheReaderAgree(loop, "a drag off the player");
 
             APressOnTheButtonLeavesTheMazeAlone(loop, report);
-            TheButtonLeavesOnArrivalAndNotOnTheTap(loop, resting, report);
-            ACommittedTapTakesTheButtonAwayUntapped(loop, report);
+            TheButtonLeavesOnThePressAndTheCameraStillEasesHome(loop, resting, report);
+            ACommittedTapTakesTheButtonAwayWhileTheWalkerIsStillMoving(loop, report);
 
             loop.Tear();
 
@@ -204,55 +204,60 @@ namespace Game.EditorTooling
                 .Append(loop.Rig.Framing.Target.ToString());
         }
 
-        static void TheButtonLeavesOnArrivalAndNotOnTheTap(
+        static void TheButtonLeavesOnThePressAndTheCameraStillEasesHome(
             GameLoop loop, CameraFraming resting, StringBuilder report)
         {
+            var pressedFrom = loop.Rig.Framing;
+
             loop.Button.Call.onClick.Invoke();
             loop.Advance(Frame);
 
-            if (!loop.Button.IsShowing)
+            if (loop.Button.IsShowing)
             {
-                Fail("The recentre button left on the tap itself, with the camera still at "
+                Fail("The recentre button was still on screen the frame after it was pressed, with the camera at "
                     + loop.Rig.Framing + ".");
             }
 
-            var came = 0;
-            var leftAt = -1;
+            if (!loop.Rig.Framing.Equals(pressedFrom))
+            {
+                Fail("The press moved the camera from " + pressedFrom + " to " + loop.Rig.Framing
+                    + " before a frame had been advanced, which is a cut and not an ease.");
+            }
 
-            while (came < Ceiling && (loop.Button.IsShowing || !loop.Rig.Framing.Equals(resting)))
+            TheButtonAndTheReaderAgree(loop, "the press on the button");
+
+            var came = 0;
+            var showedDuringTheEase = false;
+
+            while (came < Ceiling && !loop.Rig.Framing.Equals(resting))
             {
                 loop.Rig.Advance(Frame);
                 loop.Advance(Frame);
                 came++;
-
-                if (leftAt < 0 && !loop.Button.IsShowing)
-                {
-                    leftAt = came;
-                }
+                showedDuringTheEase |= loop.Button.IsShowing;
             }
 
             report.AppendFormat(
                 CultureInfo.InvariantCulture,
-                "\n  a tap eases home over {0} frames and the button leaves on frame {1}",
+                "\n  a press takes the button away at once and eases home over {0} frames, showing again in {1}",
                 came,
-                leftAt);
+                showedDuringTheEase ? "some of them" : "none of them");
+
+            if (came <= 1)
+            {
+                Fail("The camera reached the player in " + came
+                    + " frame, so the press cut it home rather than easing it.");
+            }
 
             if (!loop.Rig.Framing.Equals(resting))
             {
-                Fail("A tap on the recentre button left the camera at " + loop.Rig.Framing
+                Fail("A press on the recentre button left the camera at " + loop.Rig.Framing
                     + " rather than back on the player at " + resting + ".");
             }
 
-            if (loop.Button.IsShowing)
+            if (showedDuringTheEase)
             {
-                Fail("The camera came back to " + loop.Rig.Framing
-                    + " and the recentre button stayed on screen.");
-            }
-
-            if (leftAt <= 1)
-            {
-                Fail("The recentre button left after " + leftAt
-                    + " frame, which is the tap and not the camera's arrival.");
+                Fail("The recentre button flickered back on while the camera was easing home.");
             }
 
             TheButtonAndTheReaderAgree(loop, "the camera's arrival");
@@ -270,7 +275,8 @@ namespace Game.EditorTooling
                 + (loop.Input.CallShowing ? "showing" : "gone") + ".");
         }
 
-        static void ACommittedTapTakesTheButtonAwayUntapped(GameLoop loop, StringBuilder report)
+        static void ACommittedTapTakesTheButtonAwayWhileTheWalkerIsStillMoving(
+            GameLoop loop, StringBuilder report)
         {
             loop.Rig.Look(Along(IsoProjection.CameraRight, DragMetres));
             loop.Advance(Frame);
@@ -281,28 +287,69 @@ namespace Game.EditorTooling
                 return;
             }
 
-            var move = ALegalMove(loop);
+            AnAimedTargetNeitherRefocusesNorHidesTheButton(loop, report);
+
+            var move = TheLongestLegalMove(loop);
             if (move < 0)
             {
                 Fail("No legal move was on screen to commit, so the automatic refocus went untested.");
                 return;
             }
 
-            loop.Input.ReleaseAt(PointOf(loop, move));
+            var route = Journey.Toward(loop.Run, move).Walk.Route;
+            var panned = loop.Rig.Framing;
 
-            var frames = 0;
-            while (frames < Ceiling && loop.Button.IsShowing)
+            if (route.Nodes.Count < 3)
             {
-                loop.Rig.Advance(Frame);
-                loop.Advance(Frame);
-                frames++;
+                Fail("The longest legal move on screen ran through " + route.Nodes.Count
+                    + " nodes, so no multi-node route was on offer to walk.");
+            }
+
+            loop.Input.ReleaseAt(PointOf(loop, move));
+            loop.Advance(Frame);
+
+            var goneOnTheTap = !loop.Button.IsShowing;
+            var walked = 0;
+            var walkedShowing = 0;
+
+            while (walked < Ceiling && loop.Walker.IsWalking)
+            {
+                Step(loop);
+                walked++;
+
+                if (loop.Button.IsShowing)
+                {
+                    walkedShowing++;
+                }
             }
 
             report.AppendFormat(
                 CultureInfo.InvariantCulture,
-                "\n  a committed tap on node {0} takes the button away untapped after {1} frames",
+                "\n  a committed tap on node {0} walks a {1} node route over {2} frames; the button goes on the tap:"
+                + " {3}, and shows in {4} of the frames the walker was moving",
                 move,
-                frames);
+                route.Nodes.Count,
+                walked,
+                goneOnTheTap,
+                walkedShowing);
+
+            if (!goneOnTheTap)
+            {
+                Fail("A committed tap left the recentre button on screen; the camera sat at " + panned
+                    + " and the walker set off for node " + move + ".");
+            }
+
+            if (walkedShowing > 0)
+            {
+                Fail("The recentre button was on screen for " + walkedShowing + " of the " + walked
+                    + " frames the walker was still moving.");
+            }
+
+            if (walked <= 1)
+            {
+                Fail("The walker finished in " + walked
+                    + " frame, so the button was never tested against a moving walker.");
+            }
 
             if (loop.Button.IsShowing)
             {
@@ -311,19 +358,76 @@ namespace Game.EditorTooling
             }
         }
 
-        static int ALegalMove(GameLoop loop)
+        static void AnAimedTargetNeitherRefocusesNorHidesTheButton(GameLoop loop, StringBuilder report)
+        {
+            var aimed = TheLongestLegalMove(loop);
+            if (aimed < 0)
+            {
+                Fail("No legal move was on screen to aim at while the camera was panned away.");
+                return;
+            }
+
+            var panned = loop.Rig.Framing;
+
+            loop.Input.AimAt(PointOf(loop, aimed));
+            loop.Advance(Frame);
+
+            report.Append("\n  aiming at node ")
+                .Append(aimed.ToString(CultureInfo.InvariantCulture))
+                .Append(" while panned away leaves the button ")
+                .Append(loop.Button.IsShowing ? "showing" : "gone");
+
+            if (!loop.Input.Preview.IsAimed)
+            {
+                Fail("Aiming at node " + aimed + " while panned away aimed at nothing.");
+            }
+
+            if (!loop.Rig.Framing.Equals(panned))
+            {
+                Fail("Aiming at node " + aimed + " refocused the camera from " + panned + " to "
+                    + loop.Rig.Framing + ".");
+            }
+
+            if (!loop.Button.IsShowing)
+            {
+                Fail("Aiming at node " + aimed + " took the recentre button away with nothing committed.");
+            }
+
+            TheButtonAndTheReaderAgree(loop, "an aimed target while panned away");
+        }
+
+        static void Step(GameLoop loop)
+        {
+            loop.Walker.Advance(Frame);
+            loop.Rig.Advance(Frame);
+            loop.Advance(Frame);
+        }
+
+        static int TheLongestLegalMove(GameLoop loop)
         {
             var candidates = loop.Input.Candidates();
+            var furthest = -1;
+            var steps = 0;
 
             for (var index = 0; index < candidates.Count; index++)
             {
-                if (TargetPreview.Of(loop.Run, candidates[index].NodeId).IsLegal)
+                var nodeId = candidates[index].NodeId;
+                if (!TargetPreview.Of(loop.Run, nodeId).IsLegal)
                 {
-                    return candidates[index].NodeId;
+                    continue;
                 }
+
+                var reach = Journey.Toward(loop.Run, nodeId).Walk.Route.Steps;
+                if (furthest >= 0 && reach <= steps)
+                {
+                    continue;
+                }
+
+                furthest = nodeId;
+                steps = reach;
             }
 
-            return -1;
+            return furthest;
         }
 
         static ScreenPoint PointOf(GameLoop loop, int nodeId)

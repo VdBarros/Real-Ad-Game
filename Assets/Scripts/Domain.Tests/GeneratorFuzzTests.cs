@@ -577,6 +577,51 @@ namespace Game.Domain.Tests
             }
         }
 
+        [TestCaseSource(nameof(EveryPreset))]
+        public void NoDecisionNodeOnAnAcceptedLevelStandsOnAClimbingTile(MazePreset preset)
+        {
+            NoDecisionNodeStandsOnAClimbingTile(Sweep(preset));
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void NoDecisionNodeOnAnyPlanStandsOnAClimbingTile(int levelNumber)
+        {
+            NoDecisionNodeStandsOnAClimbingTile(PlanSweep(levelNumber));
+        }
+
+        static void NoDecisionNodeStandsOnAClimbingTile(FuzzSweep sweep)
+        {
+            var climbing = 0;
+
+            foreach (var accepted in sweep.Accepted)
+            {
+                foreach (var tile in accepted.Level.Graph.Tiles.Tiles)
+                {
+                    if (!Terraces.IsTerrace(tile.Position.Elevation))
+                    {
+                        climbing++;
+                    }
+                }
+
+                foreach (var node in accepted.Level.Graph.Decisions.Nodes)
+                {
+                    Assert.That(
+                        Terraces.IsTerrace(node.Position.Elevation),
+                        Is.True,
+                        "Seed " + accepted.Level.AttemptSeed + " stood node #" + node.Id
+                            + " (" + node.Type + ") mid-climb at " + node.Position + ".");
+                }
+            }
+
+            if (sweep.Preset.Stairs > 0)
+            {
+                Assert.That(
+                    climbing,
+                    Is.GreaterThan(0),
+                    sweep.Name + " swept no climbing tile, so it proved nothing.");
+            }
+        }
+
         [Test]
         public void EveryStallThePanelReportsOnAMutantIsOneTheOracleFindsToo()
         {

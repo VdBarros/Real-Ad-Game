@@ -130,8 +130,10 @@ namespace Game.Presentation
                     }
                     else if (part.Style == BadgeStyle.Enemy || part.Style == BadgeStyle.Boss)
                     {
+                        var carried = Worn(part.NodeId);
                         var enemy = prop.gameObject.AddComponent<EnemyFigure>();
-                        enemy.Begin(badge.transform, Worn(part.NodeId), part.NodeId, part.Value);
+                        FigureAnimator.Raise(enemy.gameObject, carried, models);
+                        enemy.Begin(badge.transform, carried, part.NodeId, part.Value);
                         enemies.Add(enemy);
                     }
                     else if (part.Style == BadgeStyle.Additive || part.Style == BadgeStyle.Multiplier)

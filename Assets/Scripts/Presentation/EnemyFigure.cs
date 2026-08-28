@@ -9,6 +9,8 @@ namespace Game.Presentation
 
         PowerBadge power;
 
+        FigureAnimator acting;
+
         int value;
 
         public int NodeId { get; private set; }
@@ -17,11 +19,25 @@ namespace Game.Presentation
 
         public bool HasFallen { get; private set; }
 
+        public FigureAct Act
+        {
+            get { return acting == null ? FigureAct.Idle : acting.Act; }
+        }
+
         internal void Begin(Transform badge, PartModel mesh, int nodeId, int enemyValue)
         {
             Stand(badge, mesh);
+            acting = GetComponent<FigureAnimator>();
             NodeId = nodeId;
             value = enemyValue;
+        }
+
+        internal void Answer(FigureCue cue)
+        {
+            if (acting != null)
+            {
+                acting.Cue(cue);
+            }
         }
 
         internal void Follow(PowerBadge playerPower)
