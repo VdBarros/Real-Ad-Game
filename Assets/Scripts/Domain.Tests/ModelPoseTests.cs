@@ -235,27 +235,31 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ACollapsingRewardPropStaysOnTheTileWhileItFlattens()
+        public void ARewardPropIsSquareOnEveryAxisSoItsLidSwingsInsteadOfShearing()
         {
             var chest = Pickup(PartStyle.Additive);
-            var ground = chest.Position.Y - chest.Scale.Y * 0.5f;
-            var pedestal = new WorldPart(
+            var square = ModelPose.ScaleOf(chest);
+
+            Assert.That(square.X, Is.EqualTo(square.Y).Within(Tolerance));
+            Assert.That(square.Z, Is.EqualTo(square.Y).Within(Tolerance));
+
+            var splayed = new WorldPart(
                 chest.Name,
                 chest.Shape,
                 chest.Model,
                 chest.Style,
-                new WorldPoint(
-                    chest.Position.X, ground + Take.PedestalHeight * 0.5f, chest.Position.Z),
+                chest.Position,
                 chest.Rotation,
-                new WorldPoint(Take.PedestalEdge, Take.PedestalHeight, Take.PedestalEdge));
+                new WorldPoint(chest.Scale.X * 1.24f, chest.Scale.Y * 0.2f, chest.Scale.Z * 1.24f));
+            var refused = ModelPose.ScaleOf(splayed);
 
-            Assert.That(ModelPose.PositionOf(pedestal).Y, Is.EqualTo(ground).Within(Tolerance));
-            Assert.That(
-                ModelPose.ScaleOf(pedestal).Y * DungeonPack.HeightOf(PartModel.Chest),
-                Is.EqualTo(Take.PedestalHeight).Within(Tolerance));
-            Assert.That(
-                ModelPose.ScaleOf(pedestal).X,
-                Is.GreaterThan(ModelPose.ScaleOf(chest).X));
+            Assert.That(refused.X, Is.EqualTo(refused.Y).Within(Tolerance));
+            Assert.That(refused.Z, Is.EqualTo(refused.Y).Within(Tolerance));
+
+            var hoard = ModelPose.ScaleOf(Pickup(PartStyle.Multiplier));
+
+            Assert.That(hoard.X, Is.EqualTo(hoard.Y).Within(Tolerance));
+            Assert.That(hoard.Z, Is.EqualTo(hoard.Y).Within(Tolerance));
         }
 
         [Test]

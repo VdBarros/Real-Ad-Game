@@ -78,10 +78,22 @@ the ad showed*. This document is the source of truth for *what we are building*.
 | 17 | Movement | Tap **any reachable node**; the player walks multi-hop to it. Unconsumed enemies block passage ([#2]) |
 | 18 | Multiplier count | **Two** per `ship` level, not the ad's three — at 24 content nodes a third collapses every value to 1 ([#8]) |
 | 19 | Workflow | Branch per task, PR to `main`, Actions runs `dotnet test` on Domain only. Unity work is human-reviewed ([#5]) |
+| 20 | Taking a reward | The prop's own `chest_lid` node swings open over the first 55% of the 0.30 s beat, then the whole prop fades out. Nothing of it is left on the tile ([#117]) |
 
 Decision 13 is about *numbers*. Enemy **appearance** is deliberately dynamic:
 [#14] bands each enemy by `enemy.value / player.power`, because absolute bands
 collapse 47% of enemies into one look. The badge never changes; the model does.
+
+Decision 20 replaces the pedestal the take used to leave — a crushed, widened,
+stone-tinted slab that read as the chest falling through the floor and staying
+there. The ad shows a chest that *opens* and is then gone, and the tile alone
+carries on saying a node was here. Two consequences are load-bearing. A mesh
+prop may **never** carry a non-uniform scale: `ModelPose` sizes it from its
+height alone and squares that across all three axes, because a lid hinged
+inside a squashed parent shears instead of swinging, and because the fit factor
+only means anything while the mesh keeps its authored proportions. And a level
+resumed onto an already-consumed node snaps to the end of the take, so the
+chest is gone from the first frame rather than fading again on every reload.
 
 [#2]: https://github.com/VdBarros/Real-Ad-Game/issues/2
 [#3]: https://github.com/VdBarros/Real-Ad-Game/issues/3
@@ -98,6 +110,7 @@ collapse 47% of enemies into one look. The badge never changes; the model does.
 [#15]: https://github.com/VdBarros/Real-Ad-Game/issues/15
 [#16]: https://github.com/VdBarros/Real-Ad-Game/issues/16
 [#61]: https://github.com/VdBarros/Real-Ad-Game/issues/61
+[#117]: https://github.com/VdBarros/Real-Ad-Game/issues/117
 
 ### Calls I made — override any of these if you disagree
 

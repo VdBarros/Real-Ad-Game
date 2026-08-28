@@ -6,11 +6,9 @@ namespace Game.Presentation.Pure
     {
         public const float Seconds = 0.30f;
 
-        public const float PedestalEdge = 0.62f;
+        public const float LidAngle = 104f;
 
-        public const float PedestalHeight = 0.10f;
-
-        static readonly Tint Stone = new Tint(0.50f, 0.48f, 0.54f);
+        public const float LidShare = 0.55f;
 
         readonly float elapsed;
         readonly bool spending;
@@ -46,19 +44,19 @@ namespace Game.Presentation.Pure
             get { return !spending || elapsed >= Seconds; }
         }
 
-        public float Edge
+        public bool IsGone
         {
-            get { return Blend(LevelBlueprintBuilder.PickupScale, PedestalEdge); }
+            get { return Opacity <= 0f; }
         }
 
-        public float Height
+        public float LidSwing
         {
-            get { return Blend(LevelBlueprintBuilder.PickupScale, PedestalHeight); }
+            get { return EaseOut(Part(0f, LidShare)) * LidAngle; }
         }
 
-        public Tint Wash(Tint gem)
+        public float Opacity
         {
-            return Tint.Lerp(gem, Stone, Collapsed);
+            get { return 1f - EaseOut(Part(LidShare, 1f)); }
         }
 
         public Take Advanced(float deltaSeconds)
@@ -78,7 +76,7 @@ namespace Game.Presentation.Pure
             return moved >= Seconds ? Spent : new Take(moved, true);
         }
 
-        float Collapsed
+        float Played
         {
             get
             {
@@ -87,13 +85,22 @@ namespace Game.Presentation.Pure
                     return 0f;
                 }
 
-                return IsSettled ? 1f : EaseOut(elapsed / Seconds);
+                return IsSettled ? 1f : elapsed / Seconds;
             }
         }
 
-        float Blend(float cube, float pedestal)
+        float Part(float from, float to)
         {
-            return cube + (pedestal - cube) * Collapsed;
+            var run = Played - from;
+
+            if (run <= 0f)
+            {
+                return 0f;
+            }
+
+            var span = to - from;
+
+            return run >= span ? 1f : run / span;
         }
 
         static float EaseOut(float t)
@@ -127,7 +134,7 @@ namespace Game.Presentation.Pure
                 return "untaken";
             }
 
-            return IsSettled ? "spent" : "being taken";
+            return IsSettled ? "gone" : "opening";
         }
     }
 }

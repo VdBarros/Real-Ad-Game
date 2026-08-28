@@ -6,89 +6,104 @@ namespace Game.Domain.Tests
 {
     public class TakeTests
     {
-        static readonly Tint Gem = new Tint(0.25f, 0.55f, 0.95f);
-
         const float Tolerance = 1e-5f;
 
         [Test]
-        public void AnUntakenPickupIsTheWholeCubeAndHasNothingToPlay()
+        public void AnUntakenPickupIsShutAndSolidAndHasNothingToPlay()
         {
             var full = Take.None;
 
             Assert.That(full.IsSpent, Is.False);
             Assert.That(full.IsSettled, Is.True);
-            Assert.That(full.Edge, Is.EqualTo(LevelBlueprintBuilder.PickupScale));
-            Assert.That(full.Height, Is.EqualTo(LevelBlueprintBuilder.PickupScale));
-            Assert.That(full.Wash(Gem), Is.EqualTo(Gem));
+            Assert.That(full.IsGone, Is.False);
+            Assert.That(full.LidSwing, Is.EqualTo(0f).Within(Tolerance));
+            Assert.That(full.Opacity, Is.EqualTo(1f).Within(Tolerance));
             Assert.That(default(Take).Equals(full), Is.True);
         }
 
         [Test]
-        public void TakingAPickupLeavesAPedestalWiderAndFlatterThanTheCube()
+        public void TheBeatIsStillThreeTenthsOfASecond()
         {
-            Assert.That(Take.PedestalEdge, Is.GreaterThan(LevelBlueprintBuilder.PickupScale));
-            Assert.That(Take.PedestalHeight, Is.LessThan(LevelBlueprintBuilder.PickupScale));
+            Assert.That(Take.Seconds, Is.EqualTo(0.30f).Within(Tolerance));
         }
 
         [Test]
-        public void ATakeCollapsesTheCubeOntoItsPedestal()
+        public void TheLidIsFullyOpenBeforeAnythingStartsToFade()
+        {
+            Assert.That(Take.LidShare, Is.GreaterThan(0f));
+            Assert.That(Take.LidShare, Is.LessThan(1f));
+
+            var opening = Take.Begun().Advanced(Take.Seconds * Take.LidShare);
+
+            Assert.That(opening.LidSwing, Is.EqualTo(Take.LidAngle).Within(Tolerance));
+            Assert.That(opening.Opacity, Is.EqualTo(1f).Within(Tolerance));
+            Assert.That(opening.IsSettled, Is.False);
+            Assert.That(opening.IsGone, Is.False);
+        }
+
+        [Test]
+        public void ATakeSwingsTheLidOpenAndThenTakesTheWholeChestAway()
         {
             var reel = Take.Begun();
 
             Assert.That(reel.IsSpent, Is.True);
             Assert.That(reel.IsSettled, Is.False);
-            Assert.That(reel.Edge, Is.EqualTo(LevelBlueprintBuilder.PickupScale).Within(Tolerance));
-            Assert.That(reel.Height, Is.EqualTo(LevelBlueprintBuilder.PickupScale).Within(Tolerance));
+            Assert.That(reel.LidSwing, Is.EqualTo(0f).Within(Tolerance));
+            Assert.That(reel.Opacity, Is.EqualTo(1f).Within(Tolerance));
 
-            var landed = reel.Advanced(Take.Seconds);
+            var midway = reel.Advanced(Take.Seconds * (Take.LidShare + 1f) * 0.5f);
 
-            Assert.That(landed.IsSettled, Is.True);
-            Assert.That(landed.Edge, Is.EqualTo(Take.PedestalEdge).Within(Tolerance));
-            Assert.That(landed.Height, Is.EqualTo(Take.PedestalHeight).Within(Tolerance));
+            Assert.That(midway.LidSwing, Is.EqualTo(Take.LidAngle).Within(Tolerance));
+            Assert.That(midway.Opacity, Is.GreaterThan(0f));
+            Assert.That(midway.Opacity, Is.LessThan(1f));
+
+            var gone = reel.Advanced(Take.Seconds);
+
+            Assert.That(gone.IsSettled, Is.True);
+            Assert.That(gone.LidSwing, Is.EqualTo(Take.LidAngle).Within(Tolerance));
+            Assert.That(gone.Opacity, Is.EqualTo(0f).Within(Tolerance));
+            Assert.That(gone.IsGone, Is.True);
         }
 
         [Test]
-        public void TheCubeOnlyEverSpreadsAndFlattens()
+        public void TheLidOnlyEverOpensAndTheChestOnlyEverThins()
         {
             var reel = Take.Begun();
-            var edge = reel.Edge;
-            var height = reel.Height;
+            var swing = reel.LidSwing;
+            var opacity = reel.Opacity;
 
             for (var step = 0; step < 12; step++)
             {
                 reel = reel.Advanced(Take.Seconds / 10f);
 
-                Assert.That(reel.Edge, Is.GreaterThanOrEqualTo(edge - Tolerance));
-                Assert.That(reel.Height, Is.LessThanOrEqualTo(height + Tolerance));
+                Assert.That(reel.LidSwing, Is.GreaterThanOrEqualTo(swing - Tolerance));
+                Assert.That(reel.LidSwing, Is.LessThanOrEqualTo(Take.LidAngle + Tolerance));
+                Assert.That(reel.Opacity, Is.LessThanOrEqualTo(opacity + Tolerance));
+                Assert.That(reel.Opacity, Is.GreaterThanOrEqualTo(0f));
 
-                edge = reel.Edge;
-                height = reel.Height;
+                swing = reel.LidSwing;
+                opacity = reel.Opacity;
             }
         }
 
         [Test]
-        public void ASpentPickupIsAPedestalFromTheFirstFrame()
+        public void ASpentPickupIsAlreadyGoneOnTheFrameItIsFirstRead()
         {
             var spent = Take.Spent;
 
             Assert.That(spent.IsSpent, Is.True);
             Assert.That(spent.IsSettled, Is.True);
-            Assert.That(spent.Edge, Is.EqualTo(Take.PedestalEdge).Within(Tolerance));
-            Assert.That(spent.Height, Is.EqualTo(Take.PedestalHeight).Within(Tolerance));
+            Assert.That(spent.IsGone, Is.True);
+            Assert.That(spent.Opacity, Is.EqualTo(0f).Within(Tolerance));
+            Assert.That(spent.LidSwing, Is.EqualTo(Take.LidAngle).Within(Tolerance));
             Assert.That(spent.Equals(Take.Begun().Advanced(Take.Seconds)), Is.True);
         }
 
         [Test]
-        public void ThePedestalWearsStoneAndTheCubeWearsItsOwnColour()
+        public void ALidOpensFarEnoughToReadAsOpenWithoutFallingOffItsHinge()
         {
-            var stone = Take.Spent.Wash(Gem);
-            var fromWhite = Take.Spent.Wash(new Tint(1f, 1f, 1f));
-
-            Assert.That(stone, Is.Not.EqualTo(Gem));
-            Assert.That(Take.Begun().Wash(Gem), Is.EqualTo(Gem));
-            Assert.That(fromWhite.Red, Is.EqualTo(stone.Red).Within(Tolerance));
-            Assert.That(fromWhite.Green, Is.EqualTo(stone.Green).Within(Tolerance));
-            Assert.That(fromWhite.Blue, Is.EqualTo(stone.Blue).Within(Tolerance));
+            Assert.That(Take.LidAngle, Is.GreaterThan(60f));
+            Assert.That(Take.LidAngle, Is.LessThan(180f));
         }
 
         [Test]
