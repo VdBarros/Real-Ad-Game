@@ -54,7 +54,7 @@ namespace Game.EditorTooling
             var report = new StringBuilder("floor state on ship seed ")
                 .Append(Seed.ToString(CultureInfo.InvariantCulture))
                 .Append(':')
-                .Append(Row("opening", state, root, Painted(root), 0, 0));
+                .Append(Row("opening", state, root, Painted(graph.Tiles, root), 0, 0));
 
             var midflip = false;
             var won = 0;
@@ -67,7 +67,7 @@ namespace Game.EditorTooling
                     break;
                 }
 
-                var before = Painted(root);
+                var before = Painted(graph.Tiles, root);
                 var reading = FloorReading.Of(state);
                 state = ActionResolver.Resolve(state, target).State;
                 var flipping = FloorReading.Of(state).Since(reading);
@@ -95,7 +95,7 @@ namespace Game.EditorTooling
 
             PreviewFilm.Shoot(lens, ClearedPath);
 
-            var acrossTheCut = Painted(root);
+            var acrossTheCut = Painted(graph.Tiles, root);
             rig.CutTo(state.Level.Decisions.Node(state.PositionNodeId).Position);
             rig.Release();
 
@@ -128,17 +128,26 @@ namespace Game.EditorTooling
             int frames)
         {
             var reading = FloorReading.Of(state);
-            var painted = Painted(root);
+            var painted = Painted(state.Level.Tiles, root);
             var disagreeing = 0;
 
             foreach (var tile in state.Level.Tiles.Tiles)
             {
                 string material;
-                if (!painted.TryGetValue(PartNames.Tile(tile.Position), out material)
+                if (!painted.TryGetValue(
+                        LevelBlueprintBuilder.WalkingSurfaceOf(state.Level.Tiles, tile.Position), out material)
                     || material != Expected(reading.IsCleared(tile.Position)))
                 {
                     disagreeing++;
                 }
+            }
+
+            if (disagreeing > 0)
+            {
+                Debug.LogError(
+                    disagreeing + " of " + state.Level.Tiles.Tiles.Count
+                    + " tiles wear the wrong material after the " + leg
+                    + " leg, so the surface a tile is walked on is not the one the floor state paints.");
             }
 
             return string.Format(
@@ -177,18 +186,33 @@ namespace Game.EditorTooling
             return changed;
         }
 
-        static IReadOnlyDictionary<string, string> Painted(GameObject root)
+        static IReadOnlyDictionary<string, string> Painted(TileGrid tiles, GameObject root)
         {
+            var byName = new Dictionary<string, Transform>();
+
+            foreach (var node in root.GetComponentsInChildren<Transform>(true))
+            {
+                byName[node.name] = node;
+            }
+
             var painted = new Dictionary<string, string>();
 
-            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            foreach (var tile in tiles.Tiles)
             {
-                if (!renderer.name.StartsWith("Tile", StringComparison.Ordinal))
+                var name = LevelBlueprintBuilder.WalkingSurfaceOf(tiles, tile.Position);
+                Transform surface;
+
+                if (!byName.TryGetValue(name, out surface))
                 {
                     continue;
                 }
 
-                painted.Add(renderer.name, renderer.sharedMaterial.name);
+                var skin = surface.GetComponentInChildren<Renderer>(true);
+
+                if (skin != null && skin.sharedMaterial != null)
+                {
+                    painted.Add(name, skin.sharedMaterial.name);
+                }
             }
 
             return painted;

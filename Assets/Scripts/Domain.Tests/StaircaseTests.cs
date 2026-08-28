@@ -363,23 +363,29 @@ namespace Game.Domain.Tests
         {
             var graph = Ship();
             var blueprint = LevelBlueprintBuilder.Build(graph);
-            var floors = blueprint.AllParts
-                .Where(part => part.Style == PartStyle.Floor)
+            var surfaces = blueprint.AllParts
+                .Where(part => LevelBlueprintBuilder.IsWalkingSurface(part.Style))
                 .ToDictionary(part => part.Name);
 
-            Assert.That(floors.Count, Is.EqualTo(graph.Tiles.Tiles.Count));
+            Assert.That(surfaces.Count, Is.EqualTo(graph.Tiles.Tiles.Count));
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                var floor = floors[PartNames.Tile(tile.Position)];
+                var surface = surfaces[LevelBlueprintBuilder.WalkingSurfaceOf(graph.Tiles, tile.Position)];
 
-                Assert.That(floor.Model, Is.EqualTo(PartModel.FloorTile), floor.Name);
-                Assert.That(floor.Position, Is.EqualTo(IsoProjection.Of(tile.Position)), floor.Name);
-                Assert.That(floor.Rotation, Is.EqualTo(new WorldPoint(90f, 0f, 0f)), floor.Name);
+                if (TileFootings.Under(graph.Tiles, tile.Position) == TileFooting.Flight)
+                {
+                    Assert.That(surface.Model, Is.EqualTo(PartModel.Staircase), surface.Name);
+                    continue;
+                }
+
+                Assert.That(surface.Model, Is.EqualTo(PartModel.FloorTile), surface.Name);
+                Assert.That(surface.Position, Is.EqualTo(IsoProjection.Of(tile.Position)), surface.Name);
+                Assert.That(surface.Rotation, Is.EqualTo(new WorldPoint(90f, 0f, 0f)), surface.Name);
                 Assert.That(
-                    floor.Scale,
+                    surface.Scale,
                     Is.EqualTo(new WorldPoint(IsoProjection.TileEdge, IsoProjection.TileEdge, 1f)),
-                    floor.Name);
+                    surface.Name);
             }
         }
 

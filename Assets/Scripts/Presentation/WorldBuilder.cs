@@ -80,7 +80,8 @@ namespace Game.Presentation
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                groundByName.Add(PartNames.Tile(tile.Position), tile.Position);
+                groundByName.Add(
+                    LevelBlueprintBuilder.WalkingSurfaceOf(graph.Tiles, tile.Position), tile.Position);
             }
 
             foreach (var terrace in blueprint.Terraces)
@@ -226,7 +227,7 @@ namespace Game.Presentation
             instance.transform.localScale = Vector(raised ? ModelPose.ScaleOf(part) : part.Scale);
             Dress(instance, materials.Of(part.Style));
 
-            if (part.Style != PartStyle.Floor)
+            if (!LevelBlueprintBuilder.IsWalkingSurface(part.Style))
             {
                 WorldObjects.Destroy(instance.GetComponent<Collider>());
             }
@@ -248,16 +249,18 @@ namespace Game.Presentation
 
         static void Enclose(GameObject instance)
         {
-            var filter = instance.GetComponentInChildren<MeshFilter>();
-            if (filter == null || filter.sharedMesh == null)
+            foreach (var filter in instance.GetComponentsInChildren<MeshFilter>(true))
             {
-                return;
-            }
+                if (filter.sharedMesh == null || filter.GetComponent<Collider>() != null)
+                {
+                    continue;
+                }
 
-            var bounds = filter.sharedMesh.bounds;
-            var box = filter.gameObject.AddComponent<BoxCollider>();
-            box.center = bounds.center;
-            box.size = bounds.size;
+                var bounds = filter.sharedMesh.bounds;
+                var box = filter.gameObject.AddComponent<BoxCollider>();
+                box.center = bounds.center;
+                box.size = bounds.size;
+            }
         }
 
         static Transform Group(Transform parent, string name)

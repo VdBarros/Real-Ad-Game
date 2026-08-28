@@ -61,18 +61,50 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EveryTileGetsOneFloorQuad()
+        public void EveryTileGetsOneWalkingSurface()
         {
             var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
-            var quads = PartsStyled(blueprint, PartStyle.Floor);
+            var surfaces = WalkingSurfaces(blueprint);
 
-            Assert.That(quads.Count, Is.EqualTo(graph.Tiles.Tiles.Count));
+            Assert.That(surfaces.Count, Is.EqualTo(graph.Tiles.Tiles.Count));
             Assert.That(
-                quads.Select(part => part.Name),
-                Is.EqualTo(graph.Tiles.Tiles.Select(tile => PartNames.Tile(tile.Position)).ToList()));
-            Assert.That(quads.All(part => part.Shape == PartShape.Quad), Is.True);
+                surfaces.Select(part => part.Name),
+                Is.EqualTo(graph.Tiles.Tiles
+                    .Select(tile => LevelBlueprintBuilder.WalkingSurfaceOf(graph.Tiles, tile.Position))
+                    .ToList()));
+            Assert.That(
+                surfaces.Where(part => part.Style == PartStyle.Floor).All(part => part.Shape == PartShape.Quad),
+                Is.True);
+        }
+
+        [Test]
+        public void ATileFootedWithAFlightWalksOnTheFlightAndCarriesNoQuadAboveIt()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = LevelBlueprintBuilder.Build(graph);
+
+            var names = new HashSet<string>(blueprint.AllParts.Select(part => part.Name));
+            var flights = 0;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                var footed = TileFootings.Under(graph.Tiles, tile.Position);
+                var quad = PartNames.Tile(tile.Position);
+
+                if (footed != TileFooting.Flight)
+                {
+                    Assert.That(names.Contains(quad), Is.True, quad);
+                    continue;
+                }
+
+                flights++;
+                Assert.That(names.Contains(quad), Is.False, quad);
+                Assert.That(names.Contains(PartNames.Stair(tile.Position)), Is.True, quad);
+            }
+
+            Assert.That(flights, Is.GreaterThan(0));
         }
 
         [Test]
@@ -98,11 +130,11 @@ namespace Game.Domain.Tests
                 var swept = graph.Tiles.Tiles
                     .Where(tile => Terraces.ElevationOf(
                         Terraces.TerraceUnder(tile.Position.Elevation)) == terrace.Elevation)
-                    .Select(tile => PartNames.Tile(tile.Position))
+                    .Select(tile => LevelBlueprintBuilder.WalkingSurfaceOf(graph.Tiles, tile.Position))
                     .ToList();
 
                 var built = terrace.Tiles
-                    .Where(part => part.Style == PartStyle.Floor)
+                    .Where(part => LevelBlueprintBuilder.IsWalkingSurface(part.Style))
                     .Select(part => part.Name)
                     .ToList();
 
@@ -306,12 +338,13 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AShipLevelIsAboutSixtyQuadsAndAHundredAndTwentyWalls()
+        public void AShipLevelIsAboutSixtyWalkingSurfacesAndAHundredAndTwentyWalls()
         {
             var level = LevelGenerator.Generate(20250824L, MazePreset.Ship);
             var blueprint = LevelBlueprintBuilder.Build(level.Graph);
 
-            Assert.That(PartsStyled(blueprint, PartStyle.Floor).Count, Is.EqualTo(60).Within(15));
+            Assert.That(WalkingSurfaces(blueprint).Count, Is.EqualTo(60).Within(15));
+            Assert.That(WalkingSurfaces(blueprint).Count, Is.EqualTo(level.Graph.Tiles.Tiles.Count));
             Assert.That(PartsStyled(blueprint, PartStyle.Wall).Count, Is.EqualTo(120).Within(30));
         }
 
@@ -425,6 +458,13 @@ namespace Game.Domain.Tests
         static IReadOnlyList<WorldPart> PartsStyled(LevelBlueprint blueprint, PartStyle style)
         {
             return blueprint.AllParts.Where(part => part.Style == style).ToList();
+        }
+
+        static IReadOnlyList<WorldPart> WalkingSurfaces(LevelBlueprint blueprint)
+        {
+            return blueprint.AllParts
+                .Where(part => LevelBlueprintBuilder.IsWalkingSurface(part.Style))
+                .ToList();
         }
 
         static WorldPoint QuadNormal(WorldPoint euler)

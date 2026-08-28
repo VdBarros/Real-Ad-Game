@@ -293,6 +293,7 @@ namespace Game.EditorTooling
             failures += NoLevelRunIsSerratedUnderneath(graph, byName, report);
             failures += EveryStaircaseSitsInItsDrop(graph, byName, report);
             failures += EveryPlinthFillsItsDropAndSpillsNothing(graph, byName, report);
+            failures += EveryTileCarriesExactlyOneWalkingSurface(graph, byName, report);
             failures += AStaircaseStaysWalkableGround(graph, byName, report);
             failures += AStaircaseHidesNothing(graph, byName, report);
             failures += TheMaterialsStayFlat(root, report);
@@ -1000,72 +1001,179 @@ namespace Game.EditorTooling
                 + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
         }
 
+        static int EveryTileCarriesExactlyOneWalkingSurface(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var tiles = 0;
+            var surfaced = 0;
+            var doubled = new List<string>();
+            var bare = new List<string>();
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                tiles++;
+                var flight = TileFootings.Under(graph.Tiles, tile.Position) == TileFooting.Flight;
+                var quad = byName.ContainsKey(PartNames.Tile(tile.Position));
+                var stair = byName.ContainsKey(PartNames.Stair(tile.Position));
+
+                if (quad != flight && stair == flight)
+                {
+                    surfaced++;
+                    continue;
+                }
+
+                if (quad && stair && doubled.Count < Complaints)
+                {
+                    doubled.Add(PartNames.Tile(tile.Position) + " hangs a floor quad over its own flight");
+                }
+                else if (!quad && !stair && bare.Count < Complaints)
+                {
+                    bare.Add(PartNames.Tile(tile.Position) + " has nothing to stand on");
+                }
+            }
+
+            return Assert(
+                report,
+                tiles > 0 && surfaced == tiles,
+                "every tile carries exactly one walking surface, a floor quad where it is footed with a "
+                + "plinth or with nothing and the flight itself where it is footed with one",
+                surfaced + " of " + tiles + " do"
+                + (doubled.Count == 0 ? "" : "; " + string.Join("; ", doubled.ToArray()))
+                + (bare.Count == 0 ? "" : "; " + string.Join("; ", bare.ToArray())));
+        }
+
         static int AStaircaseStaysWalkableGround(
             LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
             var climbs = 0;
             var floored = 0;
             var collided = 0;
-            var loose = 0;
+            var flights = 0;
+            var landing = 0;
+            var complaint = new List<string>();
+            var edge = IsoProjection.TileEdge;
+            var step = IsoProjection.StepHeight;
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                if (!StaircaseClimb.Climbs(tile.Position))
+                var flight = TileFootings.Under(graph.Tiles, tile.Position) == TileFooting.Flight;
+
+                if (!StaircaseClimb.Climbs(tile.Position) && !flight)
                 {
                     continue;
                 }
 
                 climbs++;
-                Transform floor;
+                Transform surface;
 
-                if (byName.TryGetValue(PartNames.Tile(tile.Position), out floor))
+                if (!byName.TryGetValue(
+                    LevelBlueprintBuilder.WalkingSurfaceOf(graph.Tiles, tile.Position), out surface))
                 {
-                    var ground = IsoProjection.Of(tile.Position);
-                    var at = new Vector3(ground.X, ground.Y, ground.Z);
-
-                    if ((floor.position - at).magnitude <= Epsilon
-                        && Math.Abs(floor.localEulerAngles.x) < AngleEpsilon
-                        && Math.Abs(floor.localEulerAngles.z) < AngleEpsilon)
-                    {
-                        floored++;
-                    }
-
-                    if (floor.GetComponentInChildren<Collider>() != null)
-                    {
-                        collided++;
-                    }
+                    continue;
                 }
 
-                foreach (var name in new[] { PartNames.Stair(tile.Position), PartNames.Footing(tile.Position) })
+                var ground = IsoProjection.Of(tile.Position);
+                var at = new Vector3(ground.X, ground.Y, ground.Z);
+
+                if (flight
+                    || ((surface.position - at).magnitude <= Epsilon
+                        && Math.Abs(surface.localEulerAngles.x) < AngleEpsilon
+                        && Math.Abs(surface.localEulerAngles.z) < AngleEpsilon))
                 {
-                    Transform footing;
-                    if (byName.TryGetValue(name, out footing)
-                        && footing.GetComponentInChildren<Collider>() != null)
+                    floored++;
+                }
+
+                var box = Colliding(surface);
+
+                if (box == null)
+                {
+                    if (complaint.Count < Complaints)
                     {
-                        loose++;
+                        complaint.Add(surface.name + " carries no collider, so a tap falls through it");
                     }
+
+                    continue;
+                }
+
+                collided++;
+
+                if (!flight)
+                {
+                    continue;
+                }
+
+                flights++;
+                var reach = box.Value;
+
+                if (Math.Abs(reach.size.x - edge) <= Epsilon
+                    && Math.Abs(reach.size.z - edge) <= Epsilon
+                    && Math.Abs(reach.center.x - ground.X) <= Epsilon
+                    && Math.Abs(reach.center.z - ground.Z) <= Epsilon
+                    && Math.Abs(reach.max.y - ground.Y) <= Epsilon
+                    && Math.Abs(reach.min.y - (ground.Y - step)) <= Epsilon)
+                {
+                    landing++;
+                }
+                else if (complaint.Count < Complaints)
+                {
+                    complaint.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} is tappable over {1:0.#####} by {2:0.#####} centred on ({3:0.#####}, "
+                        + "{4:0.#####}) between {5:0.#####} and {6:0.#####} rather than over its own tile "
+                        + "filling the drop under {7:0.#####}",
+                        surface.name,
+                        reach.size.x,
+                        reach.size.z,
+                        reach.center.x,
+                        reach.center.z,
+                        reach.min.y,
+                        reach.max.y,
+                        ground.Y));
                 }
             }
 
             var failures = Assert(
                 report,
                 climbs > 0 && floored == climbs,
-                "a staircase tile keeps the same flat floor tile at its own elevation that a terrace tile has",
+                "a climbing tile stands on ground at its own elevation, flat where a plinth foots it and "
+                + "the flight's own treads where a flight does",
                 floored + " of " + climbs + " do");
 
             failures += Assert(
                 report,
                 climbs > 0 && collided == climbs,
-                "a staircase tile keeps the collider that makes a floor tile walkable ground",
+                "a climbing tile keeps the collider that makes it walkable ground",
                 collided + " of " + climbs + " do");
 
             failures += Assert(
                 report,
-                loose == 0,
-                "the staircase geometry itself carries no collider, so it cannot be walked into",
-                loose + " of " + climbs + " carry one");
+                flights > 0 && landing == flights,
+                "a tap on a tile footed with a flight lands on the flight rather than on air above it: the "
+                + "collider covers the whole tile and fills the one step the tile hovers over",
+                landing + " of " + flights + " do"
+                + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
 
             return failures;
+        }
+
+        static Bounds? Colliding(Transform instance)
+        {
+            var found = false;
+            var reach = new Bounds();
+
+            foreach (var collider in instance.GetComponentsInChildren<Collider>(true))
+            {
+                if (!found)
+                {
+                    found = true;
+                    reach = collider.bounds;
+                    continue;
+                }
+
+                reach.Encapsulate(collider.bounds);
+            }
+
+            return found ? reach : (Bounds?)null;
         }
 
         static int AStaircaseHidesNothing(
