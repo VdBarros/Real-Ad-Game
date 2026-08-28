@@ -20,11 +20,11 @@ namespace Game.Domain
 
                 if (topology.Degree(tile) == 1)
                 {
-                    deadEnds.Add(tile);
+                    OfferUnlessItClimbs(plan, deadEnds, tile);
                 }
                 else
                 {
-                    junctions.Add(tile);
+                    OfferUnlessItClimbs(plan, junctions, tile);
                 }
             }
 
@@ -38,12 +38,7 @@ namespace Game.Domain
             {
                 for (var step = 0; step < run.Path.Count; step += 2)
                 {
-                    if (plan.IsStaircase(run.Path[step]))
-                    {
-                        continue;
-                    }
-
-                    candidates.Add(run.Path[step]);
+                    OfferUnlessItClimbs(plan, candidates, run.Path[step]);
                 }
             }
 
@@ -95,6 +90,16 @@ namespace Game.Domain
             }
 
             return filled < preset.ContentSlots ? LayoutRejection.SlotShortfall : LayoutRejection.None;
+        }
+
+        static void OfferUnlessItClimbs(LayoutPlan plan, List<int> candidates, int tile)
+        {
+            if (plan.IsStaircase(tile))
+            {
+                return;
+            }
+
+            candidates.Add(tile);
         }
 
         static bool RegionAlreadyHoldsASlot(LayoutPlan plan, int regionId)

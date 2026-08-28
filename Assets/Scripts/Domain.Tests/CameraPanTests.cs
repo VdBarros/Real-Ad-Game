@@ -56,7 +56,6 @@ namespace Game.Domain.Tests
 
             Assert.That(pan.IsResting, Is.True);
             Assert.That(pan.IsAway, Is.False);
-            Assert.That(pan.HoldsTheCamera, Is.False);
         }
 
         [Test]
@@ -65,13 +64,13 @@ namespace Game.Domain.Tests
             var dragged = Pan().Dragged(Origin(), Up(4f));
             var look = dragged.Look;
 
-            Assert.That(dragged.HoldsTheCamera, Is.True);
+            Assert.That(dragged.Standing, Is.EqualTo(CameraPan.Stance.UnderTheFinger));
             Assert.That(dragged.IsAway, Is.True);
 
             var held = dragged.LetGo();
 
             Assert.That(held.Look, Is.EqualTo(look));
-            Assert.That(held.HoldsTheCamera, Is.True);
+            Assert.That(held.Standing, Is.EqualTo(CameraPan.Stance.Held));
             Assert.That(held.IsAway, Is.True);
             Assert.That(held.LetGo(), Is.EqualTo(held));
         }
@@ -115,34 +114,31 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ARecallLeavesThePanOnItsWayBackUntilItArrives()
+        public void ARecalledPanIsBackOnThePlayerTheMomentItIsAskedFor()
         {
-            var recalled = Pan().Dragged(Origin(), Up(4f)).LetGo().Recalled();
+            var recalled = Pan().Dragged(Origin(), Up(4f)).LetGo().GivenUp();
 
-            Assert.That(recalled.HoldsTheCamera, Is.False);
-            Assert.That(recalled.IsAway, Is.True);
-            Assert.That(recalled.Recalled(), Is.EqualTo(recalled));
-            Assert.That(recalled.Arrived().IsResting, Is.True);
-            Assert.That(recalled.Arrived().IsAway, Is.False);
+            Assert.That(recalled.IsResting, Is.True);
+            Assert.That(recalled.IsAway, Is.False);
+            Assert.That(recalled.GivenUp(), Is.EqualTo(recalled));
         }
 
         [Test]
-        public void ARestingPanHasNothingToRecallOrArriveAt()
+        public void ARestingPanHasNothingToGiveUp()
         {
             var pan = Pan();
 
-            Assert.That(pan.Recalled(), Is.EqualTo(pan));
-            Assert.That(pan.Arrived(), Is.EqualTo(pan));
-            Assert.That(pan.Dropped(), Is.EqualTo(pan));
+            Assert.That(pan.GivenUp(), Is.EqualTo(pan));
         }
 
         [Test]
-        public void AHeldPanOnlyArrivesOnceItHasBeenRecalled()
+        public void ADragStillUnderTheFingerIsGivenUpJustAsAHeldOneIs()
         {
-            var held = Pan().Dragged(Origin(), Up(4f)).LetGo();
+            var dragged = Pan().Dragged(Origin(), Up(4f));
 
-            Assert.That(held.Arrived(), Is.EqualTo(held));
-            Assert.That(held.Dropped().IsResting, Is.True);
+            Assert.That(dragged.IsAway, Is.True);
+            Assert.That(dragged.GivenUp().IsResting, Is.True);
+            Assert.That(dragged.LetGo().GivenUp().IsResting, Is.True);
         }
 
         [Test]
@@ -150,7 +146,7 @@ namespace Game.Domain.Tests
         {
             Assert.That(() => Pan().Look, Throws.InstanceOf<System.InvalidOperationException>());
             Assert.That(
-                () => Pan().Dragged(Origin(), Up(4f)).LetGo().Recalled().Look,
+                () => Pan().Dragged(Origin(), Up(4f)).LetGo().GivenUp().Look,
                 Throws.InstanceOf<System.InvalidOperationException>());
         }
 
@@ -231,7 +227,7 @@ namespace Game.Domain.Tests
             var frames = 0;
 
             Assert.That(apart, Is.GreaterThan(0f));
-            Assert.That(staging.IsAway, Is.True);
+            Assert.That(staging.IsAway, Is.False, "The recall did not give the pan up on its own frame.");
 
             while (!staging.IsSettled && frames < 1200)
             {
