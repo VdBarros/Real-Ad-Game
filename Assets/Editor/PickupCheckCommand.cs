@@ -18,6 +18,16 @@ namespace Game.EditorTooling
 
         const string ShotPath = "dev/scratch/t-16-";
 
+        const string TakePath = "dev/scratch/t-44-";
+
+        const float CloseUpRange = 12f;
+
+        const float CloseUpSize = 0.9f;
+
+        const float CloseUpLift = 0.3f;
+
+        const int ReloadFrames = 30;
+
         const int Additive = 0;
 
         const int Multiplier = 2;
@@ -65,7 +75,9 @@ namespace Game.EditorTooling
                 .Append(Power.ToString(CultureInfo.InvariantCulture))
                 .Append(", the same two, in both orders:")
                 .Append(Row(addFirst))
-                .Append(Row(multiplyFirst));
+                .Append(Row(multiplyFirst))
+                .Append(TheLidSwingsUpBeforeTheChestThins())
+                .Append(AResumedLevelShowsNothingOfAChestItAlreadyTook());
 
             TheOrderShowsInTheResult(addFirst, multiplyFirst);
 
@@ -122,7 +134,7 @@ namespace Game.EditorTooling
 
             leg.Settled = walker.Run;
 
-            ASpentPickupLeavesAPedestal(builder, walker.Run, name);
+            NothingOfASpentPickupIsLeftOnTheTile(builder, root, walker.Run, name);
             ASpentPickupIsNoLongerATarget(walker.Run, name);
             PreviewFilm.Shoot(lens, ShotPath + name + ".png");
 
@@ -233,7 +245,8 @@ namespace Game.EditorTooling
             }
         }
 
-        static void ASpentPickupLeavesAPedestal(WorldBuilder builder, RunState state, string leg)
+        static void NothingOfASpentPickupIsLeftOnTheTile(
+            WorldBuilder builder, GameObject root, RunState state, string leg)
         {
             foreach (var nodeId in new[] { Additive, Multiplier })
             {
@@ -258,32 +271,234 @@ namespace Game.EditorTooling
                         + " leg settled.");
                 }
 
-                if (!pickup.gameObject.activeSelf)
+                if (pickup.Draws || pickup.gameObject.activeSelf)
                 {
                     Debug.LogError(
-                        "Node " + nodeId + " left the board when it was taken, so a spent node no "
-                        + "longer reads as a node.");
+                        "Node " + nodeId + " still puts " + Stands(pickup).size
+                        + " of reward on the tile after the " + leg
+                        + " leg took it, so the chest was opened and then left lying there.");
                 }
 
-                var stands = Stands(pickup);
-
-                if (Mathf.Abs(stands.size.y - Take.PedestalHeight) > Tolerance
-                    || stands.size.x <= stands.size.y)
+                if (pickup.Reel.Opacity > 0f)
                 {
                     Debug.LogError(
-                        "Node " + nodeId + " stands " + stands.size + " where a pedestal is "
-                        + Take.PedestalHeight + " tall and wider than it is tall.");
+                        "Node " + nodeId + " reads " + pickup.Reel.Opacity
+                        + " opaque after the " + leg + " leg took it.");
                 }
+
+                ATakenTileIsStillATile(root, state, nodeId, leg);
 
                 var target = builder.Targets.Of(nodeId);
 
                 if (target != null && target.gameObject.activeSelf)
                 {
                     Debug.LogError(
-                        "Node " + nodeId + " kept its badge once taken, so an empty pedestal still "
+                        "Node " + nodeId + " kept its badge once taken, so an empty tile still "
                         + "advertises a number the player cannot have.");
                 }
             }
+        }
+
+        static void ATakenTileIsStillATile(
+            GameObject root, RunState state, int nodeId, string leg)
+        {
+            var name = PartNames.Tile(state.Level.Decisions.Node(nodeId).Position);
+
+            foreach (var part in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (part.name != name)
+                {
+                    continue;
+                }
+
+                var skin = part.GetComponentInChildren<Renderer>(true);
+
+                if (skin == null || !skin.enabled || !skin.gameObject.activeInHierarchy)
+                {
+                    Debug.LogError(
+                        "The tile under node " + nodeId + " stopped drawing when the " + leg
+                        + " leg took the reward standing on it, so the chest took the floor with it.");
+                }
+
+                return;
+            }
+
+            Debug.LogError(
+                "The " + leg + " leg left no tile named " + name + " under node " + nodeId + ".");
+        }
+
+        static string TheLidSwingsUpBeforeTheChestThins()
+        {
+            var graph = Arena();
+            var rig = CameraRig.Raise();
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var chest = builder.Pickups.Of(Additive);
+
+            if (chest == null)
+            {
+                Debug.LogError("The arena raised no pickup for node " + Additive + ".");
+                Clear(root, rig, builder);
+                return "\n  the chest never rose";
+            }
+
+            if (chest.Lid == null)
+            {
+                Debug.LogError(
+                    "The chest on node " + Additive + " carries no " + PickupProp.LidNode
+                    + " node, so a taken reward can only vanish rather than open.");
+            }
+
+            var eye = PreviewFilm.Rig(
+                chest.transform.position + Vector3.up * CloseUpLift, CloseUpRange, CloseUpSize);
+
+            chest.Wear(Take.None);
+            var shut = LidHeight(chest);
+            PreviewFilm.Shoot(eye, TakePath + "chest-1-shut.png");
+
+            chest.Wear(Take.Begun().Advanced(Take.Seconds * Take.LidShare));
+            var open = LidHeight(chest);
+            var opened = chest.Reel;
+            PreviewFilm.Shoot(eye, TakePath + "chest-2-open.png");
+
+            if (open <= shut + Tolerance)
+            {
+                Debug.LogError(
+                    "The lid sat at " + shut + " shut and " + open
+                    + " open, so it does not swing up and the take reads as a chest sinking.");
+            }
+
+            if (opened.Opacity < 1f || !chest.Draws)
+            {
+                Debug.LogError(
+                    "The chest was already " + opened.Opacity
+                    + " opaque the moment its lid finished opening, so the lid never reads.");
+            }
+
+            chest.Wear(Take.Begun().Advanced(Take.Seconds * (Take.LidShare + 1f) * 0.5f));
+            var thinning = chest.Reel;
+            PreviewFilm.Shoot(eye, TakePath + "chest-3-thinning.png");
+
+            if (thinning.Opacity <= 0f || thinning.Opacity >= 1f || !chest.Draws)
+            {
+                Debug.LogError(
+                    "Halfway through the fade the chest reads " + thinning.Opacity
+                    + " opaque and drawing " + chest.Draws + ", so it snaps out rather than fading.");
+            }
+
+            chest.Wear(Take.Spent);
+            PreviewFilm.Shoot(eye, TakePath + "chest-4-gone.png");
+
+            if (chest.Draws || chest.gameObject.activeSelf)
+            {
+                Debug.LogError(
+                    "The chest still puts " + Stands(chest).size
+                    + " on the tile once the take is spent.");
+            }
+
+            WorldObjects.Destroy(eye.gameObject);
+            Clear(root, rig, builder);
+
+            return new StringBuilder("\n  the lid rises from ")
+                .Append(shut.ToString("F3", CultureInfo.InvariantCulture))
+                .Append(" to ")
+                .Append(open.ToString("F3", CultureInfo.InvariantCulture))
+                .Append(" over the first ")
+                .Append((Take.Seconds * Take.LidShare).ToString("F3", CultureInfo.InvariantCulture))
+                .Append("s, then the chest thins to ")
+                .Append(thinning.Opacity.ToString("F3", CultureInfo.InvariantCulture))
+                .Append(" and is gone")
+                .ToString();
+        }
+
+        static string AResumedLevelShowsNothingOfAChestItAlreadyTook()
+        {
+            var graph = Arena();
+            var rig = CameraRig.Raise();
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var resumed = ActionResolver.Resolve(RunState.Begin(graph, Power), Additive).State;
+            var input = TapInput.Raise(rig, builder.Targets, resumed);
+            var walker = Walker.Raise(rig, builder, input, resumed);
+            var chest = builder.Pickups.Of(Additive);
+
+            if (!resumed.IsConsumed(Additive))
+            {
+                Debug.LogError(
+                    "The resume fixture never consumed node " + Additive
+                    + ", so it proves nothing about reloading onto a spent node.");
+            }
+
+            if (chest == null)
+            {
+                Debug.LogError("The resumed arena raised no pickup for node " + Additive + ".");
+                Clear(root, rig, builder);
+                return "\n  the resumed chest never rose";
+            }
+
+            if (!chest.Reel.IsSpent || !chest.Reel.IsSettled || !chest.Reel.IsGone)
+            {
+                Debug.LogError(
+                    "A resumed level reads node " + Additive + " as " + chest.Reel
+                    + " on its first frame rather than gone.");
+            }
+
+            if (chest.Draws || chest.gameObject.activeSelf)
+            {
+                Debug.LogError(
+                    "A resumed level puts " + Stands(chest).size + " of chest back on node "
+                    + Additive + ", so a reward already taken is standing there again.");
+            }
+
+            for (var frame = 0; frame < ReloadFrames; frame++)
+            {
+                builder.Pickups.Advance(Frame);
+            }
+
+            if (chest.Draws || !builder.Pickups.IsSettled)
+            {
+                Debug.LogError(
+                    "A resumed level plays the take again on node " + Additive
+                    + ", so the chest fades out afresh on every reload.");
+            }
+
+            var eye = PreviewFilm.Rig(
+                chest.transform.position + Vector3.up * CloseUpLift, CloseUpRange, CloseUpSize);
+            PreviewFilm.Shoot(eye, TakePath + "chest-5-resumed.png");
+            WorldObjects.Destroy(eye.gameObject);
+
+            var power = walker.Run.Power;
+            Clear(root, rig, builder);
+
+            return "\n  a level resumed on power " + power.ToString(CultureInfo.InvariantCulture)
+                + " shows nothing of node " + Additive + " and never replays its take";
+        }
+
+        static float LidHeight(PickupProp pickup)
+        {
+            if (pickup.Lid == null)
+            {
+                return pickup.transform.position.y;
+            }
+
+            var skin = pickup.Lid.GetComponentInChildren<Renderer>(true);
+
+            return skin == null ? pickup.Lid.position.y : skin.bounds.center.y;
+        }
+
+        static void Clear(GameObject root, CameraRig rig, WorldBuilder builder)
+        {
+            WorldObjects.Destroy(root);
+            WorldObjects.Destroy(rig.gameObject);
+            builder.Dispose();
         }
 
         static Bounds Stands(PickupProp pickup)

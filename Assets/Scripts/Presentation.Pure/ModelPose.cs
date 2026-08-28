@@ -93,9 +93,9 @@ namespace Game.Presentation.Pure
 
         static WorldPoint Fitted(WorldPart part)
         {
-            var fit = 1f / DungeonPack.HeightOf(part.Model);
+            var square = part.Scale.Y / DungeonPack.HeightOf(part.Model);
 
-            return new WorldPoint(part.Scale.X * fit, part.Scale.Y * fit, part.Scale.Z * fit);
+            return new WorldPoint(square, square, square);
         }
 
         static WorldPoint Crested(WorldPart part)
