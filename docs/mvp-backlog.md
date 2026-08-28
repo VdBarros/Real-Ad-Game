@@ -79,6 +79,7 @@ the ad showed*. This document is the source of truth for *what we are building*.
 | 18 | Multiplier count | **Two** per `ship` level, not the ad's three — at 24 content nodes a third collapses every value to 1 ([#8]) |
 | 19 | Workflow | Branch per task, PR to `main`, Actions runs `dotnet test` on Domain only. Unity work is human-reviewed ([#5]) |
 | 20 | Taking a reward | The prop's own `chest_lid` node swings open over the first 55% of the 0.30 s beat, then the whole prop fades out. Nothing of it is left on the tile ([#117]) |
+| 21 | Walking surface | Exactly one per tile. A tile footed with a flight walks on the flight itself; every other tile walks on its floor quad. Never both ([#113]) |
 
 Decision 13 is about *numbers*. Enemy **appearance** is deliberately dynamic:
 [#14] bands each enemy by `enemy.value / player.power`, because absolute bands
@@ -95,6 +96,21 @@ only means anything while the mesh keeps its authored proportions. And a level
 resumed onto an already-consumed node snaps to the end of the take, so the
 chest is gone from the first frame rather than fading again on every reload.
 
+Decision 21 settles what a tile stands on. The floor quad used to be
+unconditional, so a tile footed with a flight carried two surfaces: the quad at
+the tile's own elevation and the pack's staircase spanning the step below it.
+The quad hovered over most of the flight, because a flight only reaches the
+tile's floor at the crest end of its climb. Since the flight already tops out
+flush with that floor and covers the whole tile, it *is* the surface, and the
+quad above it was a second, wrong one. Two things ride on whichever part a tile
+walks on, and both follow the surface rather than the quad: `FloorState` adopts
+it, so a staircase tile flips cleared and cursed with the rest of its region;
+and it is the one part of a tile that keeps its collider, so a tap on a climbing
+tile lands on the treads instead of on air a step above them. The consequence to
+watch is that `PartStyle.Staircase`'s own material never survives a built level
+— the floor state paints every flight as ground the moment the run opens.
+
+
 [#2]: https://github.com/VdBarros/Real-Ad-Game/issues/2
 [#3]: https://github.com/VdBarros/Real-Ad-Game/issues/3
 [#4]: https://github.com/VdBarros/Real-Ad-Game/issues/4
@@ -110,6 +126,7 @@ chest is gone from the first frame rather than fading again on every reload.
 [#15]: https://github.com/VdBarros/Real-Ad-Game/issues/15
 [#16]: https://github.com/VdBarros/Real-Ad-Game/issues/16
 [#61]: https://github.com/VdBarros/Real-Ad-Game/issues/61
+[#113]: https://github.com/VdBarros/Real-Ad-Game/issues/113
 [#117]: https://github.com/VdBarros/Real-Ad-Game/issues/117
 
 ### Calls I made — override any of these if you disagree

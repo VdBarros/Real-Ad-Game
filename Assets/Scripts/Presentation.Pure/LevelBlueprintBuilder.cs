@@ -12,6 +12,18 @@ namespace Game.Presentation.Pure
 
         public const float PickupScale = 0.5f;
 
+        public static bool IsWalkingSurface(PartStyle style)
+        {
+            return style == PartStyle.Floor || style == PartStyle.Staircase;
+        }
+
+        public static string WalkingSurfaceOf(TileGrid tiles, TilePosition position)
+        {
+            return TileFootings.Under(tiles, position) == TileFooting.Flight
+                ? PartNames.Stair(position)
+                : PartNames.Tile(position);
+        }
+
         public static LevelBlueprint Build(LevelGraph graph)
         {
             if (graph == null)
@@ -27,9 +39,14 @@ namespace Game.Presentation.Pure
             {
                 var slot = TerraceSlot(elevations, tilesByTerrace, nodesByTerrace, TerraceUnder(tile.Position));
                 var target = tilesByTerrace[slot];
-                target.Add(FloorQuad(tile.Position));
+                var footing = TileFootings.Under(graph.Tiles, tile.Position);
 
-                switch (TileFootings.Under(graph.Tiles, tile.Position))
+                if (footing != TileFooting.Flight)
+                {
+                    target.Add(FloorQuad(tile.Position));
+                }
+
+                switch (footing)
                 {
                     case TileFooting.Flight:
                         target.Add(Staircase(

@@ -135,10 +135,14 @@ namespace Game.Domain.Tests
             var blueprint = LevelBlueprintBuilder.Build(graph);
             var floors = PartsStyled(blueprint, PartStyle.Floor).ToDictionary(part => part.Name);
 
-            Assert.That(floors.Count, Is.EqualTo(graph.Tiles.Tiles.Count));
-
             foreach (var tile in graph.Tiles.Tiles)
             {
+                if (TileFootings.Under(graph.Tiles, tile.Position) == TileFooting.Flight)
+                {
+                    Assert.That(floors.ContainsKey(PartNames.Tile(tile.Position)), Is.False);
+                    continue;
+                }
+
                 var floor = floors[PartNames.Tile(tile.Position)];
 
                 Assert.That(floor.Position, Is.EqualTo(IsoProjection.Of(tile.Position)), floor.Name);

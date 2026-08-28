@@ -80,6 +80,18 @@ at the head of a climb carries a flight, which is what makes a run read as one
 climb rather than as one flight per tile.
 _Avoid_: buttress, base, skirt.
 
+## Walking Surface
+
+The one part of a tile the player stands on, and the only one of its parts that
+keeps a collider or takes the floor state's cleared and cursed paint. Every tile
+has exactly one. A tile footed with a plinth or with nothing walks on its own
+floor quad; a tile footed with a flight walks on the flight itself, which tops
+out flush with that tile's floor and covers the whole of it, so no quad is laid
+over it. A flight tile with a quad as well would carry two surfaces, the upper
+one hovering over everything but the crest of the climb.
+_Avoid_: floor quad, slab, ground plane — a quad is one kind of walking surface,
+not the term for all of them.
+
 ## Corridor
 
 Exactly one decision-graph edge, together with the run of tiles it covers. A

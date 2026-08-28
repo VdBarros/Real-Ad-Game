@@ -1021,12 +1021,29 @@ namespace Game.EditorTooling
             }
 
             var dressed = 0;
+            var wrong = new List<string>();
 
             foreach (PartStyle style in Enum.GetValues(typeof(PartStyle)))
             {
-                if (PartModels.Of(style) != PartModel.None)
+                var wants = PartModels.Of(style) != PartModel.None;
+
+                if (wants)
                 {
                     dressed++;
+                }
+
+                var material = Painted(root, style);
+
+                if (material == null)
+                {
+                    continue;
+                }
+
+                var wears = material.HasProperty(BaseMap) && material.GetTexture(BaseMap) != null;
+
+                if (wants != wears)
+                {
+                    wrong.Add(style.ToString());
                 }
             }
 
@@ -1042,10 +1059,12 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                atlassed == dressed,
-                "every dressed style binds the one pack atlas, so the whole dungeon is one texture",
-                atlassed + " of " + world.Count + " world materials do against " + dressed
-                + " styles that want a mesh");
+                world.Count > 0 && wrong.Count == 0,
+                "exactly the materials the built dungeon wears for a style with a mesh bind the one pack "
+                + "atlas, so the whole dungeon is one texture",
+                atlassed + " of " + world.Count + " world materials do, drawn from the " + dressed
+                + " styles that want a mesh"
+                + (wrong.Count == 0 ? "" : "; wrong on " + string.Join(", ", wrong.ToArray())));
 
             return failures;
         }
