@@ -1022,6 +1022,7 @@ namespace Game.EditorTooling
 
             var dressed = 0;
             var wrong = new List<string>();
+            var missing = new List<string>();
 
             foreach (PartStyle style in Enum.GetValues(typeof(PartStyle)))
             {
@@ -1036,6 +1037,11 @@ namespace Game.EditorTooling
 
                 if (material == null)
                 {
+                    if (wants)
+                    {
+                        missing.Add(style.ToString());
+                    }
+
                     continue;
                 }
 
@@ -1065,6 +1071,16 @@ namespace Game.EditorTooling
                 atlassed + " of " + world.Count + " world materials do, drawn from the " + dressed
                 + " styles that want a mesh"
                 + (wrong.Count == 0 ? "" : "; wrong on " + string.Join(", ", wrong.ToArray())));
+
+            var explained = new List<string> { PartStyle.Staircase.ToString() };
+
+            failures += Assert(
+                report,
+                missing.Count == explained.Count && missing.TrueForAll(explained.Contains),
+                "every style that wants a mesh wears one somewhere in the built world, bar the staircase, "
+                + "whose flight the floor state paints as ground the moment the run opens",
+                (missing.Count == 0 ? "nothing is missing" : "missing " + string.Join(", ", missing.ToArray()))
+                + " against the " + string.Join(", ", explained.ToArray()) + " this level explains");
 
             return failures;
         }
