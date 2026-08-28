@@ -49,5 +49,25 @@ namespace Game.Presentation.Pure
                     return FigureCue.Still;
             }
         }
+
+        public static FigureCue Answering(Fight fight)
+        {
+            var struck = Striking(fight);
+
+            return struck.Loops ? FigureCue.Still : FigureCue.Within(Answered(struck.Act), struck.Beat);
+        }
+
+        public static FigureAct Answered(FigureAct act)
+        {
+            switch (act)
+            {
+                case FigureAct.Strike:
+                    return FigureAct.Recoil;
+                case FigureAct.Recoil:
+                    return FigureAct.Strike;
+                default:
+                    return act;
+            }
+        }
     }
 }

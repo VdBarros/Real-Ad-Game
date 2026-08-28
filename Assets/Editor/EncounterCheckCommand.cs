@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Game.Domain;
@@ -17,6 +18,16 @@ namespace Game.EditorTooling
         const string Preset = "ship";
 
         const string ShotPath = "dev/scratch/t-15-";
+
+        const string SidesPath = "dev/scratch/t-43-encounter-";
+
+        const int Sequence = 6;
+
+        const int EveryNthFrame = 3;
+
+        const float CloseRange = 6f;
+
+        const float CloseFraming = 1.1f;
 
         const int Doorstep = 1;
 
@@ -42,6 +53,12 @@ namespace Game.EditorTooling
             public int Cleared;
             public int ClearedBefore;
             public RunState Settled;
+            public readonly HashSet<FigureAct> PlayerActs = new HashSet<FigureAct>();
+            public readonly HashSet<FigureAct> EnemyActs = new HashSet<FigureAct>();
+            public int BlowFrames;
+            public int Shot;
+            public bool PlayerActing;
+            public bool EnemyActing;
         }
 
         public static void Check()
@@ -60,10 +77,17 @@ namespace Game.EditorTooling
             report.Append(Row(win, Power, Power - 1));
             report.Append(Row(tie, Power, Power));
             report.Append(Row(loss, Power, Power + 1));
+            report.Append(Sides(win, "win"));
+            report.Append(Sides(tie, "tie"));
+            report.Append(Sides(loss, "loss"));
 
             Expect(win.Outcome, ActionOutcome.Win);
             Expect(tie.Outcome, ActionOutcome.Tie);
             Expect(loss.Outcome, ActionOutcome.Loss);
+
+            BothSidesRead(win, "win", FigureAct.Strike, FigureAct.Recoil);
+            BothSidesRead(tie, "tie", FigureAct.Clash, FigureAct.Clash);
+            BothSidesRead(loss, "loss", FigureAct.Recoil, FigureAct.Strike);
 
             TieAndLossAreToldApart(tie, loss);
             NothingMoved(tie, Power);
@@ -119,9 +143,20 @@ namespace Game.EditorTooling
             walker.Arrived += result => reel.Outcome = result.Outcome;
 
             var figure = builder.Fights.Of(Doorstep);
+            var acting = root.GetComponentsInChildren<FigureAnimator>(true);
+            var striking = builder.Player == null ? null : builder.Player.GetComponent<FigureAnimator>();
+            var answering = figure == null ? null : figure.GetComponent<FigureAnimator>();
+
+            reel.PlayerActing = striking != null && striking.IsRigged && striking.HasClipsToPlay;
+            reel.EnemyActing = answering != null && answering.IsRigged && answering.HasClipsToPlay;
+
             var post = IsoProjection.Of(graph.Decisions.Node(Doorstep).Position);
             var enemyPost = figure != null ? figure.Ground : post;
             var band = figure != null ? figure.Band : default(EnemyBand);
+            var close = PreviewFilm.Rig(
+                new Vector3(enemyPost.X, enemyPost.Y, enemyPost.Z), CloseRange, CloseFraming);
+
+            PreviewFilm.Warm(close);
 
             if (figure == null)
             {
@@ -137,7 +172,8 @@ namespace Game.EditorTooling
 
             for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
             {
-                Step(rig, builder, walker);
+                Step(rig, builder, walker, acting);
+                Answer(reel, striking, answering, close, leg);
 
                 if (!walker.Walk.IsWaiting)
                 {
@@ -167,7 +203,7 @@ namespace Game.EditorTooling
 
             for (var frame = 0; frame < 120; frame++)
             {
-                Step(rig, builder, walker);
+                Step(rig, builder, walker, acting);
                 reel.WeaponFlew |= builder.Player.IsFlying;
                 reel.EnemyFell |= figure != null && figure.HasFallen;
             }
@@ -188,6 +224,7 @@ namespace Game.EditorTooling
 
             ThePlayerStandsOnItsNode(builder, walker.Run, leg);
 
+            WorldObjects.Destroy(close.gameObject);
             WorldObjects.Destroy(root);
             WorldObjects.Destroy(rig.gameObject);
             builder.Dispose();
@@ -318,7 +355,7 @@ namespace Game.EditorTooling
             return away > peak ? away : peak;
         }
 
-        static void Step(CameraRig rig, WorldBuilder builder, Walker walker)
+        static void Step(CameraRig rig, WorldBuilder builder, Walker walker, FigureAnimator[] acting)
         {
             walker.Advance(Frame);
             rig.Advance(Frame);
@@ -329,6 +366,108 @@ namespace Game.EditorTooling
             {
                 builder.PlayerBadge.Advance(Frame);
             }
+
+            foreach (var driven in acting)
+            {
+                driven.Advance(Frame);
+            }
+        }
+
+        static void Answer(
+            Tally reel, FigureAnimator striking, FigureAnimator answering, Camera lens, string leg)
+        {
+            var blow = striking == null ? FigureAct.Idle : striking.Act;
+            var reply = answering == null ? FigureAct.Idle : answering.Act;
+
+            if (!IsBlow(blow) && !IsBlow(reply))
+            {
+                return;
+            }
+
+            reel.BlowFrames++;
+            reel.PlayerActs.Add(blow);
+            reel.EnemyActs.Add(reply);
+
+            if (reel.Shot < Sequence && reel.BlowFrames % EveryNthFrame == 0)
+            {
+                PreviewFilm.Shoot(
+                    lens,
+                    SidesPath + leg + "-" + reel.Shot.ToString("00", CultureInfo.InvariantCulture) + ".png");
+                reel.Shot++;
+            }
+        }
+
+        static bool IsBlow(FigureAct act)
+        {
+            return act == FigureAct.Strike || act == FigureAct.Clash || act == FigureAct.Recoil;
+        }
+
+        static void BothSidesRead(Tally reel, string leg, FigureAct blow, FigureAct reply)
+        {
+            if (!reel.PlayerActing || !reel.EnemyActing)
+            {
+                Debug.LogError(
+                    "The " + leg + " was fought with the player animated " + reel.PlayerActing
+                    + " and the enemy animated " + reel.EnemyActing
+                    + ", so one side of it could never have read at all.");
+            }
+
+            if (reel.BlowFrames == 0)
+            {
+                Debug.LogError("The " + leg + " played no blow on either side.");
+            }
+
+            if (!Only(reel.PlayerActs, blow))
+            {
+                Debug.LogError(
+                    "The " + leg + " had the player play " + Acts(reel.PlayerActs) + " where it owes "
+                    + blow + ".");
+            }
+
+            if (!Only(reel.EnemyActs, reply))
+            {
+                Debug.LogError(
+                    "The " + leg + " had the enemy play " + Acts(reel.EnemyActs) + " where it owes "
+                    + reply + ".");
+            }
+
+            if (reel.Shot == 0)
+            {
+                Debug.LogError("The " + leg + " was never photographed, so nobody can read it on both sides.");
+            }
+        }
+
+        static bool Only(HashSet<FigureAct> acts, FigureAct wanted)
+        {
+            return acts.Count == 1 && acts.Contains(wanted);
+        }
+
+        static string Acts(HashSet<FigureAct> acts)
+        {
+            var names = new List<string>();
+
+            foreach (var act in acts)
+            {
+                names.Add(act.ToString());
+            }
+
+            names.Sort(StringComparer.Ordinal);
+
+            return names.Count == 0 ? "nothing" : string.Join("/", names.ToArray());
+        }
+
+        static string Sides(Tally reel, string leg)
+        {
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "\n  the {0} read on both sides over {1} blow frames: the player played {2} while the enemy "
+                + "played {3}, photographed as {4} frames at {5}{0}-NN.png",
+                leg,
+                reel.BlowFrames,
+                Acts(reel.PlayerActs),
+                Acts(reel.EnemyActs),
+                reel.Shot,
+                SidesPath);
         }
 
         static string Row(Tally reel, int startingPower, int enemyValue)
