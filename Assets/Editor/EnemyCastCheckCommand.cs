@@ -232,7 +232,7 @@ namespace Game.EditorTooling
 
             var census = new List<string>();
 
-            for (var tier = 0; tier < VisualTier.Count; tier++)
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
             {
                 census.Add("tier " + tier + " -> " + CharacterCast.TierMeshOf(tier));
             }

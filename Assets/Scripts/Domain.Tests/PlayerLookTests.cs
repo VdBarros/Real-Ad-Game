@@ -18,7 +18,7 @@ namespace Game.Domain.Tests
         {
             foreach (var power in new[] { 2, 8, 29, 30, 99, 100, 299, 300, 490 })
             {
-                Assert.That(PlayerLook.Of(power).Tier, Is.EqualTo(VisualTier.Of(power)));
+                Assert.That(PlayerLook.Of(power).Tier, Is.EqualTo(PlayerTier.Of(power)));
             }
         }
 
@@ -27,7 +27,7 @@ namespace Game.Domain.Tests
         {
             Assert.That(Look(0).Scale, Is.EqualTo(PlayerLook.BaseScale).Within(1e-6f));
 
-            for (var tier = 1; tier < VisualTier.Count; tier++)
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
                 Assert.That(
                     Look(tier).Scale / Look(tier - 1).Scale,
@@ -38,7 +38,7 @@ namespace Game.Domain.Tests
         [Test]
         public void TheRampRunsCoolToWarmWithoutDoublingBackOnItself()
         {
-            for (var tier = 1; tier < VisualTier.Count; tier++)
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
                 Assert.That(Look(tier).Tint.Red, Is.GreaterThan(Look(tier - 1).Tint.Red));
                 Assert.That(Look(tier).Tint.Blue, Is.LessThan(Look(tier - 1).Tint.Blue));
@@ -52,13 +52,13 @@ namespace Game.Domain.Tests
             Assert.That(Look(1).Trophies, Is.EqualTo(0));
             Assert.That(Look(2).Trophies, Is.EqualTo(1));
             Assert.That(Look(3).Trophies, Is.EqualTo(2));
-            Assert.That(Look(VisualTier.Count - 1).Trophies, Is.EqualTo(Trophy.Cap));
+            Assert.That(Look(PlayerTier.Count - 1).Trophies, Is.EqualTo(Trophy.Cap));
         }
 
         [Test]
         public void ThePromotionIntoTheBossTierStillPlantsAPrimitiveOfItsOwn()
         {
-            var top = VisualTier.Count - 1;
+            var top = PlayerTier.Count - 1;
 
             Assert.That(Look(top).Trophies - Look(top - 1).Trophies, Is.EqualTo(1));
         }
@@ -89,7 +89,7 @@ namespace Game.Domain.Tests
 
         static PlayerLook Look(int tier)
         {
-            var power = tier == 0 ? 1 : VisualTier.Thresholds[tier - 1];
+            var power = tier == 0 ? 1 : PlayerTier.Thresholds[tier - 1];
             return PlayerLook.Of(power);
         }
     }
