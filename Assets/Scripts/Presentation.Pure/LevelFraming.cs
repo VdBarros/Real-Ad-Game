@@ -49,6 +49,23 @@ namespace Game.Presentation.Pure
             return height / (2f * shareOfScreen);
         }
 
+        public static float HeightShowing(float shareOfScreen, float orthographicSize)
+        {
+            if (shareOfScreen <= 0f || shareOfScreen > 1f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(shareOfScreen), shareOfScreen, "A share of the screen runs above nothing and up to all of it.");
+            }
+
+            if (orthographicSize <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(orthographicSize), orthographicSize, "A framing always has a positive size.");
+            }
+
+            return shareOfScreen * 2f * orthographicSize;
+        }
+
         public static float ShareOfScreen(float height, float orthographicSize)
         {
             if (orthographicSize <= 0f)

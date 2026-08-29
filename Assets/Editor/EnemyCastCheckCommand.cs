@@ -137,6 +137,7 @@ namespace Game.EditorTooling
             failures += NoFigureHidesMoreGroundThanItsCapsule(graph, byName, packs, report);
             failures += TheStripTakesTheSparesAndLeavesTheSilhouette(graph, byName, report);
             failures += BadgesStayLegibleOverTheFigures(graph, byName, packs, report);
+            failures += EveryAdversaryReadsAsACreatureAtEveryBand(graph, byName, packs, report);
 
             Portraits(rig, lens, graph, byName, packs);
             var silhouettes = Silhouettes(rig, lens, graph, byName, root);
@@ -144,6 +145,7 @@ namespace Game.EditorTooling
             failures += EveryRiggedFigureIsPosedByAnAnimator(root, byName, rig, lens, graph, report);
             failures += TheBandMovesTheScaleButNeverTheMeshNorTheColour(
                 graph, byName, packs, power, report);
+            failures += EveryAdversaryStillReadsOnceThePlayerHasOutgrownIt(graph, byName, packs, report);
             failures += EveryAdversaryShowsThePacksOwnTexture(graph, byName, report);
             failures += EveryBandIsPhotographedWithItsBadgeCovered(silhouettes, report);
 
@@ -1006,6 +1008,218 @@ namespace Game.EditorTooling
                 + (materials.Count == 1 && materials[0] != null ? " named " + materials[0].name : ""));
 
             return failures;
+        }
+
+        static int EveryAdversaryReadsAsACreatureAtEveryBand(
+            LevelGraph graph,
+            IDictionary<string, Transform> byName,
+            IDictionary<PartModel, ISet<Mesh>> packs,
+            StringBuilder report)
+        {
+            var swept = 0;
+            var reading = 0;
+            var measured = 0;
+            var agreeing = 0;
+            var smallest = float.MaxValue;
+            var smallestAt = "nothing";
+            var bossFloor = float.MaxValue;
+            var enemyCeiling = 0f;
+            var tightest = float.MaxValue;
+            var complaint = new List<string>();
+
+            foreach (var figure in Adversaries(graph, byName))
+            {
+                var model = CharacterCast.MeshOf(figure.Style, figure.Value);
+                var basis = figure.Figure.transform.localScale.x
+                    / FigureFit.ScaleOf(model) / EnemyBands.ScaleOf(figure.Figure.Band);
+
+                measured++;
+                var box = PackMesh.Wearing(figure.Instance, Pack(packs, model));
+                var showing = LevelFraming.ShareOfScreen(box.size.y, LevelFraming.PlaySize)
+                    * ScreenFrame.Height;
+                var wanted = FigureReadability.PixelsShowing(
+                    model, basis * EnemyBands.ScaleOf(figure.Figure.Band));
+
+                var slack = LevelFraming.ShareOfScreen(Epsilon, LevelFraming.PlaySize)
+                    * ScreenFrame.Height;
+
+                if (Math.Abs(showing - wanted) <= slack)
+                {
+                    agreeing++;
+                }
+                else if (complaint.Count < 6)
+                {
+                    complaint.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} measures {1:0.#} pixels where the pure fit reads {2:0.#}",
+                        figure.Name,
+                        showing,
+                        wanted));
+                }
+
+                foreach (EnemyBand band in Enum.GetValues(typeof(EnemyBand)))
+                {
+                    var scale = basis * EnemyBands.ScaleOf(band);
+                    var pixels = FigureReadability.PixelsShowing(model, scale);
+
+                    swept++;
+
+                    if (FigureReadability.Reads(model, scale))
+                    {
+                        reading++;
+                    }
+                    else if (complaint.Count < 6)
+                    {
+                        complaint.Add(string.Format(
+                            CultureInfo.InvariantCulture,
+                            "{0} in band {1} stands {2:0.#} pixels",
+                            figure.Name,
+                            band,
+                            pixels));
+                    }
+
+                    if (pixels < smallest)
+                    {
+                        smallest = pixels;
+                        smallestAt = figure.Name + " in band " + band;
+                    }
+
+                    var height = FigureFit.StandingHeight(model, scale);
+
+                    if (figure.Style == PartStyle.Boss)
+                    {
+                        bossFloor = Math.Min(bossFloor, height);
+                    }
+                    else
+                    {
+                        enemyCeiling = Math.Max(enemyCeiling, height);
+                    }
+                }
+            }
+
+            if (enemyCeiling > 0f && bossFloor < float.MaxValue)
+            {
+                tightest = bossFloor / enemyCeiling;
+            }
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                swept > 0 && reading == swept,
+                "no adversary on the level falls below the readability floor at any band the player's "
+                + "own number can put it in, so a trivial enemy still reads as a creature rather than a "
+                + "speck",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} of {1} band readings clear the floor of {2:0.#} pixels of the {3} tall frame, "
+                    + "which is {4:0.###} of screen height; the smallest is {5} at {6:0.#} pixels"
+                    + "{7}",
+                    reading,
+                    swept,
+                    FigureReadability.ReadablePixels,
+                    ScreenFrame.Height,
+                    FigureReadability.ShareOfScreen,
+                    smallestAt,
+                    smallest,
+                    complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+
+            failures += Assert(
+                report,
+                measured > 0 && agreeing == measured,
+                "the floor is read off the framing rather than off a pinned scale - every adversary's "
+                + "measured mesh fills the share of screen height the pure reading of the play framing "
+                + "asks of it",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} of {1} agree at a play framing of {2:0.#####}, where a figure of {3:0.#####} "
+                    + "metres is the floor",
+                    agreeing,
+                    measured,
+                    LevelFraming.PlaySize,
+                    FigureReadability.Height));
+
+            failures += Assert(
+                report,
+                tightest > 1.2f,
+                "the boss stands taller than every enemy on the level at every pairing of bands the two "
+                + "can be read in at once, not only when both are read against the same number",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the boss at its smallest band stands {0:0.#####} against {1:0.#####} for the "
+                    + "tallest enemy at its largest, which is {2:0.###} times as tall",
+                    bossFloor,
+                    enemyCeiling,
+                    tightest));
+
+            return failures;
+        }
+
+        static int EveryAdversaryStillReadsOnceThePlayerHasOutgrownIt(
+            LevelGraph graph,
+            IDictionary<string, Transform> byName,
+            IDictionary<PartModel, ISet<Mesh>> packs,
+            StringBuilder report)
+        {
+            var read = 0;
+            var reading = 0;
+            var trivial = 0;
+            var smallest = float.MaxValue;
+            var smallestAt = "nothing";
+            var complaint = new List<string>();
+
+            foreach (var figure in Adversaries(graph, byName))
+            {
+                read++;
+
+                if (figure.Figure.Band == EnemyBand.Trivial)
+                {
+                    trivial++;
+                }
+
+                var model = CharacterCast.MeshOf(figure.Style, figure.Value);
+                var box = PackMesh.Wearing(figure.Instance, Pack(packs, model));
+                var pixels = LevelFraming.ShareOfScreen(box.size.y, LevelFraming.PlaySize)
+                    * ScreenFrame.Height;
+
+                if (pixels < smallest)
+                {
+                    smallest = pixels;
+                    smallestAt = figure.Name;
+                }
+
+                if (pixels >= FigureReadability.ReadablePixels)
+                {
+                    reading++;
+                }
+                else if (complaint.Count < 6)
+                {
+                    complaint.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} measures {1:0.#} pixels",
+                        figure.Name,
+                        pixels));
+                }
+            }
+
+            return Assert(
+                report,
+                read > 0 && trivial > 0 && reading == read,
+                "with the run pumped to " + RichPower
+                + " and the board reread at its smallest, every adversary's own measured mesh still "
+                + "fills the readability floor, so the shrinking end of the band ramp is measured on the "
+                + "world and not only on the pure fit",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} of {1} do, {2} of them trivial; the smallest is {3} at {4:0.#} pixels against a "
+                    + "floor of {5:0.#}{6}",
+                    reading,
+                    read,
+                    trivial,
+                    smallestAt,
+                    smallest,
+                    FigureReadability.ReadablePixels,
+                    complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
         }
 
         static int TheBandMovesTheScaleButNeverTheMeshNorTheColour(
