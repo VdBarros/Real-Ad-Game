@@ -109,7 +109,7 @@ namespace Game.Presentation.Pure
 
         static void Guard(PartModel model)
         {
-            if (!ArtPacks.IsRigged(model))
+            if (!ArtPacks.IsRiggedCharacter(model))
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(model), model, "Only a cast mesh or a primitive can stand as a figure.");

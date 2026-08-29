@@ -246,7 +246,7 @@ namespace Game.EditorTooling
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (model == PartModel.None || ArtPacks.IsRigged(model))
+                if (model == PartModel.None || ArtPacks.ShipsWithTheCast(model))
                 {
                     continue;
                 }
@@ -942,7 +942,7 @@ namespace Game.EditorTooling
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (ArtPacks.IsRigged(model))
+                if (ArtPacks.IsRiggedCharacter(model))
                 {
                     meshes.Add(model);
                 }

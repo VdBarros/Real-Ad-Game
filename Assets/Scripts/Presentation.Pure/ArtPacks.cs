@@ -20,14 +20,32 @@ namespace Game.Presentation.Pure
             return SkeletonPack.Carries(model) ? ArtPack.Skeletons : ArtPack.Dungeon;
         }
 
-        public static bool IsRigged(PartModel model)
-        {
-            return model != PartModel.None && IsRigged(Of(model));
-        }
-
-        public static bool IsRigged(ArtPack pack)
+        public static bool IsCastPack(ArtPack pack)
         {
             return pack == ArtPack.Adventurers || pack == ArtPack.Skeletons;
+        }
+
+        public static bool ShipsWithTheCast(PartModel model)
+        {
+            return model != PartModel.None && IsCastPack(Of(model));
+        }
+
+        public static bool IsRiggedCharacter(PartModel model)
+        {
+            if (model == PartModel.None)
+            {
+                return false;
+            }
+
+            switch (Of(model))
+            {
+                case ArtPack.Adventurers:
+                    return !AdventurerPack.Wields(model);
+                case ArtPack.Skeletons:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         public static float CastImportScale
@@ -191,10 +209,10 @@ namespace Game.Presentation.Pure
         {
             var pack = Of(model);
 
-            if (!IsRigged(pack))
+            if (!IsCastPack(pack))
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(model), model, "Only a rigged cast mesh carries a measured figure footprint.");
+                    nameof(model), model, "Only a cast pack mesh carries a measured figure footprint.");
             }
 
             return pack;

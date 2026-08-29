@@ -20,7 +20,7 @@ namespace Game.Domain.Tests
 
             Assert.That(mesh, Is.Not.EqualTo(PartModel.None));
             Assert.That(ArtPacks.Of(mesh), Is.EqualTo(ArtPack.Adventurers));
-            Assert.That(ArtPacks.IsRigged(mesh), Is.True);
+            Assert.That(ArtPacks.IsRiggedCharacter(mesh), Is.True);
             Assert.That(AdventurerPack.Carries(mesh), Is.True);
             Assert.That(PartModels.Of(PartStyle.Start), Is.EqualTo(mesh));
         }
@@ -138,7 +138,7 @@ namespace Game.Domain.Tests
                 foreach (var mesh in CharacterCast.MeshesOf(role))
                 {
                     Assert.That(mesh, Is.Not.EqualTo(PartModel.None), role.ToString());
-                    Assert.That(ArtPacks.IsRigged(mesh), Is.True, role + " wears " + mesh);
+                    Assert.That(ArtPacks.IsRiggedCharacter(mesh), Is.True, role + " wears " + mesh);
                 }
             }
         }
@@ -348,7 +348,7 @@ namespace Game.Domain.Tests
         {
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (model == PartModel.None || ArtPacks.IsRigged(model))
+                if (model == PartModel.None || ArtPacks.IsRiggedCharacter(model))
                 {
                     Assert.That(() => FigureFit.ScaleOf(model), Throws.Nothing, model.ToString());
                     continue;
@@ -358,6 +358,43 @@ namespace Game.Domain.Tests
                     () => FigureFit.ScaleOf(model),
                     Throws.InstanceOf<ArgumentOutOfRangeException>(),
                     model.ToString());
+            }
+        }
+
+        [Test]
+        public void AWieldedWeaponShipsWithTheCastWithoutStandingAsOneOfIt()
+        {
+            var wielded = 0;
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (!AdventurerPack.Wields(model))
+                {
+                    continue;
+                }
+
+                wielded++;
+
+                Assert.That(ArtPacks.Of(model), Is.EqualTo(ArtPack.Adventurers), model.ToString());
+                Assert.That(ArtPacks.ShipsWithTheCast(model), Is.True, model.ToString());
+                Assert.That(ArtPacks.IsRiggedCharacter(model), Is.False, model.ToString());
+                Assert.That(ArtPacks.WidthOf(model), Is.GreaterThan(0f), model.ToString());
+                Assert.That(
+                    () => FigureFit.ScaleOf(model),
+                    Throws.InstanceOf<ArgumentOutOfRangeException>(),
+                    model.ToString());
+            }
+
+            Assert.That(wielded, Is.EqualTo(PlayerKit.Weapons.Count - 1));
+
+            foreach (var role in CharacterCast.Roles)
+            {
+                foreach (var mesh in CharacterCast.MeshesOf(role))
+                {
+                    Assert.That(AdventurerPack.Wields(mesh), Is.False, role + " wears " + mesh);
+                    Assert.That(ArtPacks.ShipsWithTheCast(mesh), Is.True, role + " wears " + mesh);
+                    Assert.That(ArtPacks.IsRiggedCharacter(mesh), Is.True, role + " wears " + mesh);
+                }
             }
         }
 

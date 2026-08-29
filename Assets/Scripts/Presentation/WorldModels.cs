@@ -216,7 +216,7 @@ namespace Game.Presentation
 
         public static string FolderOf(PartModel model)
         {
-            return ArtPacks.IsRigged(model) ? CharacterFolder : ResourcesFolder;
+            return ArtPacks.ShipsWithTheCast(model) ? CharacterFolder : ResourcesFolder;
         }
 
         static Dictionary<string, AnimationClip> Clips(PartModel model)
@@ -224,7 +224,7 @@ namespace Game.Presentation
             var table = new Dictionary<string, AnimationClip>(StringComparer.Ordinal);
             var path = AssetPathOf(model);
 
-            if (path == null || !ArtPacks.IsRigged(model))
+            if (path == null || !ArtPacks.IsRiggedCharacter(model))
             {
                 return table;
             }

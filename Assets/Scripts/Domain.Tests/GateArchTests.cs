@@ -62,7 +62,7 @@ namespace Game.Domain.Tests
             foreach (var piece in GateArch.Pieces(GateArch.MostPips))
             {
                 Assert.That(ArtPacks.Of(piece.Model), Is.EqualTo(ArtPack.Dungeon), piece.Name);
-                Assert.That(ArtPacks.IsRigged(piece.Model), Is.False, piece.Name);
+                Assert.That(ArtPacks.IsRiggedCharacter(piece.Model), Is.False, piece.Name);
 
                 var fit = DungeonPack.FitOf(piece.Model, piece.Scale);
 
