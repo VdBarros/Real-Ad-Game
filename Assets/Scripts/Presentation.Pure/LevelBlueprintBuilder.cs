@@ -24,6 +24,36 @@ namespace Game.Presentation.Pure
                 : PartNames.Tile(position);
         }
 
+        public static WorldPart WalkingSurface(TileGrid tiles, TilePosition position)
+        {
+            if (tiles == null)
+            {
+                throw new ArgumentNullException(nameof(tiles));
+            }
+
+            return TileFootings.Under(tiles, position) == TileFooting.Flight
+                ? Staircase(position, TileFootings.AscentOf(tiles, position))
+                : FloorQuad(position);
+        }
+
+        public static bool TryWall(TileGrid tiles, TilePosition position, TileSide side, out WorldPart wall)
+        {
+            if (tiles == null)
+            {
+                throw new ArgumentNullException(nameof(tiles));
+            }
+
+            if (TileFootings.Under(tiles, position) == TileFooting.Flight
+                && StaircaseFlight.RailsItsOwn(side, TileFootings.AscentOf(tiles, position)))
+            {
+                wall = default(WorldPart);
+                return false;
+            }
+
+            wall = Wall(position, side, StaircaseFlight.HandsOverAt(tiles, position, side));
+            return true;
+        }
+
         public static LevelBlueprint Build(LevelGraph graph)
         {
             if (graph == null)
@@ -41,30 +71,23 @@ namespace Game.Presentation.Pure
                 var slot = TerraceSlot(
                     elevations, tilesByTerrace, nodesByTerrace, landmarksByTerrace, TerraceUnder(tile.Position));
                 var target = tilesByTerrace[slot];
-                var footing = TileFootings.Under(graph.Tiles, tile.Position);
 
-                if (footing != TileFooting.Flight)
-                {
-                    target.Add(FloorQuad(tile.Position));
-                }
+                target.Add(WalkingSurface(graph.Tiles, tile.Position));
 
-                switch (footing)
+                if (TileFootings.Under(graph.Tiles, tile.Position) == TileFooting.Plinth)
                 {
-                    case TileFooting.Flight:
-                        target.Add(Staircase(
-                            tile.Position, TileFootings.AscentOf(graph.Tiles, tile.Position)));
-                        break;
-                    case TileFooting.Plinth:
-                        target.Add(Plinth(tile.Position));
-                        break;
+                    target.Add(Plinth(tile.Position));
                 }
 
                 foreach (var side in TileSides.All)
                 {
                     var beyond = TileSides.Step(tile.Position, side);
-                    if (!graph.Tiles.ContainsPlace(beyond.X, beyond.Y))
+                    WorldPart wall;
+
+                    if (!graph.Tiles.ContainsPlace(beyond.X, beyond.Y)
+                        && TryWall(graph.Tiles, tile.Position, side, out wall))
                     {
-                        target.Add(Wall(tile.Position, side));
+                        target.Add(wall);
                     }
                 }
             }
@@ -178,7 +201,7 @@ namespace Game.Presentation.Pure
                 new WorldPoint(1f, 1f, 1f));
         }
 
-        static WorldPart Wall(TilePosition position, TileSide side)
+        static WorldPart Wall(TilePosition position, TileSide side, float standing)
         {
             var tile = IsoProjection.Of(position);
             var neighbour = IsoProjection.Of(TileSides.Step(position, side));
@@ -190,7 +213,7 @@ namespace Game.Presentation.Pure
                 PartStyle.Wall,
                 new WorldPoint(
                     (tile.X + neighbour.X) * 0.5f,
-                    tile.Y + IsoProjection.WallHeight * 0.5f,
+                    standing + IsoProjection.WallHeight * 0.5f,
                     (tile.Z + neighbour.Z) * 0.5f),
                 new WorldPoint(0f, TileSides.InwardYaw(side), 0f),
                 new WorldPoint(IsoProjection.TileEdge, IsoProjection.WallHeight, 1f));
