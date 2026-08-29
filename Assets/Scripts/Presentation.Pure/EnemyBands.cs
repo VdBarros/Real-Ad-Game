@@ -8,7 +8,7 @@ namespace Game.Presentation.Pure
 
         public const int CloseReach = 2;
 
-        static readonly float[] scales = { 0.78f, 0.92f, 1.06f, 1.22f };
+        static readonly float[] scales = { 0.85f, 0.93f, 1.01f, 1.09f };
 
         public static EnemyBand Of(int enemyValue, int playerPower)
         {
