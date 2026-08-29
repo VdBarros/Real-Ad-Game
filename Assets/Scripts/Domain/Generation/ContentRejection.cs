@@ -15,6 +15,7 @@ namespace Game.Domain
         BossWithinReach,
         PanelStalled,
         RegionSpreadTooThin,
-        OpeningWithoutAChoice
+        OpeningWithoutAChoice,
+        MultiplierProductBeyondCap
     }
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Game.Presentation.Pure
 {
-    public static class VisualTier
+    public static class EnemyTier
     {
         static readonly int[] thresholds = { 8, 30, 100, 300 };
 
@@ -17,15 +17,15 @@ namespace Game.Presentation.Pure
             get { return thresholds.Length + 1; }
         }
 
-        public static int Of(int power)
+        public static int Of(int number)
         {
-            if (power < 1)
+            if (number < 1)
             {
-                throw new ArgumentOutOfRangeException(nameof(power), power, "A run always holds power.");
+                throw new ArgumentOutOfRangeException(nameof(number), number, "An enemy always holds power.");
             }
 
             var tier = 0;
-            while (tier < thresholds.Length && power >= thresholds[tier])
+            while (tier < thresholds.Length && number >= thresholds[tier])
             {
                 tier++;
             }

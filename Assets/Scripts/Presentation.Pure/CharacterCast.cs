@@ -52,7 +52,7 @@ namespace Game.Presentation.Pure
 
         public static PartModel MeshOf(PartStyle role, int power)
         {
-            return role == PartStyle.Enemy ? TierMeshOf(VisualTier.Of(power)) : MeshOf(role);
+            return role == PartStyle.Enemy ? TierMeshOf(EnemyTier.Of(power)) : MeshOf(role);
         }
 
         public static PartModel TierMeshOf(int tier)

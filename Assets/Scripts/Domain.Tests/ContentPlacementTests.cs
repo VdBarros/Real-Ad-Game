@@ -163,6 +163,54 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void ALadderOfGatesWhoseProductPassesTheCapIsTurnedAwayRatherThanShipped()
+        {
+            var stacked = new ContentRecipe(6, 10, 7);
+
+            var thrown = Assert.Throws<LevelGenerationException>(
+                () => LevelGenerator.Generate(Seed, MazePreset.Ship, stacked, PowerTuning.Ship, out _));
+
+            Assert.That(thrown.Attempts, Is.EqualTo(LevelGenerator.MaximumAttempts));
+            Assert.That(
+                thrown.CountOf(ContentRejection.MultiplierProductBeyondCap),
+                Is.GreaterThan(0),
+                "The histogram lost the reason the cap turned the attempts away with: " + thrown.Report);
+            Assert.That(thrown.Message, Does.Contain("MultiplierProductBeyondCap"));
+        }
+
+        [Test]
+        public void TheCapOnTheGateProductRidesTheGrowthEveryPlanIsTunedToHandOut()
+        {
+            Assert.That(PowerTuning.Ship.MultiplierProductCap, Is.EqualTo(150));
+            Assert.That(PowerTuning.Tiny.MultiplierProductCap, Is.EqualTo(50));
+            Assert.That(PowerTuning.Stress.MultiplierProductCap, Is.EqualTo(500));
+            Assert.That(
+                LevelPlan.For(LevelPlan.PlateauLevel).Tuning.MultiplierProductCap,
+                Is.EqualTo(PowerTuning.Ship.MultiplierProductCap),
+                "Rebasing a plan on a richer opening power must not move the cap it measures against.");
+        }
+
+        [Test]
+        public void TheGateProductAGeneratedLevelMintsStaysUnderItsCap()
+        {
+            var level = Ship();
+
+            Assert.That(
+                MultiplierProduct.Of(level.Graph),
+                Is.LessThanOrEqualTo(level.Tuning.MultiplierProductCap));
+        }
+
+        [Test]
+        public void AValidatorHandedAGateLadderBeyondTheCapRefusesTheGraph()
+        {
+            var verdict = SolvabilityValidator.Validate(
+                LevelSketch.Branching(multiplier: 64).Build(), LevelSketch.Tuning);
+
+            Assert.That(verdict.IsSafe, Is.False);
+            Assert.That(verdict.Reason, Is.EqualTo(SolvabilityReason.MultiplierProductBeyondCap));
+        }
+
+        [Test]
         public void APresetWithNoFiledRecipeIsAnArgumentErrorRatherThanAGuess()
         {
             var unknown = new MazePreset("unknown", 5, 3, 1, 2, 0.25, 0, 11, 1, 0);
