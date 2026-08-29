@@ -166,7 +166,7 @@ namespace Game.Interaction
             }
 
             Project();
-            var aimed = TapAim.Of(candidates, finger, reach);
+            var aimed = TapAim.Of(candidates, finger, reach, Preview.NodeId);
 
             if (aimed == Preview.NodeId)
             {

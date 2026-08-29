@@ -29,6 +29,12 @@ namespace Game.EditorTooling
 
         const string PortraitPath = "dev/scratch/t-32-player-tier-";
 
+        const string SilhouettePath = "dev/scratch/t-132-player-silhouette-";
+
+        const float ShapeStep = 0.04f;
+
+        const float ShapeSpread = 0.15f;
+
         static readonly int[] Climb = { 9, 40, 140, 420 };
 
         static readonly PartStyle[] StillPrimitive =
@@ -43,6 +49,7 @@ namespace Game.EditorTooling
             for (var tier = 0; tier < PlayerTier.Count; tier++)
             {
                 Wipe(PortraitPath + tier + ".png");
+                Wipe(SilhouettePath + tier + ".png");
             }
 
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -93,13 +100,15 @@ namespace Game.EditorTooling
             failures += EverythingElseStillFallsBack(root, graph, report);
             failures += LooksUpEachMeshOnce(report);
 
-            Portrait(rig, lens, player, pack, power.Look.Tier);
+            Portrait(rig, lens, root, player, pack, power.Look.Tier);
 
             report.Append("\n  tier climb:").Append(Row(power, player, enemies, pack));
             var heights = new List<float> { Standing(player, pack) };
             var hides = new List<float> { Hiding(player, pack) };
             var tints = new List<Color> { Painted(player) };
             var overrides = new List<int> { Overrides(player) };
+            var states = new List<Kitted> { Kit(player) };
+            var opening = power.Power;
 
             foreach (var target in Climb)
             {
@@ -109,11 +118,15 @@ namespace Game.EditorTooling
                 hides.Add(Hiding(player, pack));
                 tints.Add(Painted(player));
                 overrides.Add(Overrides(player));
-                Portrait(rig, lens, player, pack, power.Look.Tier);
+                states.Add(Kit(player));
+                Portrait(rig, lens, root, player, pack, power.Look.Tier);
             }
 
             failures += TheTierStillReads(worn, heights, hides, tints, report);
             failures += TheMeshKeepsItsPackTexture(player, tints, overrides, report);
+            failures += EachTierWearsAKitOfItsOwn(states, report);
+            failures += TheSilhouetteChangesShapeAndNotOnlySize(states, report);
+            failures += ThePropsComeOffTheWayTheyWentOn(power, player, opening, report);
 
             Application.logMessageReceived -= watcher;
 
@@ -125,6 +138,8 @@ namespace Game.EditorTooling
                 warnings.Count == 0
                     ? "the model cache logged no fallback"
                     : string.Join(" | ", warnings.ToArray()));
+
+            failures += NoPropOutlivesTheLevelItWasPlantedIn(root, report);
 
             report.Append("\n  t-32: ")
                 .Append(failures == 0
@@ -139,7 +154,6 @@ namespace Game.EditorTooling
                     "The player tier check failed " + failures + " assertions. Read the report above.");
             }
 
-            WorldObjects.Destroy(root);
             builder.Dispose();
         }
 
@@ -688,8 +702,433 @@ namespace Game.EditorTooling
             return failures;
         }
 
+        struct Kitted
+        {
+            public PlayerWeapon Weapon;
+
+            public bool Cloak;
+
+            public int Trophies;
+
+            public int Props;
+
+            public int Dressed;
+
+            public float Height;
+
+            public float Breadth;
+
+            public float Aspect
+            {
+                get { return Height <= 0f ? 0f : Breadth / Height; }
+            }
+
+            public override string ToString()
+            {
+                return string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0}{1} over {2} trophies in {3} objects, {4:0.####} by {5:0.####} at aspect {6:0.####}",
+                    Weapon,
+                    Cloak ? " cloaked" : " uncloaked",
+                    Trophies,
+                    Props,
+                    Breadth,
+                    Height,
+                    Aspect);
+            }
+        }
+
+        static Kitted Kit(PlayerFigure player)
+        {
+            var kit = new Kitted();
+
+            if (player == null)
+            {
+                return kit;
+            }
+
+            kit.Weapon = player.Gripping;
+            kit.Cloak = player.IsCloaked;
+            kit.Trophies = player.Carrying;
+            kit.Props = Planted(player);
+            kit.Dressed = Wearing(player);
+
+            var box = Silhouette(player);
+            kit.Height = box.size.y;
+            kit.Breadth = Math.Max(box.size.x, box.size.z);
+
+            return kit;
+        }
+
+        static Bounds Silhouette(PlayerFigure player)
+        {
+            var box = new Bounds();
+            var first = true;
+
+            foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
+            {
+                if (first)
+                {
+                    box = renderer.bounds;
+                    first = false;
+                }
+                else
+                {
+                    box.Encapsulate(renderer.bounds);
+                }
+            }
+
+            return box;
+        }
+
+        static int Planted(PlayerFigure player)
+        {
+            var found = 0;
+
+            foreach (var node in player.GetComponentsInChildren<Transform>(true))
+            {
+                if (PartNames.IsWorn(node.name))
+                {
+                    found++;
+                }
+            }
+
+            return found;
+        }
+
+        static int Wearing(PlayerFigure player)
+        {
+            var found = 0;
+
+            foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
+            {
+                if (Dressed(renderer))
+                {
+                    found++;
+                }
+            }
+
+            return found;
+        }
+
+        static int WantedProps(int tier)
+        {
+            var wanted = PlayerLook.Of(PowerAt(tier)).Trophies;
+            var weapon = PlayerKit.WeaponOf(tier);
+
+            if (weapon != PlayerWeapon.None)
+            {
+                wanted += 1 + PlayerKit.LimbsOf(weapon).Count;
+            }
+
+            if (PlayerKit.CloakedAt(tier))
+            {
+                wanted += 1 + PlayerKit.CloakLimbs.Count;
+            }
+
+            return wanted;
+        }
+
+        static int PowerAt(int tier)
+        {
+            return tier == 0 ? 1 : PlayerTier.Thresholds[tier - 1];
+        }
+
+        static int EachTierWearsAKitOfItsOwn(IReadOnlyList<Kitted> states, StringBuilder report)
+        {
+            var failures = 0;
+            var matched = 0;
+            var strayed = new List<string>();
+
+            report.Append("\n  kits:");
+
+            for (var tier = 0; tier < states.Count; tier++)
+            {
+                report.Append("\n    tier ").Append(tier).Append(": ").Append(states[tier].ToString());
+            }
+
+            for (var tier = 0; tier < states.Count; tier++)
+            {
+                var wanted = PlayerKit.WeaponOf(tier);
+                var cloaked = PlayerKit.CloakedAt(tier);
+                var props = WantedProps(tier);
+
+                if (states[tier].Weapon == wanted
+                    && states[tier].Cloak == cloaked
+                    && states[tier].Props == props)
+                {
+                    matched++;
+                }
+                else
+                {
+                    strayed.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} wears {1} against the {2}{3} in {4} objects the kit calls for",
+                        tier,
+                        states[tier],
+                        wanted,
+                        cloaked ? " cloaked" : " uncloaked",
+                        props));
+                }
+            }
+
+            failures += Assert(
+                report,
+                states.Count == PlayerTier.Count && matched == states.Count,
+                "every tier the climb crosses into wears exactly the weapon, cloak and trophies its "
+                + "threshold dresses it in, in exactly that many objects and no spares",
+                matched + " of " + states.Count + " do"
+                + (strayed.Count == 0 ? "" : "; " + string.Join("; ", strayed.ToArray())));
+
+            var distinct = 0;
+            var twinned = new List<string>();
+
+            for (var tier = 0; tier < states.Count; tier++)
+            {
+                var same = false;
+
+                for (var other = 0; other < tier; other++)
+                {
+                    if (states[other].Weapon == states[tier].Weapon
+                        && states[other].Cloak == states[tier].Cloak
+                        && states[other].Trophies == states[tier].Trophies)
+                    {
+                        same = true;
+                        twinned.Add("tier " + tier + " reads as tier " + other);
+                    }
+                }
+
+                if (!same)
+                {
+                    distinct++;
+                }
+            }
+
+            failures += Assert(
+                report,
+                distinct >= 4 && distinct == states.Count,
+                "the climb passes through at least four states no two of which carry the same weapon, "
+                + "cloak and trophy count",
+                distinct + " of " + states.Count + " are their own"
+                + (twinned.Count == 0 ? "" : "; " + string.Join("; ", twinned.ToArray())));
+
+            var held = 0;
+            var carried = new List<PlayerWeapon>();
+
+            for (var tier = 0; tier < states.Count; tier++)
+            {
+                if (states[tier].Weapon != PlayerWeapon.None && !carried.Contains(states[tier].Weapon))
+                {
+                    carried.Add(states[tier].Weapon);
+                    held++;
+                }
+            }
+
+            failures += Assert(
+                report,
+                held >= 3 && held <= 4,
+                "the climb swaps between three or four weapon props rather than growing one",
+                held + " weapons: " + string.Join(", ", Named(carried)));
+
+            var steady = 0;
+
+            for (var tier = 1; tier < states.Count; tier++)
+            {
+                if (states[tier].Dressed == states[0].Dressed)
+                {
+                    steady++;
+                }
+            }
+
+            failures += Assert(
+                report,
+                states.Count > 1 && steady == states.Count - 1 && states[0].Dressed > 0,
+                "swapping a prop adds no renderer to the body itself, so the count of meshes wearing the "
+                + "pack material is the same at every tier and nothing is layered over the figure",
+                steady + " of " + (states.Count - 1) + " tiers keep the opening " + states[0].Dressed);
+
+            return failures;
+        }
+
+        static int TheSilhouetteChangesShapeAndNotOnlySize(
+            IReadOnlyList<Kitted> states, StringBuilder report)
+        {
+            var failures = 0;
+            var reshaped = 0;
+            var flat = new List<string>();
+
+            for (var tier = 1; tier < states.Count; tier++)
+            {
+                var change = Math.Abs(states[tier].Aspect - states[tier - 1].Aspect);
+
+                if (change > ShapeStep)
+                {
+                    reshaped++;
+                }
+                else
+                {
+                    flat.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} reads {1:0.####} against the {2:0.####} of tier {3}",
+                        tier,
+                        states[tier].Aspect,
+                        states[tier - 1].Aspect,
+                        tier - 1));
+                }
+            }
+
+            failures += Assert(
+                report,
+                states.Count > 1 && reshaped == states.Count - 1,
+                "every promotion changes the outline's proportions by more than "
+                + ShapeStep.ToString("0.##", CultureInfo.InvariantCulture)
+                + ", so a tier is not just a scaled copy of the one below it, which uniform growth alone "
+                + "would leave it as",
+                reshaped + " of " + (states.Count - 1) + " promotions do"
+                + (flat.Count == 0 ? "" : "; " + string.Join("; ", flat.ToArray())));
+
+            var widest = 0f;
+            var apart = "nothing to compare";
+
+            for (var tier = 0; tier < states.Count; tier++)
+            {
+                for (var other = 0; other < tier; other++)
+                {
+                    var gap = Math.Abs(states[tier].Aspect - states[other].Aspect);
+
+                    if (gap > widest)
+                    {
+                        widest = gap;
+                        apart = string.Format(
+                            CultureInfo.InvariantCulture,
+                            "tier {0} at {1:0.####} against tier {2} at {3:0.####}",
+                            tier,
+                            states[tier].Aspect,
+                            other,
+                            states[other].Aspect);
+                    }
+                }
+            }
+
+            failures += Assert(
+                report,
+                widest > ShapeSpread,
+                "two of the states stand apart in outline proportion by more than "
+                + ShapeSpread.ToString("0.##", CultureInfo.InvariantCulture)
+                + ", which is the silhouette reading the badges cannot supply",
+                string.Format(CultureInfo.InvariantCulture, "{0:0.####} apart at their widest, {1}", widest, apart));
+
+            var grew = 0;
+
+            for (var tier = 1; tier < states.Count; tier++)
+            {
+                if (states[tier].Height > states[tier - 1].Height)
+                {
+                    grew++;
+                }
+            }
+
+            failures += Assert(
+                report,
+                states.Count > 1 && grew == states.Count - 1,
+                "the whole silhouette, props included, still stands taller at every tier than at the one "
+                + "below it",
+                grew + " of " + (states.Count - 1) + " do");
+
+            return failures;
+        }
+
+        static int ThePropsComeOffTheWayTheyWentOn(
+            PowerBadge power, PlayerFigure player, int opening, StringBuilder report)
+        {
+            if (player == null)
+            {
+                return Assert(report, false, "the props come off again", "there is no figure to strip");
+            }
+
+            var top = Kit(player);
+            PowerPump.Settle(power, opening);
+            var back = Kit(player);
+            PowerPump.Settle(power, Climb[Climb.Length - 1]);
+            var again = Kit(player);
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                back.Weapon == PlayerKit.WeaponOf(0)
+                && back.Cloak == PlayerKit.CloakedAt(0)
+                && back.Props == WantedProps(0),
+                "falling back to the opening power destroys every prop the climb planted rather than "
+                + "leaving them hanging on the figure",
+                "it reads " + back + " against the " + WantedProps(0) + " objects tier 0 wants");
+
+            failures += Assert(
+                report,
+                again.Weapon == top.Weapon && again.Cloak == top.Cloak && again.Props == top.Props,
+                "climbing the same tier a second time plants the same props again rather than doubling "
+                + "them up",
+                "it reads " + again + " against the opening climb's " + top);
+
+            return failures;
+        }
+
+        static int NoPropOutlivesTheLevelItWasPlantedIn(GameObject root, StringBuilder report)
+        {
+            var standing = 0;
+
+            foreach (var node in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (PartNames.IsWorn(node.name))
+                {
+                    standing++;
+                }
+            }
+
+            WorldObjects.Destroy(root);
+
+            var left = new List<string>();
+
+            foreach (var survivor in UnityEngine.SceneManagement.SceneManager
+                .GetActiveScene().GetRootGameObjects())
+            {
+                foreach (var node in survivor.GetComponentsInChildren<Transform>(true))
+                {
+                    if (PartNames.IsWorn(node.name) && left.Count < 8)
+                    {
+                        left.Add(node.name + " under " + survivor.name);
+                    }
+                }
+            }
+
+            return Assert(
+                report,
+                standing > 0 && left.Count == 0,
+                "tearing the level down takes every prop with it, so nothing the climb planted survives "
+                + "into the level that replaces it",
+                standing + " props stood in the level and " + left.Count + " outlived it"
+                + (left.Count == 0 ? "" : ": " + string.Join(", ", left.ToArray())));
+        }
+
+        static string[] Named(IReadOnlyList<PlayerWeapon> weapons)
+        {
+            var named = new string[weapons.Count];
+
+            for (var slot = 0; slot < weapons.Count; slot++)
+            {
+                named[slot] = weapons[slot].ToString();
+            }
+
+            return named;
+        }
+
         static void Portrait(
-            CameraRig rig, Camera lens, PlayerFigure player, ICollection<Mesh> pack, int tier)
+            CameraRig rig,
+            Camera lens,
+            GameObject root,
+            PlayerFigure player,
+            ICollection<Mesh> pack,
+            int tier)
         {
             if (player == null)
             {
@@ -702,6 +1141,40 @@ namespace Game.EditorTooling
             rig.Hold(new CameraFraming(
                 new WorldPoint(ground.X, ground.Y + size * 0.25f, ground.Z), size));
             PreviewFilm.Shoot(lens, PortraitPath + tier + ".png");
+
+            var badges = Badges(root);
+
+            foreach (var group in badges)
+            {
+                group.SetActive(false);
+            }
+
+            PreviewFilm.Shoot(lens, SilhouettePath + tier + ".png");
+
+            foreach (var group in badges)
+            {
+                group.SetActive(true);
+            }
+        }
+
+        static List<GameObject> Badges(GameObject root)
+        {
+            var groups = new List<GameObject>();
+
+            if (root == null)
+            {
+                return groups;
+            }
+
+            foreach (var node in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (node.name == PartNames.BadgesGroup && node.gameObject.activeSelf)
+                {
+                    groups.Add(node.gameObject);
+                }
+            }
+
+            return groups;
         }
 
         static float Standing(PlayerFigure player, ICollection<Mesh> pack)
@@ -784,6 +1257,18 @@ namespace Game.EditorTooling
                 + "they have always worn, because a primitive carries no texture for a tint to hide",
                 tinted + " of " + carried + " are, against the " + wanted + " the top tier carries");
 
+            int washed;
+            int textured;
+            var props = Kitting(player, out washed, out textured);
+
+            failures += Assert(
+                report,
+                props > 0 && washed == props && textured == 0,
+                "the weapon and cloak the top tier wears are washed primitives of their own, carrying no "
+                + "texture the wash could be hiding, so the progression is a prop and never a layer of "
+                + "colour over the body",
+                washed + " of " + props + " prop meshes are washed and " + textured + " carry a texture");
+
             return failures;
         }
 
@@ -793,6 +1278,43 @@ namespace Game.EditorTooling
 
             return material != null
                 && material.name.StartsWith(WorldMaterials.NamePrefix, StringComparison.Ordinal);
+        }
+
+        static int Kitting(PlayerFigure player, out int tinted, out int textured)
+        {
+            tinted = 0;
+            textured = 0;
+
+            if (player == null)
+            {
+                return 0;
+            }
+
+            var found = 0;
+
+            foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
+            {
+                if (Dressed(renderer) || PartNames.IsTrophy(renderer.name) || !PartNames.IsWorn(renderer.name))
+                {
+                    continue;
+                }
+
+                found++;
+
+                if (renderer.HasPropertyBlock())
+                {
+                    tinted++;
+                }
+
+                var material = renderer.sharedMaterial;
+
+                if (material != null && material.HasProperty(BaseMap) && material.GetTexture(BaseMap) != null)
+                {
+                    textured++;
+                }
+            }
+
+            return found;
         }
 
         static int Trophies(PlayerFigure player, out int tinted)
@@ -808,7 +1330,7 @@ namespace Game.EditorTooling
 
             foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
             {
-                if (Dressed(renderer))
+                if (Dressed(renderer) || !PartNames.IsTrophy(renderer.name))
                 {
                     continue;
                 }

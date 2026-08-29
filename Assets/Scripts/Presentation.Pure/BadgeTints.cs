@@ -21,5 +21,26 @@ namespace Game.Presentation.Pure
                     throw new ArgumentOutOfRangeException(nameof(style), style, "No colour for that badge style.");
             }
         }
+
+        public static Tint Washed(BadgeStyle style, MarkLook look)
+        {
+            return Washed(Of(style), look);
+        }
+
+        public static Tint Washed(Tint plain, MarkLook look)
+        {
+            return Tint.Lerp(plain, look.Tint, look.Weight);
+        }
+
+        public static float Chroma(Tint tint)
+        {
+            var high = tint.Red > tint.Green ? tint.Red : tint.Green;
+            high = high > tint.Blue ? high : tint.Blue;
+
+            var low = tint.Red < tint.Green ? tint.Red : tint.Green;
+            low = low < tint.Blue ? low : tint.Blue;
+
+            return high - low;
+        }
     }
 }

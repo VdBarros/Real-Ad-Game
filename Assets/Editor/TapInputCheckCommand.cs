@@ -24,11 +24,17 @@ namespace Game.EditorTooling
 
         const string LossPath = "dev/scratch/t-13-tap-loss.png";
 
+        const string SafeTrailPath = "dev/scratch/t-134-trail-safe.png";
+
+        const string DangerTrailPath = "dev/scratch/t-134-trail-danger.png";
+
         public static void Check()
         {
             Wipe(IdlePath);
             Wipe(WinPath);
             Wipe(LossPath);
+            Wipe(SafeTrailPath);
+            Wipe(DangerTrailPath);
 
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -162,7 +168,11 @@ namespace Game.EditorTooling
             }
 
             report.Append(PanHeldAndGivenBack(input, rig, state));
-            report.Append(ReachesTheWalkerMidJourney(rig, builder, input, opening));
+
+            input.Show(opening);
+            var walker = Walker.Raise(rig, builder, input, opening);
+            report.Append(ReachesTheWalkerMidJourney(walker, rig, builder, input, opening));
+            report.Append(TrailPreviewedOnAim(walker, rig, builder, input, lens, opening));
 
             report.Append("\n  ")
                 .Append(previewed.ToString(CultureInfo.InvariantCulture))
@@ -234,11 +244,11 @@ namespace Game.EditorTooling
         }
 
         static string ReachesTheWalkerMidJourney(
-            CameraRig rig, WorldBuilder builder, TapInput input, RunState opening)
+            Walker walker, CameraRig rig, WorldBuilder builder, TapInput input, RunState opening)
         {
+            walker.Begin(rig, builder, input, opening);
             input.Show(opening);
 
-            var walker = Walker.Raise(rig, builder, input, opening);
             var committed = new List<int>();
             Action<TargetPreview> note = preview => committed.Add(preview.NodeId);
             input.Tapped += note;
@@ -344,6 +354,381 @@ namespace Game.EditorTooling
                 first,
                 walker.Run.PositionNodeId,
                 walker.Run.Power);
+        }
+
+        static string TrailPreviewedOnAim(
+            Walker walker,
+            CameraRig rig,
+            WorldBuilder builder,
+            TapInput input,
+            Camera lens,
+            RunState opening)
+        {
+            walker.Begin(rig, builder, input, opening);
+            input.Show(opening);
+            builder.Floor.Show(opening);
+            Settle(builder.Floor);
+            Rest(rig);
+
+            var trail = builder.Trail;
+
+            if (trail.Showing != 0)
+            {
+                Debug.LogError(
+                    "A run nobody has aimed at yet already lights " + trail.Showing + " trail dots.");
+            }
+
+            var safeDots = Tints.Of(Trail.Look(TrailMood.Safe).Tint);
+
+            if (safeDots != WorldPalette.Of(PartStyle.Trail))
+            {
+                Debug.LogError(
+                    "A safe preview paints its dots " + safeDots + " where the trail material is "
+                    + WorldPalette.Of(PartStyle.Trail) + ".");
+            }
+
+            var navigation = NavigationMap.Of(opening);
+            var safe = TapAim.Nothing;
+            var dangerous = TapAim.Nothing;
+            var safeRank = 0;
+            var dangerRank = 0;
+
+            foreach (var candidate in input.Candidates())
+            {
+                var preview = TargetPreview.Of(navigation, candidate.NodeId);
+
+                if (!preview.IsLegal || preview.Route.Count < 2)
+                {
+                    continue;
+                }
+
+                if (!preview.IsDangerous)
+                {
+                    if (preview.Route.Count > safeRank)
+                    {
+                        safe = candidate.NodeId;
+                        safeRank = preview.Route.Count;
+                    }
+
+                    continue;
+                }
+
+                var rank = preview.Route.Count
+                    + (preview.BlockedByNodeId == candidate.NodeId ? 0 : 100);
+
+                if (rank > dangerRank)
+                {
+                    dangerous = candidate.NodeId;
+                    dangerRank = rank;
+                }
+            }
+
+            if (safe == TapAim.Nothing || dangerous == TapAim.Nothing)
+            {
+                Debug.LogError(
+                    "The check needs one safe and one dangerous route to tell apart, and found node "
+                    + safe + " and node " + dangerous + ".");
+                return "\n  no pair of a safe and a dangerous route was there to tell apart";
+            }
+
+            var blocked = TargetPreview.Of(navigation, dangerous);
+
+            if (blocked.BlockedByNodeId == dangerous)
+            {
+                Debug.LogWarning(
+                    "The deadliest route on this seed is blocked by the node the finger is on, so the "
+                    + "photographs do not separate the corridor from the destination.");
+            }
+
+            var safely = Sketched(input, rig, builder, lens, opening, safe, TrailMood.Safe, SafeTrailPath);
+            var deadly = Sketched(
+                input, rig, builder, lens, opening, dangerous, TrailMood.Dangerous, DangerTrailPath);
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "\n  {0}\n  {1}, blocked by node {2} with {3} fights counted on the way\n  {4}\n  {5}",
+                safely,
+                deadly,
+                blocked.BlockedByNodeId,
+                blocked.FightsOnTheWay,
+                SweptWithoutThrashing(input, opening),
+                ConsumedOnCommit(walker, rig, builder, input, opening, safe));
+        }
+
+        static string Sketched(
+            TapInput input,
+            CameraRig rig,
+            WorldBuilder builder,
+            Camera lens,
+            RunState state,
+            int nodeId,
+            TrailMood mood,
+            string path)
+        {
+            var trail = builder.Trail;
+
+            input.AimAt(FingerOn(input, state, nodeId));
+
+            var preview = input.Preview;
+
+            if (preview.NodeId != nodeId)
+            {
+                Debug.LogError("A finger on node " + nodeId + " aimed at " + preview.NodeId + " instead.");
+            }
+
+            var expected = Trail.Along(TileRoute.Of(state.Level, preview.Route)).Count;
+
+            if (expected == 0 || trail.Showing != expected)
+            {
+                Debug.LogError(
+                    "Aiming node " + nodeId + " lit " + trail.Showing + " trail dots where its route is "
+                    + expected + " dots long.");
+            }
+
+            if (!trail.IsPreviewing)
+            {
+                Debug.LogError(
+                    "The trail drawn on the aim at node " + nodeId + " does not read as a preview.");
+            }
+
+            if (trail.Mood != mood)
+            {
+                Debug.LogError(
+                    "The route to node " + nodeId + " is drawn " + trail.Mood + " where it is " + mood + ".");
+            }
+
+            rig.CutTo(state.Level.Decisions.Node(preview.Route[preview.Route.Count / 2]).Position);
+            PreviewFilm.Shoot(lens, path);
+            rig.Release();
+            Rest(rig);
+
+            input.Cancel();
+
+            if (trail.Showing != 0)
+            {
+                Debug.LogError(
+                    "Cancelling the aim on node " + nodeId + " left " + trail.Showing + " trail dots lit.");
+            }
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "aiming node {0} drew {1} {2} dots of {3} on the floor and cancelling put them away",
+                nodeId,
+                expected,
+                mood,
+                Tints.Of(Trail.Look(mood).Tint));
+        }
+
+        static string SweptWithoutThrashing(TapInput input, RunState state)
+        {
+            var candidates = input.Candidates();
+            var from = default(TapCandidate);
+            var to = default(TapCandidate);
+            var bridged = false;
+            var widest = 0f;
+            var nearest = float.MaxValue;
+
+            for (var index = 0; index < candidates.Count; index++)
+            {
+                for (var other = index + 1; other < candidates.Count; other++)
+                {
+                    var apart = ScreenPoint.Distance(candidates[index].Point, candidates[other].Point);
+
+                    if (apart > 2f * input.Reach && apart <= (1f + TapAim.Hold) * input.Reach)
+                    {
+                        if (apart <= widest)
+                        {
+                            continue;
+                        }
+
+                        bridged = true;
+                        widest = apart;
+                    }
+                    else
+                    {
+                        if (bridged || apart >= nearest)
+                        {
+                            continue;
+                        }
+
+                        nearest = apart;
+                    }
+
+                    from = candidates[index];
+                    to = candidates[other];
+                }
+            }
+
+            if (!bridged && nearest == float.MaxValue)
+            {
+                Debug.LogError("The check needs two targets to sweep the aim between, and found fewer.");
+                return "no pair of targets was there to sweep the aim between";
+            }
+
+            const int Samples = 80;
+            var swept = new List<int>();
+
+            for (var sample = 0; sample <= Samples; sample++)
+            {
+                var along = (float)sample / Samples;
+
+                input.AimAt(new ScreenPoint(
+                    from.Point.X + (to.Point.X - from.Point.X) * along,
+                    from.Point.Y + (to.Point.Y - from.Point.Y) * along));
+
+                swept.Add(input.Preview.NodeId);
+            }
+
+            input.Cancel();
+
+            var visited = new List<int>();
+            var settled = 0;
+
+            for (var sample = 0; sample < swept.Count; sample++)
+            {
+                if (swept[sample] == TapAim.Nothing)
+                {
+                    Debug.LogError(
+                        "Sweeping the aim from node " + from.NodeId + " to node " + to.NodeId
+                        + " let go of everything at sample " + sample
+                        + ", so the preview blinked out between two targets.");
+                    break;
+                }
+
+                if (sample != 0 && swept[sample] == swept[sample - 1])
+                {
+                    continue;
+                }
+
+                if (visited.Contains(swept[sample]))
+                {
+                    Debug.LogError(
+                        "Sweeping the aim came back to node " + swept[sample] + " at sample " + sample
+                        + " after having left it, so the preview thrashed between two targets.");
+                    break;
+                }
+
+                visited.Add(swept[sample]);
+                settled++;
+            }
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "an aim swept in {0} steps across the {1:0.#} px between nodes {2} and {3}, {4} the "
+                + "{5:0.#} px reach, settled on {6} routes in turn without ever blinking out",
+                Samples,
+                ScreenPoint.Distance(from.Point, to.Point),
+                from.NodeId,
+                to.NodeId,
+                bridged ? "wider than twice" : "within twice",
+                input.Reach,
+                settled);
+        }
+
+        static string ConsumedOnCommit(
+            Walker walker,
+            CameraRig rig,
+            WorldBuilder builder,
+            TapInput input,
+            RunState opening,
+            int nodeId)
+        {
+            walker.Begin(rig, builder, input, opening);
+            input.Show(opening);
+            builder.Floor.Show(opening);
+
+            var trail = builder.Trail;
+            var finger = FingerOn(input, opening, nodeId);
+
+            input.Reading(pressedNow: true, releasedNow: false, isPressed: true, hovers: false, finger: finger);
+
+            var aimed = trail.Showing;
+
+            if (aimed == 0 || !trail.IsPreviewing)
+            {
+                Debug.LogError(
+                    "A press on node " + nodeId + " drew " + aimed
+                    + " dots before the commit, and the choice was made blind.");
+            }
+
+            input.Reading(pressedNow: false, releasedNow: true, isPressed: false, hovers: false, finger: finger);
+
+            if (!walker.IsWalking)
+            {
+                Debug.LogError("Letting go on node " + nodeId + " started no walk.");
+                return "letting go on node " + nodeId + " started no walk";
+            }
+
+            if (trail.IsPreviewing)
+            {
+                Debug.LogError("The trail a commit walks along still reads as a preview.");
+            }
+
+            var committed = trail.Showing;
+
+            if (committed == 0)
+            {
+                Debug.LogError("Committing node " + nodeId + " left no trail to walk along.");
+            }
+
+            var lit = committed;
+            var spent = 0;
+            var frames = 0;
+
+            while (walker.IsWalking && frames < 4000)
+            {
+                Step(rig, builder, walker);
+                frames++;
+
+                if (trail.Showing > lit)
+                {
+                    Debug.LogError(
+                        "The trail grew from " + lit + " to " + trail.Showing + " dots on frame " + frames
+                        + " of a walk that should only ever spend them.");
+                    break;
+                }
+
+                if (walker.IsWalking && trail.Showing < lit)
+                {
+                    spent++;
+                }
+
+                lit = trail.Showing;
+            }
+
+            if (walker.IsWalking)
+            {
+                Debug.LogError("A committed walk was still running 4000 frames later.");
+            }
+
+            if (trail.Showing != 0)
+            {
+                Debug.LogError("The walk ended with " + trail.Showing + " trail dots still lit.");
+            }
+
+            if (spent == 0)
+            {
+                Debug.LogError(
+                    "The committed trail to node " + nodeId
+                    + " never gave a dot up while the walker was moving along it.");
+            }
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "a press on node {0} drew {1} preview dots, letting go handed the same route to the walker "
+                + "as {2} committed dots, and the walk spent them down to none over {3} frames",
+                nodeId,
+                aimed,
+                committed,
+                frames);
+        }
+
+        static void Rest(CameraRig rig)
+        {
+            for (var frame = 0; frame < 400 && rig.IsBusy; frame++)
+            {
+                rig.Advance(1f / 60f);
+            }
         }
 
         static int Longest(RunState state)
@@ -796,7 +1181,8 @@ namespace Game.EditorTooling
                 return;
             }
 
-            var washed = Color.Lerp(BadgePalette.Of(badge.Style), Tints.Of(look.Tint), look.Weight);
+            var washed = Tints.Of(BadgeTints.Washed(badge.Style, look));
+            washed.a = look.Opacity;
 
             if (badge.Colour != washed)
             {

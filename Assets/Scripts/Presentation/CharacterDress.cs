@@ -25,7 +25,12 @@ namespace Game.Presentation
 
                 for (var slot = 0; slot < node.childCount; slot++)
                 {
-                    carried.Add(node.GetChild(slot).gameObject);
+                    var accessory = node.GetChild(slot).gameObject;
+
+                    if (!PartNames.IsWorn(accessory.name))
+                    {
+                        carried.Add(accessory);
+                    }
                 }
             }
 
@@ -36,6 +41,24 @@ namespace Game.Presentation
             }
 
             return carried.Count;
+        }
+
+        public static Transform Hand(GameObject instance)
+        {
+            if (instance == null)
+            {
+                return null;
+            }
+
+            foreach (var node in instance.GetComponentsInChildren<Transform>(true))
+            {
+                if (node.name.StartsWith(ArtPacks.CastSlotNode, StringComparison.Ordinal))
+                {
+                    return node;
+                }
+            }
+
+            return null;
         }
     }
 }
