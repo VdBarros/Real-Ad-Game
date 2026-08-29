@@ -78,9 +78,13 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AnEmptyHandCarriesNoLimbsAndEveryWeaponCarriesSome()
+        public void AnEmptyHandHangsNoMeshAndEveryWeaponNamesOneTheAdventurersPackShips()
         {
-            Assert.That(PlayerKit.LimbsOf(PlayerWeapon.None).Count, Is.EqualTo(0));
+            Assert.That(
+                () => PlayerKit.ModelOf(PlayerWeapon.None),
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
+
+            var mounted = new List<PartModel>();
 
             foreach (PlayerWeapon weapon in Enum.GetValues(typeof(PlayerWeapon)))
             {
@@ -89,32 +93,66 @@ namespace Game.Domain.Tests
                     continue;
                 }
 
-                Assert.That(PlayerKit.LimbsOf(weapon).Count, Is.GreaterThan(0));
+                var model = PlayerKit.ModelOf(weapon);
+
+                Assert.That(AdventurerPack.Wields(model), Is.True, weapon.ToString());
+                Assert.That(ArtPacks.Of(model), Is.EqualTo(ArtPack.Adventurers), weapon.ToString());
+                Assert.That(mounted, Has.No.Member(model));
+                mounted.Add(model);
             }
         }
 
         [Test]
-        public void NoTwoWeaponsShareBothTheirReachAndTheirBreadth()
+        public void NoWeaponHangsTheMeshTheBodyItselfIsCutFrom()
         {
-            var tips = new List<float>();
-            var breadths = new List<float>();
+            var body = CharacterCast.MeshOf(PartStyle.Start);
+
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            {
+                Assert.That(PlayerKit.ModelOf(PlayerKit.WeaponOf(tier)), Is.Not.EqualTo(body));
+            }
+
+            Assert.That(AdventurerPack.Wields(body), Is.False);
+            Assert.That(AdventurerPack.Carries(body), Is.True);
+        }
+
+        [Test]
+        public void EveryWeaponIsABiggerObjectThanTheOneTheTierBelowSwung()
+        {
+            Assert.That(PlayerKit.ReachOf(PlayerWeapon.None), Is.EqualTo(0f));
+
+            var smallest = PlayerKit.ReachOf(PlayerKit.WeaponOf(1));
+            var reached = 0f;
 
             for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
                 var weapon = PlayerKit.WeaponOf(tier);
-                var tip = PlayerKit.TipOf(weapon);
-                var breadth = PlayerKit.BreadthOf(weapon);
+                var reach = PlayerKit.ReachOf(weapon);
 
-                for (var other = 0; other < tips.Count; other++)
-                {
-                    Assert.That(
-                        Math.Abs(tips[other] - tip) > 0.1f || Math.Abs(breadths[other] - breadth) > 0.1f,
-                        Is.True,
-                        weapon + " reads the same as the weapon of tier " + (other + 1));
-                }
+                Assert.That(reach, Is.GreaterThan(reached), weapon.ToString());
+                reached = reach;
+            }
 
-                tips.Add(tip);
-                breadths.Add(breadth);
+            Assert.That(reached, Is.GreaterThan(smallest * 4f / 3f));
+        }
+
+        [Test]
+        public void EveryWeaponIsMeasuredOffItsOwnPackFootprintRatherThanAShapeTheKitInvented()
+        {
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            {
+                var weapon = PlayerKit.WeaponOf(tier);
+                var model = PlayerKit.ModelOf(weapon);
+                var width = AdventurerPack.PackWidthOf(model);
+                var height = AdventurerPack.PackHeightOf(model);
+                var depth = AdventurerPack.PackDepthOf(model);
+
+                Assert.That(
+                    PlayerKit.ReachOf(weapon),
+                    Is.EqualTo(AdventurerPack.StandingPerPackUnit
+                        * (float)Math.Sqrt(width * width + height * height + depth * depth))
+                        .Within(1e-5f),
+                    weapon.ToString());
             }
         }
 
@@ -131,18 +169,13 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EveryWeaponReachesFurtherAboveTheHeadThanTheOneTheTierBelowSwungIt()
+        public void NoWeaponTipsHigherThanTheHeadThePackHangsItBeside()
         {
             var standing = FigureFit.StandingScalesOf(PartModel.Knight);
-            var reached = PlayerKit.GripHeight;
 
             for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
-                var tip = PlayerKit.TipOf(PlayerKit.WeaponOf(tier));
-
-                Assert.That(tip, Is.GreaterThan(reached));
-                Assert.That(tip, Is.GreaterThan(standing));
-                reached = tip;
+                Assert.That(PlayerKit.TipOf(PlayerKit.WeaponOf(tier)), Is.LessThan(standing));
             }
         }
 
@@ -151,61 +184,34 @@ namespace Game.Domain.Tests
         {
             var standing = FigureFit.StandingScalesOf(PartModel.Knight);
 
-            Assert.That(PlayerKit.GripHeight, Is.GreaterThan(standing * 0.4f));
-            Assert.That(PlayerKit.GripHeight, Is.LessThan(standing * 0.8f));
+            Assert.That(PlayerKit.GripHeight, Is.GreaterThan(standing / 3f));
+            Assert.That(PlayerKit.GripHeight, Is.LessThan(standing * 0.5f));
         }
 
         [Test]
-        public void TheCloakHangsBehindTheBodyRatherThanThroughIt()
+        public void TheCloakIsTheClothThePackAlreadyBoltsToTheBodyItDressses()
         {
-            var limbs = PlayerKit.CloakLimbs;
+            Assert.That(PlayerKit.CloakNode, Is.EqualTo(AdventurerPack.CloakNode));
+            Assert.That(PlayerKit.CloakNode, Is.Not.Empty);
+            Assert.That(PlayerKit.CloakNode, Does.StartWith(PartModel.Knight.ToString()));
+            Assert.That(PlayerKit.CloakNode, Is.Not.EqualTo(AdventurerPack.SlotNode));
+        }
 
-            Assert.That(limbs.Count, Is.GreaterThan(0));
+        [Test]
+        public void EveryWeaponSpansAWidthOfItsOwnAndNoneOfThemSpansNothing()
+        {
+            Assert.That(PlayerKit.BreadthOf(PlayerWeapon.None), Is.EqualTo(0f));
 
-            for (var limb = 0; limb < limbs.Count; limb++)
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
-                Assert.That(limbs[limb].Offset.Z, Is.LessThan(0f));
-                Assert.That(limbs[limb].Foot, Is.GreaterThan(0f));
-                Assert.That(limbs[limb].Top, Is.LessThan(FigureFit.StandingScalesOf(PartModel.Knight)));
-            }
-        }
-
-        [Test]
-        public void ARotatedLimbMeasuresTheBoxItActuallyOccupiesRatherThanTheOneItWasCutFrom()
-        {
-            var upright = new PropLimb(
-                new WorldPoint(0.2f, 2f, 0.2f), new WorldPoint(0f, 1f, 0f), new WorldPoint(0f, 0f, 0f));
-            var flat = new PropLimb(
-                new WorldPoint(0.2f, 2f, 0.2f), new WorldPoint(0f, 1f, 0f), new WorldPoint(0f, 0f, 90f));
-
-            Assert.That(upright.Top, Is.EqualTo(2f).Within(1e-4f));
-            Assert.That(flat.Top, Is.EqualTo(1.1f).Within(1e-4f));
-            Assert.That(flat.Reach, Is.EqualTo(1f).Within(1e-4f));
-        }
-
-        [Test]
-        public void NoLimbOfAnyPropSinksBelowTheGroundItsFigureStandsOn()
-        {
-            foreach (PlayerWeapon weapon in Enum.GetValues(typeof(PlayerWeapon)))
-            {
-                var limbs = PlayerKit.LimbsOf(weapon);
-
-                for (var limb = 0; limb < limbs.Count; limb++)
-                {
-                    Assert.That(
-                        PlayerKit.GripHeight + limbs[limb].Foot,
-                        Is.GreaterThan(0f),
-                        weapon + " limb " + limb + " is planted underground");
-                }
+                Assert.That(PlayerKit.BreadthOf(PlayerKit.WeaponOf(tier)), Is.GreaterThan(0f));
             }
         }
 
         [Test]
         public void EveryPlantedPropIsNamedSoAStripAndALeakScanBothKnowItIsOurs()
         {
-            Assert.That(PartNames.IsWorn(PartNames.Cloak), Is.True);
             Assert.That(PartNames.IsWorn(PartNames.Trophy(0)), Is.True);
-            Assert.That(PartNames.IsWorn(PartNames.Limb(PartNames.Cloak, 0)), Is.True);
 
             var named = new List<string>();
 
@@ -227,10 +233,14 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EveryPropStaysASteelOrClothPrimitiveRatherThanAColourLaidOverTheBody()
+        public void NothingTheTierRampSwapsIsAPrimitiveWithAColourOfItsOwnAnyMore()
         {
-            Assert.That(PlayerKit.Steel, Is.EqualTo(Trophy.Steel));
-            Assert.That(PlayerKit.Cloth, Is.Not.EqualTo(PlayerKit.Steel));
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            {
+                Assert.That(AdventurerPack.Wields(PlayerKit.ModelOf(PlayerKit.WeaponOf(tier))), Is.True);
+            }
+
+            Assert.That(PlayerKit.CloakNode, Does.StartWith(PartModel.Knight.ToString()));
         }
     }
 }

@@ -12,6 +12,8 @@ namespace Game.Presentation.Pure
 
         public const string SlotNode = "handslot";
 
+        public const string CloakNode = "Knight_Cape";
+
         public const float KnightPackHeight = 2.63436f;
 
         public const float KnightPackWidth = 1.94251f;
@@ -19,6 +21,38 @@ namespace Game.Presentation.Pure
         public const float KnightPackDepth = 1.25362f;
 
         public const float KnightPackBase = -0.1678f;
+
+        public const float Sword1HandedPackHeight = 1.77526f;
+
+        public const float Sword1HandedPackWidth = 0.50344f;
+
+        public const float Sword1HandedPackDepth = 0.13063f;
+
+        public const float Sword1HandedPackBase = -0.36577f;
+
+        public const float Axe2HandedPackHeight = 1.72463f;
+
+        public const float Axe2HandedPackWidth = 1.23955f;
+
+        public const float Axe2HandedPackDepth = 0.2618f;
+
+        public const float Axe2HandedPackBase = -0.43298f;
+
+        public const float StaffPackHeight = 2.1547f;
+
+        public const float StaffPackWidth = 0.57621f;
+
+        public const float StaffPackDepth = 0.29235f;
+
+        public const float StaffPackBase = -0.90045f;
+
+        public const float Sword2HandedPackHeight = 2.3658f;
+
+        public const float Sword2HandedPackWidth = 0.83903f;
+
+        public const float Sword2HandedPackDepth = 0.24802f;
+
+        public const float Sword2HandedPackBase = -0.40136f;
 
         public const float StandingPerPackUnit = StandingScales / KnightPackHeight;
 
@@ -29,35 +63,97 @@ namespace Game.Presentation.Pure
 
         public static bool Carries(PartModel model)
         {
-            return model == PartModel.Knight;
+            return model == PartModel.Knight || Wields(model);
+        }
+
+        public static bool Wields(PartModel model)
+        {
+            switch (model)
+            {
+                case PartModel.Sword1Handed:
+                case PartModel.Axe2Handed:
+                case PartModel.Staff:
+                case PartModel.Sword2Handed:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         public static float PackHeightOf(PartModel model)
         {
-            Guard(model);
-
-            return KnightPackHeight;
+            switch (model)
+            {
+                case PartModel.Knight:
+                    return KnightPackHeight;
+                case PartModel.Sword1Handed:
+                    return Sword1HandedPackHeight;
+                case PartModel.Axe2Handed:
+                    return Axe2HandedPackHeight;
+                case PartModel.Staff:
+                    return StaffPackHeight;
+                case PartModel.Sword2Handed:
+                    return Sword2HandedPackHeight;
+                default:
+                    throw Stranger(model);
+            }
         }
 
         public static float PackWidthOf(PartModel model)
         {
-            Guard(model);
-
-            return KnightPackWidth;
+            switch (model)
+            {
+                case PartModel.Knight:
+                    return KnightPackWidth;
+                case PartModel.Sword1Handed:
+                    return Sword1HandedPackWidth;
+                case PartModel.Axe2Handed:
+                    return Axe2HandedPackWidth;
+                case PartModel.Staff:
+                    return StaffPackWidth;
+                case PartModel.Sword2Handed:
+                    return Sword2HandedPackWidth;
+                default:
+                    throw Stranger(model);
+            }
         }
 
         public static float PackDepthOf(PartModel model)
         {
-            Guard(model);
-
-            return KnightPackDepth;
+            switch (model)
+            {
+                case PartModel.Knight:
+                    return KnightPackDepth;
+                case PartModel.Sword1Handed:
+                    return Sword1HandedPackDepth;
+                case PartModel.Axe2Handed:
+                    return Axe2HandedPackDepth;
+                case PartModel.Staff:
+                    return StaffPackDepth;
+                case PartModel.Sword2Handed:
+                    return Sword2HandedPackDepth;
+                default:
+                    throw Stranger(model);
+            }
         }
 
         public static float PackBaseOf(PartModel model)
         {
-            Guard(model);
-
-            return KnightPackBase;
+            switch (model)
+            {
+                case PartModel.Knight:
+                    return KnightPackBase;
+                case PartModel.Sword1Handed:
+                    return Sword1HandedPackBase;
+                case PartModel.Axe2Handed:
+                    return Axe2HandedPackBase;
+                case PartModel.Staff:
+                    return StaffPackBase;
+                case PartModel.Sword2Handed:
+                    return Sword2HandedPackBase;
+                default:
+                    throw Stranger(model);
+            }
         }
 
         public static float HeightOf(PartModel model)
@@ -80,13 +176,10 @@ namespace Game.Presentation.Pure
             return PackBaseOf(model) * ImportScale;
         }
 
-        static void Guard(PartModel model)
+        static ArgumentOutOfRangeException Stranger(PartModel model)
         {
-            if (!Carries(model))
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(model), model, "The adventurers pack carries no mesh for that part model.");
-            }
+            return new ArgumentOutOfRangeException(
+                nameof(model), model, "The adventurers pack carries no mesh for that part model.");
         }
     }
 }

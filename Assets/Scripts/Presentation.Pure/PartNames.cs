@@ -123,8 +123,6 @@ namespace Game.Presentation.Pure
 
         public const string WornPrefix = "Worn_";
 
-        public const string Cloak = WornPrefix + "Cloak";
-
         public const string TrophyPrefix = WornPrefix + "Trophy_";
 
         public static string Trophy(int slot)
@@ -146,11 +144,6 @@ namespace Game.Presentation.Pure
             }
 
             return WornPrefix + weapon;
-        }
-
-        public static string Limb(string prop, int limb)
-        {
-            return prop + "_" + limb.ToString(CultureInfo.InvariantCulture);
         }
 
         public static bool IsWorn(string name)

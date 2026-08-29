@@ -279,6 +279,14 @@ namespace Game.Presentation
                     return "Skeleton_Warrior";
                 case PartModel.SkeletonMage:
                     return "Skeleton_Mage";
+                case PartModel.Sword1Handed:
+                    return "sword_1handed";
+                case PartModel.Axe2Handed:
+                    return "axe_2handed";
+                case PartModel.Staff:
+                    return "staff";
+                case PartModel.Sword2Handed:
+                    return "sword_2handed";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(model), model, "No asset name for that part model.");
             }

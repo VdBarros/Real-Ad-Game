@@ -7,7 +7,23 @@ namespace Game.Presentation.Pure
     {
         public const int CloakFrom = 1;
 
-        public const float GripHeight = 1.08f;
+        public const float GripHeight = 0.63728f;
+
+        readonly struct Wielded
+        {
+            public Wielded(PartModel model, float tip, float breadth)
+            {
+                Model = model;
+                Tip = tip;
+                Breadth = breadth;
+            }
+
+            public PartModel Model { get; }
+
+            public float Tip { get; }
+
+            public float Breadth { get; }
+        }
 
         static readonly PlayerWeapon[] weaponByTier =
         {
@@ -17,78 +33,6 @@ namespace Game.Presentation.Pure
             PlayerWeapon.Spear,
             PlayerWeapon.Greatsword
         };
-
-        static readonly PropLimb[] none = new PropLimb[0];
-
-        static readonly PropLimb[] shortsword =
-        {
-            new PropLimb(
-                new WorldPoint(0.11f, 0.72f, 0.11f),
-                new WorldPoint(0f, 0.40f, 0f),
-                new WorldPoint(0f, 0f, 0f)),
-            new PropLimb(
-                new WorldPoint(0.38f, 0.09f, 0.13f),
-                new WorldPoint(0f, 0.05f, 0f),
-                new WorldPoint(0f, 0f, 0f))
-        };
-
-        static readonly PropLimb[] axe =
-        {
-            new PropLimb(
-                new WorldPoint(0.12f, 1.28f, 0.12f),
-                new WorldPoint(0f, 0.62f, 0f),
-                new WorldPoint(0f, 0f, 0f)),
-            new PropLimb(
-                new WorldPoint(0.52f, 0.46f, 0.16f),
-                new WorldPoint(0.24f, 1.10f, 0f),
-                new WorldPoint(0f, 0f, 0f))
-        };
-
-        static readonly PropLimb[] spear =
-        {
-            new PropLimb(
-                new WorldPoint(0.09f, 1.94f, 0.09f),
-                new WorldPoint(0f, 0.90f, 0f),
-                new WorldPoint(0f, 0f, 0f)),
-            new PropLimb(
-                new WorldPoint(0.20f, 0.34f, 0.20f),
-                new WorldPoint(0f, 1.90f, 0f),
-                new WorldPoint(0f, 45f, 0f))
-        };
-
-        static readonly PropLimb[] greatsword =
-        {
-            new PropLimb(
-                new WorldPoint(0.26f, 2.50f, 0.11f),
-                new WorldPoint(0f, 1.40f, 0f),
-                new WorldPoint(0f, 0f, 0f)),
-            new PropLimb(
-                new WorldPoint(0.86f, 0.15f, 0.17f),
-                new WorldPoint(0f, 0.12f, 0f),
-                new WorldPoint(0f, 0f, 0f))
-        };
-
-        static readonly PropLimb[] cloak =
-        {
-            new PropLimb(
-                new WorldPoint(0.86f, 1.12f, 0.16f),
-                new WorldPoint(0f, 0.62f, -0.34f),
-                new WorldPoint(-8f, 0f, 0f)),
-            new PropLimb(
-                new WorldPoint(1.02f, 0.20f, 0.20f),
-                new WorldPoint(0f, 1.16f, -0.22f),
-                new WorldPoint(0f, 0f, 0f))
-        };
-
-        public static Tint Steel
-        {
-            get { return Trophy.Steel; }
-        }
-
-        public static Tint Cloth
-        {
-            get { return new Tint(0.42f, 0.16f, 0.19f); }
-        }
 
         public static PlayerWeapon WeaponOf(int tier)
         {
@@ -109,61 +53,58 @@ namespace Game.Presentation.Pure
             get { return weaponByTier; }
         }
 
-        public static IReadOnlyList<PropLimb> LimbsOf(PlayerWeapon weapon)
+        public static PartModel ModelOf(PlayerWeapon weapon)
         {
-            switch (weapon)
-            {
-                case PlayerWeapon.None:
-                    return none;
-                case PlayerWeapon.Shortsword:
-                    return shortsword;
-                case PlayerWeapon.Axe:
-                    return axe;
-                case PlayerWeapon.Spear:
-                    return spear;
-                case PlayerWeapon.Greatsword:
-                    return greatsword;
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        nameof(weapon), weapon, "The kit carries no shape for that weapon.");
-            }
+            return Held(weapon).Model;
         }
 
-        public static IReadOnlyList<PropLimb> CloakLimbs
+        public static string CloakNode
         {
-            get { return cloak; }
+            get { return AdventurerPack.CloakNode; }
         }
 
         public static float TipOf(PlayerWeapon weapon)
         {
-            var limbs = LimbsOf(weapon);
-            var top = 0f;
-
-            for (var limb = 0; limb < limbs.Count; limb++)
-            {
-                if (limbs[limb].Top > top)
-                {
-                    top = limbs[limb].Top;
-                }
-            }
-
-            return top == 0f ? 0f : GripHeight + top;
+            return weapon == PlayerWeapon.None ? 0f : Held(weapon).Tip;
         }
 
         public static float BreadthOf(PlayerWeapon weapon)
         {
-            var limbs = LimbsOf(weapon);
-            var widest = 0f;
+            return weapon == PlayerWeapon.None ? 0f : Held(weapon).Breadth;
+        }
 
-            for (var limb = 0; limb < limbs.Count; limb++)
+        public static float ReachOf(PlayerWeapon weapon)
+        {
+            if (weapon == PlayerWeapon.None)
             {
-                if (limbs[limb].Reach > widest)
-                {
-                    widest = limbs[limb].Reach;
-                }
+                return 0f;
             }
 
-            return widest;
+            var model = Held(weapon).Model;
+            var width = AdventurerPack.PackWidthOf(model);
+            var height = AdventurerPack.PackHeightOf(model);
+            var depth = AdventurerPack.PackDepthOf(model);
+
+            return AdventurerPack.StandingPerPackUnit
+                * (float)Math.Sqrt(width * width + height * height + depth * depth);
+        }
+
+        static Wielded Held(PlayerWeapon weapon)
+        {
+            switch (weapon)
+            {
+                case PlayerWeapon.Shortsword:
+                    return new Wielded(PartModel.Sword1Handed, 0.67695f, 0.97863f);
+                case PlayerWeapon.Axe:
+                    return new Wielded(PartModel.Axe2Handed, 0.71678f, 1.27302f);
+                case PlayerWeapon.Spear:
+                    return new Wielded(PartModel.Staff, 0.72606f, 1.17284f);
+                case PlayerWeapon.Greatsword:
+                    return new Wielded(PartModel.Sword2Handed, 0.7126f, 1.37637f);
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(weapon), weapon, "The kit hangs no mesh on an empty hand.");
+            }
         }
 
         static void RequireTier(int tier)
