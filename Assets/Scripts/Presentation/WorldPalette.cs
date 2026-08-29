@@ -28,6 +28,8 @@ namespace Game.Presentation
                     return new Color(0.25f, 0.55f, 0.95f);
                 case PartStyle.Multiplier:
                     return new Color(0.30f, 0.82f, 0.93f);
+                case PartStyle.Landmark:
+                    return new Color(0.62f, 0.60f, 0.56f);
                 case PartStyle.Staircase:
                     return new Color(0.44f, 0.46f, 0.53f);
                 case PartStyle.Foundation:

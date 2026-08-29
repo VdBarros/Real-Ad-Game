@@ -77,6 +77,7 @@ namespace Game.Presentation
             var pickups = new List<PickupProp>();
             var groundByName = new Dictionary<string, TilePosition>(graph.Tiles.Tiles.Count);
             var gatesByName = new Dictionary<string, DecisionNode>();
+            var landmarksByName = new Dictionary<string, LandmarkKind>();
             worn.Clear();
             WarnIfTheCameraHasTurned();
 
@@ -92,6 +93,11 @@ namespace Game.Presentation
                 {
                     gatesByName.Add(PartNames.Node(node.Id), node);
                 }
+            }
+
+            foreach (var spot in Landmarks.Of(graph))
+            {
+                landmarksByName.Add(PartNames.Landmark(spot.Tile), spot.Kind);
             }
 
             foreach (var terrace in blueprint.Terraces)
@@ -120,6 +126,13 @@ namespace Game.Presentation
                     {
                         pickups.Add(Arch(instance, gate));
                     }
+                }
+
+                var marks = Group(terraceRoot, PartNames.LandmarksGroup);
+
+                foreach (var part in terrace.Landmarks)
+                {
+                    Stand(Raise(part, marks), landmarksByName[part.Name]);
                 }
 
                 var group = Group(terraceRoot, PartNames.BadgesGroup);
@@ -218,6 +231,27 @@ namespace Game.Presentation
             return worn.TryGetValue(PartNames.Node(nodeId), out mesh) ? mesh : PartModel.None;
         }
 
+        static LandmarkProp Stand(GameObject instance, LandmarkKind kind)
+        {
+            var pieces = LandmarkForm.Pieces(kind);
+
+            foreach (var piece in pieces)
+            {
+                var block = GameObject.CreatePrimitive(PrimitiveOf(piece.Part.Shape));
+                block.name = piece.Part.Name;
+                block.transform.SetParent(instance.transform, worldPositionStays: false);
+                block.transform.localPosition = Vector(piece.Part.Position);
+                block.transform.localEulerAngles = Vector(piece.Part.Rotation);
+                block.transform.localScale = Vector(piece.Part.Scale);
+                WorldObjects.Destroy(block.GetComponent<Collider>());
+            }
+
+            var prop = instance.AddComponent<LandmarkProp>();
+            prop.Begin(kind, pieces);
+
+            return prop;
+        }
+
         PickupProp Arch(GameObject instance, DecisionNode node)
         {
             var pieces = GateArch.Pieces(node.Value);
@@ -260,7 +294,7 @@ namespace Game.Presentation
 
             var instance = raised
                 ? UnityEngine.Object.Instantiate(model)
-                : part.Shape == PartShape.Gate
+                : part.Shape == PartShape.Gate || part.Shape == PartShape.Landmark
                     ? new GameObject()
                     : GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
 
@@ -329,6 +363,10 @@ namespace Game.Presentation
                     return PrimitiveType.Cube;
                 case PartShape.Capsule:
                     return PrimitiveType.Capsule;
+                case PartShape.Sphere:
+                    return PrimitiveType.Sphere;
+                case PartShape.Cylinder:
+                    return PrimitiveType.Cylinder;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(shape), shape, "No primitive for that shape.");
             }

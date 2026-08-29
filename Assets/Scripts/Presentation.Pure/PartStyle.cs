@@ -14,6 +14,7 @@ namespace Game.Presentation.Pure
         Staircase,
         Foundation,
         Trail,
-        Spark
+        Spark,
+        Landmark
     }
 }
