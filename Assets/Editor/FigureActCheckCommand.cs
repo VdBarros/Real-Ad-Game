@@ -48,6 +48,10 @@ namespace Game.EditorTooling
 
         const int Limbs = 16;
 
+        const string BaseMap = "_BaseMap";
+
+        const string BaseColour = "_BaseColor";
+
         static readonly ActionOutcome[] FoughtOutcomes =
         {
             ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss
@@ -515,6 +519,75 @@ namespace Game.EditorTooling
             return meshes;
         }
 
+        static int NothingTintsTheCast(GameObject root, StringBuilder report)
+        {
+            var skins = 0;
+            var atlassed = 0;
+            var white = 0;
+            var overridden = 0;
+            var complaint = new List<string>();
+
+            foreach (var cast in root.GetComponentsInChildren<Figure>(true))
+            {
+                foreach (var renderer in cast.GetComponentsInChildren<Renderer>(true))
+                {
+                    var material = renderer.sharedMaterial;
+
+                    if (material == null
+                        || !material.name.StartsWith(WorldMaterials.NamePrefix, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (renderer.HasPropertyBlock())
+                    {
+                        overridden++;
+                    }
+
+                    if (!(renderer is SkinnedMeshRenderer))
+                    {
+                        continue;
+                    }
+
+                    skins++;
+
+                    if (material.HasProperty(BaseMap) && material.GetTexture(BaseMap) != null)
+                    {
+                        atlassed++;
+                    }
+
+                    if (!material.HasProperty(BaseColour) || material.GetColor(BaseColour) == Color.white)
+                    {
+                        white++;
+                    }
+                    else if (complaint.Count < 6)
+                    {
+                        complaint.Add(cast.name + " reads " + material.GetColor(BaseColour));
+                    }
+                }
+            }
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                skins > 0 && atlassed == skins,
+                "every animated figure the world raised wears a material bound to its pack atlas, so the "
+                + "mesh a clip poses is the mesh the pack drew",
+                atlassed + " of " + skins + " do");
+
+            failures += Assert(
+                report,
+                skins > 0 && white == skins && overridden == 0,
+                "no flat colour sits over any of them, neither on the material nor in a property block, so "
+                + "a pose reads against the pack's own texture",
+                white + " of " + skins + " keep the atlas unmultiplied and " + overridden
+                + " renderers carry a property block"
+                + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+
+            return failures;
+        }
+
         static int Walked(WorldModels models, StringBuilder report)
         {
             var worn = PartModels.Of(PartStyle.Start);
@@ -576,6 +649,8 @@ namespace Game.EditorTooling
                 driven.Act == FigureAct.Idle,
                 "a figure nobody has asked to move stands on its idle clip",
                 "it plays " + driven.Act + " as " + (driven.Playing == null ? "nothing" : driven.Playing.name));
+
+            failures += NothingTintsTheCast(root, report);
 
             PreviewFilm.Warm(lens);
 

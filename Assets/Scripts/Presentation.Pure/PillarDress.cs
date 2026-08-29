@@ -132,6 +132,11 @@ namespace Game.Presentation.Pure
             return FigureFit.StandingHeight(MeshOf(mark.Look), mark.Scale);
         }
 
+        public static float WidthOf(CastMark mark)
+        {
+            return FigureFit.WidthOf(MeshOf(mark.Look), mark.Scale);
+        }
+
         public static WorldPoint GroundScale
         {
             get

@@ -9,6 +9,21 @@ namespace Game.Presentation.Pure
             return part.Position.Y + HalfHeight(part);
         }
 
+        public static float WidthOf(WorldPart part)
+        {
+            switch (part.Shape)
+            {
+                case PartShape.Capsule:
+                    return FigureFit.WidthOf(part.Model, part.Scale.X);
+                case PartShape.Cube:
+                case PartShape.Quad:
+                    return part.Scale.X;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(part), part.Shape, "No width for that part shape.");
+            }
+        }
+
         static float HalfHeight(WorldPart part)
         {
             switch (part.Shape)

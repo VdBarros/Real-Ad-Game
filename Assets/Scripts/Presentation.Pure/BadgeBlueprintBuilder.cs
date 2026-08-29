@@ -13,8 +13,6 @@ namespace Game.Presentation.Pure
                 throw new ArgumentNullException(nameof(graph));
             }
 
-            var ceiling = PowerCeiling.Of(graph, startingPower);
-            var plan = new BadgePlan(CapacityFor(graph, ceiling), ceiling);
             var badges = new List<BadgePart>();
 
             foreach (var node in graph.Decisions.Nodes)
@@ -26,8 +24,7 @@ namespace Game.Presentation.Pure
                     continue;
                 }
 
-                var isPlayer = style == BadgeStyle.Player;
-                var value = isPlayer ? startingPower : node.Value;
+                var value = style == BadgeStyle.Player ? startingPower : node.Value;
                 var tile = IsoProjection.Of(node.Position);
 
                 badges.Add(new BadgePart(
@@ -36,30 +33,24 @@ namespace Game.Presentation.Pure
                     node.Position.Elevation,
                     style,
                     value,
-                    isPlayer ? plan.Capacity : BadgeText.Cells(style, value),
+                    BadgeText.Cells(style, value),
+                    WorldParts.WidthOf(prop),
                     new WorldPoint(tile.X, BadgeMetrics.AnchorHeight(prop), tile.Z),
                     IsoProjection.CameraRotation));
             }
 
-            return new BadgeBlueprint(plan, badges);
+            return new BadgeBlueprint(new BadgePlan(CapacityOf(badges)), badges);
         }
 
-        static int CapacityFor(LevelGraph graph, long ceiling)
+        static int CapacityOf(IReadOnlyList<BadgePart> badges)
         {
-            var capacity = BadgeText.Digits(ceiling);
+            var capacity = (int)BadgeMetrics.MinimumCells;
 
-            foreach (var node in graph.Decisions.Nodes)
+            for (var slot = 0; slot < badges.Count; slot++)
             {
-                BadgeStyle style;
-                if (!BadgeStyles.TryOf(node.Type, out style) || style == BadgeStyle.Player)
+                if (badges[slot].Cells > capacity)
                 {
-                    continue;
-                }
-
-                var cells = BadgeText.Cells(style, node.Value);
-                if (cells > capacity)
-                {
-                    capacity = cells;
+                    capacity = badges[slot].Cells;
                 }
             }
 

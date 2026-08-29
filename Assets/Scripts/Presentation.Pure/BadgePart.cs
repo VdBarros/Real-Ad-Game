@@ -11,6 +11,7 @@ namespace Game.Presentation.Pure
             BadgeStyle style,
             int value,
             int cells,
+            float subjectWidth,
             WorldPoint position,
             WorldPoint rotation)
         {
@@ -25,6 +26,7 @@ namespace Game.Presentation.Pure
             Style = style;
             Value = value;
             Cells = cells;
+            SubjectWidth = subjectWidth;
             Position = position;
             Rotation = rotation;
         }
@@ -41,9 +43,16 @@ namespace Game.Presentation.Pure
 
         public int Cells { get; }
 
+        public float SubjectWidth { get; }
+
+        public BadgeSize Size
+        {
+            get { return BadgeFit.Of(Cells, SubjectWidth); }
+        }
+
         public float Width
         {
-            get { return BadgeMetrics.WidthFor(Cells); }
+            get { return Size.Width; }
         }
 
         public string Text
@@ -68,6 +77,7 @@ namespace Game.Presentation.Pure
                 && Style == other.Style
                 && Value == other.Value
                 && Cells == other.Cells
+                && SubjectWidth.Equals(other.SubjectWidth)
                 && Position.Equals(other.Position)
                 && Rotation.Equals(other.Rotation);
         }
@@ -87,6 +97,7 @@ namespace Game.Presentation.Pure
                 hash = (hash * 397) ^ (int)Style;
                 hash = (hash * 397) ^ Value.GetHashCode();
                 hash = (hash * 397) ^ Cells;
+                hash = (hash * 397) ^ SubjectWidth.GetHashCode();
                 hash = (hash * 397) ^ Position.GetHashCode();
                 hash = (hash * 397) ^ Rotation.GetHashCode();
                 return hash;

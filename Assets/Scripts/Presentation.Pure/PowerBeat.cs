@@ -28,6 +28,11 @@ namespace Game.Presentation.Pure
             get { return countUp.Display; }
         }
 
+        public float Digits
+        {
+            get { return countUp.Digits; }
+        }
+
         public bool HasLanded
         {
             get { return countUp.IsSettled; }
@@ -46,11 +51,6 @@ namespace Game.Presentation.Pure
         public float Scale
         {
             get { return promotion.Scale; }
-        }
-
-        public Tint Tint
-        {
-            get { return promotion.Tint; }
         }
 
         public PowerBeat Toward(int power)

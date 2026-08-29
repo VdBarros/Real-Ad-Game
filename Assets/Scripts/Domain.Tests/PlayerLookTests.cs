@@ -36,12 +36,11 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheRampRunsCoolToWarmWithoutDoublingBackOnItself()
+        public void TheRampRunsSmallToLargeWithoutDoublingBackOnItself()
         {
             for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
-                Assert.That(Look(tier).Tint.Red, Is.GreaterThan(Look(tier - 1).Tint.Red));
-                Assert.That(Look(tier).Tint.Blue, Is.LessThan(Look(tier - 1).Tint.Blue));
+                Assert.That(Look(tier).Scale, Is.GreaterThan(Look(tier - 1).Scale));
             }
         }
 

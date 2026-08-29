@@ -70,6 +70,7 @@ namespace Game.EditorTooling
 
             var previewed = 0;
             var multiHop = 0;
+            var behindAnEnemy = 0;
             var shotWin = false;
             var shotLoss = false;
 
@@ -85,13 +86,14 @@ namespace Game.EditorTooling
                 var clearestLoss = default(TapCandidate);
                 var winRoom = 0f;
                 var lossRoom = 0f;
+                var navigation = NavigationMap.Of(state);
 
                 foreach (var candidate in input.Candidates())
                 {
                     input.AimAt(candidate.Point);
 
                     var preview = input.Preview;
-                    var resolved = ActionResolver.Resolve(state, candidate.NodeId);
+                    var resolved = ActionResolver.Along(state, navigation.RouteTo(candidate.NodeId));
 
                     if (preview.NodeId != candidate.NodeId)
                     {
@@ -138,7 +140,7 @@ namespace Game.EditorTooling
                     report.Append(Photograph(input, rig, lens, LossPath, "loss", builder.Targets, state, clearestLoss));
                 }
 
-                RefuseTheUnreachable(input, builder.Targets, state);
+                behindAnEnemy += TakenBehindAnEnemy(input, builder.Targets, state, navigation);
 
                 if (stepped == TapAim.Nothing)
                 {
@@ -153,7 +155,7 @@ namespace Game.EditorTooling
                     Debug.LogError("Sliding onto node " + stepped + " and letting go did not commit that node.");
                 }
 
-                state = ActionResolver.Resolve(state, stepped).State;
+                state = ActionResolver.Along(state, navigation.RouteTo(stepped)).State;
                 builder.Floor.Show(state);
                 builder.PlayerBadge.Show(state.Power);
             }
@@ -166,13 +168,22 @@ namespace Game.EditorTooling
                 .Append(multiHop.ToString(CultureInfo.InvariantCulture))
                 .Append(" of them multi-hop, ")
                 .Append(tapped.Count.ToString(CultureInfo.InvariantCulture))
-                .Append(" taps committed");
+                .Append(" taps committed, ")
+                .Append(behindAnEnemy.ToString(CultureInfo.InvariantCulture))
+                .Append(" of the offered targets standing behind an unbeaten enemy");
 
             if (previewed == 0 || multiHop == 0 || tapped.Count == 0)
             {
                 Debug.LogError(
                     "The check needs previews, a multi-hop one and a committed tap, and got "
                     + previewed + ", " + multiHop + " and " + tapped.Count + ".");
+            }
+
+            if (behindAnEnemy == 0)
+            {
+                Debug.LogError(
+                    "The check never met a target behind an unbeaten enemy, so it proved nothing "
+                    + "about the navigation predicate.");
             }
 
             if (!shotWin || !shotLoss)
@@ -501,14 +512,23 @@ namespace Game.EditorTooling
             }
         }
 
-        static void RefuseTheUnreachable(TapInput input, TargetBoard board, RunState state)
+        static int TakenBehindAnEnemy(
+            TapInput input, TargetBoard board, RunState state, NavigationMap navigation)
         {
-            var aimable = new HashSet<int>(TapAim.Aimable(state));
+            var aimable = new HashSet<int>(TapAim.Aimable(navigation));
+            var behind = 0;
 
             foreach (var target in board.Targets)
             {
-                if (aimable.Contains(target.NodeId) || target.NodeId == state.PositionNodeId)
+                if (target.NodeId == state.PositionNodeId || state.IsConsumed(target.NodeId))
                 {
+                    continue;
+                }
+
+                if (!aimable.Contains(target.NodeId))
+                {
+                    Debug.LogError(
+                        "Drawn node " + target.NodeId + " is never offered to the finger.");
                     continue;
                 }
 
@@ -517,21 +537,40 @@ namespace Game.EditorTooling
                     continue;
                 }
 
-                if (target.Mark != TargetMark.Unreachable)
+                behind++;
+
+                if (navigation.FightsOnTheWayTo(target.NodeId) < 1)
                 {
                     Debug.LogError(
-                        "Unreachable node " + target.NodeId + " wears " + target.Mark + " and reads as tappable.");
+                        "Node " + target.NodeId
+                        + " stands out of passage yet navigation walks in without a fight.");
+                }
+
+                var preview = TargetPreview.Of(navigation, target.NodeId);
+
+                if (!preview.IsLegal)
+                {
+                    Debug.LogError(
+                        "A tap on node " + target.NodeId + " behind an enemy produced no route.");
+                }
+                else if (preview.Route[preview.Route.Count - 1] != target.NodeId)
+                {
+                    Debug.LogError(
+                        "The route to node " + target.NodeId + " behind an enemy ends somewhere else.");
                 }
 
                 input.AimAt(FingerOn(input, state, target.NodeId));
 
-                if (input.Preview.NodeId == target.NodeId)
+                if (input.Preview.NodeId == TapAim.Nothing)
                 {
-                    Debug.LogError("A finger on unreachable node " + target.NodeId + " aimed at it anyway.");
+                    Debug.LogError(
+                        "A finger on node " + target.NodeId + " behind an enemy aimed at nothing at all.");
                 }
 
                 input.Cancel();
             }
+
+            return behind;
         }
 
         static ScreenPoint FingerOn(TapInput input, RunState state, int nodeId)

@@ -27,7 +27,7 @@ namespace Game.Presentation.Pure
                 throw new ArgumentNullException(nameof(state));
             }
 
-            var resolved = ActionResolver.Resolve(state, nodeId);
+            var resolved = ActionResolver.Along(state, NavigationMap.Of(state).RouteTo(nodeId));
             if (resolved.Outcome == ActionOutcome.Rejected)
             {
                 return Nowhere;
@@ -92,7 +92,7 @@ namespace Game.Presentation.Pure
             var reached = walked.ArrivedNodeId;
             var spendsAMultiplier = !State.IsConsumed(reached)
                 && State.Level.Decisions.Node(reached).Type == NodeType.Multiplier;
-            var resolved = ActionResolver.Resolve(State, reached);
+            var resolved = ActionResolver.Along(State, new[] { State.PositionNodeId, reached });
 
             return new Journey(
                 resolved.State, walked, resolved, spendsAMultiplier, Fight.Of(resolved.Outcome));
