@@ -1,9 +1,44 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 
 namespace Game.Domain.Tests
 {
     public class InvariantAOracleTests
     {
+        static List<int> Affordable(RunState state)
+        {
+            var moves = new List<int>();
+
+            foreach (var nodeId in state.ReachableNodes)
+            {
+                if (state.IsConsumed(nodeId))
+                {
+                    continue;
+                }
+
+                var node = state.Level.Decisions.Node(nodeId);
+
+                switch (node.Type)
+                {
+                    case NodeType.Additive:
+                    case NodeType.Multiplier:
+                        moves.Add(nodeId);
+                        break;
+
+                    case NodeType.Enemy:
+                    case NodeType.Boss:
+                        if (state.Power > node.Value)
+                        {
+                            moves.Add(nodeId);
+                        }
+
+                        break;
+                }
+            }
+
+            return moves;
+        }
+
         [Test]
         public void ALevelEveryOrderingFinishesCarriesNoStall()
         {
@@ -85,6 +120,47 @@ namespace Game.Domain.Tests
             Assert.That(verdict.FirstStall.Stranded.Count, Is.EqualTo(1));
             Assert.That(verdict.FirstStall.Stranded[0].Type, Is.EqualTo(NodeType.Additive));
             Assert.That(verdict.FirstStall.Stranded[0].Reachable, Is.False);
+        }
+
+        [Test]
+        public void ADrainedStateIsNotOneTheOracleExplores()
+        {
+            var level = LevelSketch.Solvable().Build();
+            var verdict = InvariantAOracle.Sweep(level, LevelSketch.Tuning);
+            var full = RunState.Begin(level, LevelSketch.Tuning.StartingPower);
+            var floored = full.Drained(Drain.Floor);
+
+            Assert.That(verdict.Stalled, Is.False);
+            Assert.That(floored.ConsumedNodes, Is.EqualTo(full.ConsumedNodes));
+            Assert.That(floored.ReachableNodes, Is.EqualTo(full.ReachableNodes));
+            Assert.That(Affordable(full), Has.Member(LevelSketch.GateEnemyNodeId));
+            Assert.That(Affordable(floored), Has.No.Member(LevelSketch.GateEnemyNodeId));
+        }
+
+        [Test]
+        public void InvariantAIsQuantifiedOverProgressAndADrainMakesNone()
+        {
+            var level = new LevelSketch()
+                .NodeAt(0, 0, NodeType.Start)
+                .NodeAt(1, 0, NodeType.Enemy, 1)
+                .NodeAt(2, 0, NodeType.Additive, 20)
+                .NodeAt(0, 1, NodeType.Boss, 21)
+                .Joined(0, 0, 1, 0)
+                .Joined(1, 0, 2, 0)
+                .Joined(0, 0, 0, 1)
+                .Build();
+
+            var verdict = InvariantAOracle.Sweep(level, LevelSketch.Tuning);
+            var full = RunState.Begin(level, LevelSketch.Tuning.StartingPower);
+
+            Assert.That(verdict.Stalled, Is.False, verdict.ToString());
+            Assert.That(Affordable(full), Is.Not.Empty);
+            Assert.That(
+                Affordable(full.Drained(Drain.Floor)),
+                Is.Empty,
+                "A run that throws its power away can walk itself into a corner Invariant A never "
+                + "promised it out of: the oracle quantifies over orderings of moves that consume, "
+                + "and a drain consumes nothing, so it adds no ordering and no state to the sweep.");
         }
 
         [Test]

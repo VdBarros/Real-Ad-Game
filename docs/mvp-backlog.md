@@ -156,17 +156,62 @@ Agents implementing Phase 1 and Phase 3 must match this exactly.
 ```
 tap(Enemy E) from power P:
     P >  E.power  ->  WIN   : P += E.power; consume E; clear corridor; drop weapon
-    P == E.power  ->  TIE   : no state change; return to previous node
-    P <  E.power  ->  LOSS  : no state change; return to previous node
+    P == E.power  ->  TIE   : E drains P while contact holds; E unchanged; return
+    P <  E.power  ->  LOSS  : E drains P while contact holds; E unchanged; return
 
 tap(Additive A)   ->  P += A.value ; consume A
 tap(Multiplier M) ->  P *= M.value ; consume M
 tap(Boss B)       ->  same as Enemy; WIN also ends the level
 ```
 
-A tie is strictly a no-op: **affordable means `P > E`**, never `P >= E`. A
-`P == E` transition is not a legal move in any reasoning about the level
-([#9]).
+A tie is not a win: **affordable means `P > E`**, never `P >= E`. A `P == E`
+transition consumes nothing and is not a legal move in any reasoning about the
+level ([#9]). `Tie` stays a separate outcome from `Loss` because it drives its
+own animation and its own aim preview; no validator or oracle reads it.
+
+**A tie or a loss costs power — the drain ([#135]).** Winning was free and
+losing was impossible, so the game carried no risk. Contact with a node that
+will not fall now bleeds the player's number while the contact is held:
+
+```
+Drain.Floor        = 1      // the run continues at 1; there is no game over
+Drain.RampSeconds  = 0.30   // rate ramps 0 -> full over the first 0.3 s
+Drain.Seconds      = 2.00   // contact held that long takes any P to the floor
+
+spent(t) = t < R  ->  V * t^2 / 2R          // V = 1 / (Seconds - R/2)
+           t >= R ->  V * (t - R/2)
+P(t)     = Floor + ceil((P0 - Floor) * (1 - spent(t)))
+```
+
+The drain is a fraction of the span `P0 - Floor` per second, not an absolute
+rate, so it reads the same at 54 and at 54 000, and it reproduces the
+reference's 54 -> 44 -> 30 -> 16 -> 1 over two seconds. **The ramp is not
+cosmetic**: it makes touching a wall a probe. Pulling out inside a frame costs
+nothing, a quarter-second brush costs 3 of 59, and only holding on costs
+everything — so a player can test a wall and learn its number without being
+punished for asking. Breaking off mid-drain (#133) keeps whatever is left.
+
+**The enemy's value never moves.** Confirmed in the reference: the boss holds
+55 from first frame to last. Nothing is consumed, no corridor opens, the run
+returns to the node it came from, and only `P` is different.
+
+**A drain is not a move.** It consumes nothing, so it adds no ordering to any
+reasoning about the level, and every invariant below is quantified over
+orderings of moves that *consume*. Two consequences, both real:
+
+- The **power ceiling still bounds a draining run.** Affordability and every
+  gain are monotone in `P`, so a run that has lost power is bounded by the same
+  `(P0 + ΣA) * ΠM` as the run it came from, and the floor keeps it at or above
+  1.
+- The **oracle's state space is unchanged** — measured, not assumed: peak
+  `(consumed-set, power)` counts on `tiny` mutants stayed at p50 199 / p90 1747
+  / max 16177 across the change. Admitting drained states would not have grown
+  it, it would have destroyed it: from `(mask, 1)` almost every level has no
+  affordable reachable node, so Invariant A would fail everywhere and no level
+  would generate. A player who throws their power away can therefore walk into
+  a corner Invariant A never promised them out of — a stall reachable only by
+  draining, never by playing. Pickups stay affordable at any power, so it takes
+  a state whose only affordable reachable node is an enemy.
 
 ### Gating and reachability ([#2])
 

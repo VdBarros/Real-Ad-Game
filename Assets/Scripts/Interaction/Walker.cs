@@ -50,6 +50,16 @@ namespace Game.Interaction
             get { return holding; }
         }
 
+        public bool IsDraining
+        {
+            get { return journey.IsDraining; }
+        }
+
+        public Drain Drain
+        {
+            get { return journey.Drain; }
+        }
+
         public ActionResult Arrival
         {
             get { return journey.Arrival; }
@@ -202,6 +212,10 @@ namespace Game.Interaction
             {
                 Land();
             }
+            else
+            {
+                Bleed();
+            }
 
             if (journey.HoldsForAFight)
             {
@@ -267,6 +281,21 @@ namespace Game.Interaction
 
             holding = true;
             rig.CutTo(Run.Level.Decisions.Node(journey.Walk.ArrivedNodeId).Position);
+        }
+
+        void Bleed()
+        {
+            if (journey.State == null || ReferenceEquals(journey.State, Run))
+            {
+                return;
+            }
+
+            Run = journey.State;
+
+            if (power != null)
+            {
+                power.Show(Run.Power);
+            }
         }
 
         void Act()

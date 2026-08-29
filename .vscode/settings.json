@@ -67,5 +67,5 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "t-134-trail-preview.slnx"
+    "dotnet.defaultSolution": "t-135-drain.slnx"
 }
