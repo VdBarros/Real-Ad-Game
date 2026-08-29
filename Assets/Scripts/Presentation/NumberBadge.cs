@@ -92,6 +92,11 @@ namespace Game.Presentation
             get { return background == null ? washed : background.color; }
         }
 
+        public bool IsDrawn
+        {
+            get { return background != null && background.color.a > 0f; }
+        }
+
         public float Opacity
         {
             get { return crowd; }

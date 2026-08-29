@@ -260,16 +260,252 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void AGainWorthAlmostNothingBesideThePowerItIsAddedToStopsDrawing()
+        {
+            Assert.That(GateWorth.ShareOf(1, 244), Is.LessThan(GateWorth.Negligible));
+
+            Assert.That(
+                TargetMarks.Opacity(TargetMark.Idle, BadgeStyle.Additive, 1, 244),
+                Is.EqualTo(TargetMarks.Suppressed),
+                "a +1 beside a held 244 is worth four tenths of a percent and still takes up the screen.");
+            Assert.That(
+                TargetMarks.IsSuppressed(TargetMark.Idle, BadgeStyle.Additive, 1, 244),
+                Is.True);
+        }
+
+        [Test]
+        public void AGainStillWorthWalkingForKeepsTheBadgeItsMarkGivesIt()
+        {
+            foreach (var mark in Resting)
+            {
+                Assert.That(
+                    TargetMarks.Opacity(mark, BadgeStyle.Additive, 40, 244),
+                    Is.EqualTo(TargetMarks.Look(mark).Opacity),
+                    "a gain worth a sixth of what the player holds is not clutter, and " + mark
+                    + " is the only thing that may fade it.");
+            }
+        }
+
+        [Test]
+        public void TheCutIsTheShareItself()
+        {
+            var atTheCut = (int)Math.Round(1000 * GateWorth.Negligible);
+
+            Assert.That(GateWorth.IsNegligible(atTheCut, 1000), Is.False, "the cut itself still draws.");
+            Assert.That(GateWorth.IsNegligible(atTheCut - 1, 1000), Is.True);
+            Assert.That(GateWorth.IsNegligible(atTheCut, 1001), Is.True);
+        }
+
+        [Test]
+        public void AGateHiddenAtOnePowerIsBackTheMomentADrainDropsThePlayerUnderTheCut()
+        {
+            var ramp = new[] { 40, 400, 4000, 400, 40, 4000, 40 };
+            var answers = new bool[ramp.Length];
+
+            for (var step = 0; step < ramp.Length; step++)
+            {
+                answers[step] = TargetMarks.IsSuppressed(
+                    TargetMark.Idle, BadgeStyle.Additive, 5, ramp[step]);
+            }
+
+            Assert.That(answers[0], Is.False, "a +5 beside 40 is an eighth of the run and reads.");
+            Assert.That(answers[2], Is.True, "a +5 beside 4000 is worth an eighth of a percent.");
+
+            for (var step = 0; step < ramp.Length; step++)
+            {
+                Assert.That(
+                    answers[step],
+                    Is.EqualTo(TargetMarks.IsSuppressed(TargetMark.Idle, BadgeStyle.Additive, 5, ramp[step])),
+                    "power " + ramp[step] + " answered differently the second time round, so the mark "
+                    + "is latched rather than read off the state.");
+
+                for (var other = 0; other < ramp.Length; other++)
+                {
+                    if (ramp[other] != ramp[step])
+                    {
+                        continue;
+                    }
+
+                    Assert.That(
+                        answers[other],
+                        Is.EqualTo(answers[step]),
+                        "power " + ramp[step] + " read one way climbing and another falling, so what "
+                        + "the player already passed through is deciding what they see now.");
+                }
+            }
+        }
+
+        [Test]
+        public void OnlyAGainIsEverSuppressedAndNeverAFightOrThePlayer()
+        {
+            foreach (BadgeStyle style in Enum.GetValues(typeof(BadgeStyle)))
+            {
+                if (style == BadgeStyle.Additive)
+                {
+                    continue;
+                }
+
+                Assert.That(
+                    TargetMarks.IsSuppressed(TargetMark.Idle, style, 4, 4000),
+                    Is.False,
+                    "a " + style + " badge went quiet because its number was small beside the player's. "
+                    + "A gate is clutter once it is worth nothing; an enemy worth nothing is a door "
+                    + "standing open and the player still has to see it.");
+            }
+        }
+
+        [Test]
+        public void TheBadgeUnderTheFingerIsNeverTheOneThatVanishes()
+        {
+            foreach (TargetMark mark in Enum.GetValues(typeof(TargetMark)))
+            {
+                if (!TargetMarks.IsAimed(mark))
+                {
+                    continue;
+                }
+
+                Assert.That(
+                    TargetMarks.Opacity(mark, BadgeStyle.Additive, 1, 4000),
+                    Is.EqualTo(TargetMarks.Look(mark).Opacity),
+                    mark + " is the answer the player asked for, so it is drawn however little it is worth.");
+            }
+        }
+
+        [Test]
+        public void ARunHoldingNoPowerYetHidesNothing()
+        {
+            Assert.That(GateWorth.IsNegligible(1, 0), Is.False);
+            Assert.That(
+                TargetMarks.Opacity(TargetMark.Idle, BadgeStyle.Additive, 1, 0),
+                Is.EqualTo(TargetMarks.Look(TargetMark.Idle).Opacity));
+            Assert.Throws<ArgumentOutOfRangeException>(() => GateWorth.ShareOf(1, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => GateWorth.ShareOf(-1, 10));
+        }
+
+        [Test]
+        public void NoGainTheCutHidesCouldHaveBrokenTheNearestWall()
+        {
+            var gateMoments = 0;
+            var hidden = 0;
+            var unlocking = 0;
+            var smallestUnlockingShare = double.MaxValue;
+
+            foreach (var levelNumber in new[] { 1, 7, LevelPlan.PlateauLevel, 20 })
+            {
+                var plan = LevelPlan.For(levelNumber);
+
+                for (var seed = 0; seed < SuppressionSeeds; seed++)
+                {
+                    LevelGenerationReport report;
+                    var level = LevelGenerator.Generate(seed, plan.Preset, plan.Recipe, plan.Tuning, out report);
+                    var decisions = level.Graph.Decisions;
+                    var walk = ParWalk.Richest(level.Graph, level.Tuning);
+                    var state = RunState.Begin(level.Graph, level.StartingPower);
+
+                    foreach (var target in walk.Targets)
+                    {
+                        var wall = NearestWall(state);
+
+                        foreach (var node in decisions.Nodes)
+                        {
+                            if (node.Type != NodeType.Additive || state.IsConsumed(node.Id))
+                            {
+                                continue;
+                            }
+
+                            gateMoments++;
+                            var quiet = TargetMarks.IsSuppressed(
+                                TargetMark.Idle, BadgeStyle.Additive, node.Value, state.Power);
+                            var breaks = wall > 0 && state.Power + node.Value > wall;
+
+                            if (quiet)
+                            {
+                                hidden++;
+                            }
+
+                            if (!breaks)
+                            {
+                                continue;
+                            }
+
+                            unlocking++;
+                            var share = node.Value / (double)state.Power;
+                            if (share < smallestUnlockingShare)
+                            {
+                                smallestUnlockingShare = share;
+                            }
+
+                            Assert.That(
+                                quiet,
+                                Is.False,
+                                "a gain of " + node.Value + " beside a held " + state.Power
+                                + " is small enough to hide and large enough to break the wall at "
+                                + wall + ", so the cut is set too high.");
+                        }
+
+                        var result = ActionResolver.Resolve(state, target);
+                        if (result.Outcome == ActionOutcome.Rejected)
+                        {
+                            break;
+                        }
+
+                        state = result.State;
+                        if (state.IsLevelComplete)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            Console.WriteLine(
+                "gate-moments " + gateMoments + ", hidden by a cut of " + GateWorth.Negligible + ": "
+                + hidden + " (" + (100.0 * hidden / gateMoments).ToString("0.0") + "%), of which none "
+                + "of the " + unlocking + " that break the nearest wall; the smallest wall-breaking "
+                + "share seen was " + smallestUnlockingShare.ToString("0.0000"));
+
+            Assert.That(unlocking, Is.GreaterThan(0), "the sweep found no gain that unlocks anything.");
+            Assert.That(hidden, Is.GreaterThan(0), "the sweep hid nothing, so it proves nothing.");
+            Assert.That(
+                smallestUnlockingShare,
+                Is.GreaterThan((double)GateWorth.Negligible),
+                "the cut has caught up with the smallest gain that still breaks a wall.");
+        }
+
+        [Test]
         public void AMarkThatDoesNotExistHasNoLook()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => TargetMarks.Look((TargetMark)99));
             Assert.Throws<ArgumentOutOfRangeException>(() => TargetMarks.IsAimed((TargetMark)99));
         }
 
+        const int SuppressionSeeds = 30;
+
         static readonly TargetMark[] Resting =
         {
             TargetMark.Idle, TargetMark.Aside, TargetMark.Unreachable
         };
+
+        static int NearestWall(RunState state)
+        {
+            var wall = 0;
+
+            foreach (var nodeId in state.ReachableNodes)
+            {
+                if (!state.BlocksPassage(nodeId))
+                {
+                    continue;
+                }
+
+                var barrier = state.Level.Decisions.Node(nodeId).Value;
+                if (state.Power <= barrier && (wall == 0 || barrier < wall))
+                {
+                    wall = barrier;
+                }
+            }
+
+            return wall;
+        }
 
         static TargetMark Mark(RunState state, int nodeId)
         {
