@@ -11,6 +11,8 @@ namespace Game.Presentation
 
         PlayerFigure player;
 
+        PartModel worn;
+
         PowerBeat beat;
 
         public event Action Settled;
@@ -42,12 +44,23 @@ namespace Game.Presentation
             get { return beat.Look; }
         }
 
-        internal void Begin(NumberBadge composed, PlayerFigure figure, int power)
+        public float Width
+        {
+            get { return badge == null ? 0f : badge.Width; }
+        }
+
+        public float CharacterWidth
+        {
+            get { return FigureFit.WidthOf(worn, beat.Scale); }
+        }
+
+        internal void Begin(NumberBadge composed, PlayerFigure figure, PartModel mesh, int power)
         {
             badge = composed;
             player = figure;
+            worn = mesh;
             beat = PowerBeat.Begin(power);
-            badge.Show(power);
+            Dress();
 
             if (player != null)
             {
@@ -66,7 +79,7 @@ namespace Game.Presentation
             }
 
             beat = retargeted;
-            badge.Show(beat.Shown);
+            Dress();
             enabled = true;
 
             var changed = Changed;
@@ -84,6 +97,16 @@ namespace Game.Presentation
             }
         }
 
+        void Dress()
+        {
+            badge.Fit(beat.Digits, CharacterWidth);
+
+            if (beat.Shown != badge.Value)
+            {
+                badge.Show(beat.Shown);
+            }
+        }
+
         void Update()
         {
             Advance(Time.deltaTime);
@@ -93,11 +116,7 @@ namespace Game.Presentation
         {
             var landed = beat.HasLanded;
             beat = beat.Advanced(deltaSeconds);
-
-            if (beat.Shown != badge.Value)
-            {
-                badge.Show(beat.Shown);
-            }
+            Dress();
 
             if (player != null)
             {

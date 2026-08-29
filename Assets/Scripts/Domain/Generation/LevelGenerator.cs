@@ -6,9 +6,9 @@ namespace Game.Domain
     {
         public const int MaximumAttempts = 50;
 
-        const int LayoutReasonCount = (int)LayoutRejection.TooFewOffPathSlots + 1;
+        static readonly int LayoutReasonCount = Enum.GetValues(typeof(LayoutRejection)).Length;
 
-        const int ContentReasonCount = (int)ContentRejection.OpeningWithoutAChoice + 1;
+        static readonly int ContentReasonCount = Enum.GetValues(typeof(ContentRejection)).Length;
 
         public static PlacedLevel Generate(long seed, MazePreset preset)
         {

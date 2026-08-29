@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using Game.Domain;
 using Game.Presentation;
@@ -183,25 +184,41 @@ namespace Game.EditorTooling
                 }
             }
 
+            var player = PlayerBadgeOf(badges);
+
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
-                "preview: {0} terraces, {1} floor quads, {2} walls, {13} staircases, {3} props, {4} badges at "
-                + "{5} glyph cells ({6:0.###} x {7:0.###} units, font {8:0.###}, ceiling {9}), "
-                + "{10} transforms under {11}, written to {12}",
+                "preview: {0} terraces, {1} floor quads, {2} walls, {12} staircases, {3} props, {4} badges at "
+                + "up to {5} glyph cells (design {6:0.###} units tall, font {7:0.###}), "
+                + "player badge {8:0.###} units wide over a {9:0.###} unit character, "
+                + "{10} transforms under {11}, written to {13}",
                 blueprint.Terraces.Count,
                 quads,
                 walls,
                 props,
                 badges.Badges.Count,
                 badges.Plan.Capacity,
-                badges.Plan.PlayerWidth,
                 badges.Plan.Height,
                 badges.Plan.FontSize,
-                badges.Plan.PowerCeiling,
+                player.Width,
+                player.SubjectWidth,
                 root.GetComponentsInChildren<Transform>(true).Length,
                 PartNames.Root,
-                path,
-                stairs));
+                stairs,
+                path));
+        }
+
+        static BadgePart PlayerBadgeOf(BadgeBlueprint badges)
+        {
+            foreach (var badge in badges.Badges)
+            {
+                if (badge.Style == BadgeStyle.Player)
+                {
+                    return badge;
+                }
+            }
+
+            throw new InvalidOperationException("The level raised no player badge to measure.");
         }
     }
 }

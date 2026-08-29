@@ -72,6 +72,7 @@ namespace Game.Presentation
             Trail.Dress(materials.Of(PartStyle.Trail));
             NumberBadge playerNumber = null;
             PlayerFigure playerFigure = null;
+            var playerWorn = PartModel.None;
             var enemies = new List<EnemyFigure>();
             var pickups = new List<PickupProp>();
             var groundByName = new Dictionary<string, TilePosition>(graph.Tiles.Tiles.Count);
@@ -115,7 +116,7 @@ namespace Game.Presentation
                         continue;
                     }
 
-                    var badge = BadgeFactory.Raise(part, badges.Plan, badgeAssets, group);
+                    var badge = BadgeFactory.Raise(part, badgeAssets, group);
                     var prop = nodes.Find(PartNames.Node(part.NodeId));
                     var target = badge.gameObject.AddComponent<NodeTarget>();
                     target.Begin(part);
@@ -124,6 +125,7 @@ namespace Game.Presentation
                     if (part.Style == BadgeStyle.Player)
                     {
                         var worn = Worn(part.NodeId);
+                        playerWorn = worn;
                         playerNumber = badge;
                         playerFigure = prop.gameObject.AddComponent<PlayerFigure>();
                         playerFigure.Stand(badge.transform, worn);
@@ -160,7 +162,7 @@ namespace Game.Presentation
             {
                 Player = playerFigure;
                 PlayerBadge = playerNumber.gameObject.AddComponent<PowerBadge>();
-                PlayerBadge.Begin(playerNumber, playerFigure, startingPower);
+                PlayerBadge.Begin(playerNumber, playerFigure, playerWorn, startingPower);
 
                 foreach (var enemy in enemies)
                 {

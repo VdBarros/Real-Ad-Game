@@ -4,20 +4,14 @@ namespace Game.Presentation.Pure
 {
     public sealed class BadgePlan
     {
-        internal BadgePlan(int capacity, long powerCeiling)
+        internal BadgePlan(int capacity)
         {
             Capacity = capacity;
-            PowerCeiling = powerCeiling;
-            PlayerWidth = BadgeMetrics.WidthFor(capacity);
             Height = BadgeMetrics.Height;
             FontSize = BadgeMetrics.FontSize;
         }
 
         public int Capacity { get; }
-
-        public long PowerCeiling { get; }
-
-        public float PlayerWidth { get; }
 
         public float Height { get; }
 

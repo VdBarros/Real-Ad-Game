@@ -56,6 +56,10 @@ namespace Game.Domain
             {
                 reason = SolvabilityReason.AdversaryStalled;
             }
+            else if (MultiplierProduct.Of(board) > tuning.MultiplierProductCap)
+            {
+                reason = SolvabilityReason.MultiplierProductBeyondCap;
+            }
 
             return new SolvabilityVerdict(
                 reason, offendingNodeId, bossNodeId, bossPower, bound, beelinePower, beelineBlocked, stall);

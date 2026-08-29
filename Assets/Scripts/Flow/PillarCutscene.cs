@@ -273,6 +273,7 @@ namespace Game.Flow
                 mark.Badge,
                 mark.Number,
                 plan.Capacity,
+                PillarDress.WidthOf(mark),
                 new WorldPoint(0f, 0f, 0f),
                 IsoProjection.CameraRotation);
 
@@ -281,7 +282,7 @@ namespace Game.Flow
                 Role = role,
                 Pillar = pillar,
                 Costumes = costumes,
-                Badge = BadgeFactory.Raise(part, plan, badges, group.transform)
+                Badge = BadgeFactory.Raise(part, badges, group.transform)
             };
         }
 

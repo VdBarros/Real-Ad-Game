@@ -28,6 +28,11 @@ namespace Game.Presentation.Pure
             get { return countUp.Display; }
         }
 
+        public float Digits
+        {
+            get { return countUp.Digits; }
+        }
+
         public bool HasLanded
         {
             get { return countUp.IsSettled; }

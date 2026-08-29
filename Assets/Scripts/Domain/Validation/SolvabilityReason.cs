@@ -13,6 +13,7 @@ namespace Game.Domain
         GatedBehindBoss,
         BossBeyondBound,
         BossWithinReach,
-        AdversaryStalled
+        AdversaryStalled,
+        MultiplierProductBeyondCap
     }
 }

@@ -146,6 +146,37 @@ namespace Game.Domain.Tests
                 + CountOf(LayoutRejection.TooFewOffPathSlots) + " layouts turned away for holding fewer";
         }
 
+        public string Multipliers()
+        {
+            var products = new List<double>();
+            var gates = 0;
+            var highest = 0.0;
+
+            foreach (var level in accepted)
+            {
+                var product = (double)MultiplierProduct.Of(level.Level.Graph);
+                products.Add(product);
+                highest = Math.Max(highest, product);
+
+                foreach (var node in level.Level.Graph.Decisions.Nodes)
+                {
+                    if (node.Type == NodeType.Multiplier)
+                    {
+                        gates++;
+                    }
+                }
+            }
+
+            products.Sort();
+            return gates + " gates over " + accepted.Count + " levels, product p10 "
+                + SweepStatistics.Round(SweepStatistics.Percentile(products, 0.1)) + " p50 "
+                + SweepStatistics.Round(SweepStatistics.Percentile(products, 0.5)) + " p90 "
+                + SweepStatistics.Round(SweepStatistics.Percentile(products, 0.9)) + " highest "
+                + SweepStatistics.Round(highest) + ", capped at " + Plan.Tuning.MultiplierProductCap
+                + ", " + CountOf(ContentRejection.MultiplierProductBeyondCap)
+                + " attempts turned away for passing it";
+        }
+
         public string Spread()
         {
             var everywhere = SpreadsEverywhere();
