@@ -25,6 +25,11 @@ namespace Game.Presentation.Pure
             return ByFactor[factor - GateArch.SmallestFactor];
         }
 
+        public static float Dimming(MarkLook look)
+        {
+            return 1f - (1f - look.Opacity) * WashShare;
+        }
+
         public static Tint Washed(int factor, MarkLook look)
         {
             return Washed(Of(factor), look);
@@ -32,7 +37,10 @@ namespace Game.Presentation.Pure
 
         public static Tint Washed(Tint plain, MarkLook look)
         {
-            return Tint.Lerp(plain, look.Tint, look.Weight * WashShare);
+            var painted = Tint.Lerp(plain, look.Tint, look.Weight * WashShare);
+            var dimming = Dimming(look);
+
+            return new Tint(painted.Red * dimming, painted.Green * dimming, painted.Blue * dimming);
         }
     }
 }

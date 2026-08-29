@@ -195,18 +195,37 @@ namespace Game.Domain.Tests
         [Test]
         public void AnUnreachableGateDimsButStaysLit()
         {
+            var look = TargetMarks.Look(TargetMark.Unreachable);
             var plain = GateLook.Of(3);
-            var dimmed = GateLook.Washed(3, TargetMarks.Look(TargetMark.Unreachable));
-            var badge = TargetMarks.Look(TargetMark.Unreachable);
-            var flattened = Tint.Lerp(plain, badge.Tint, badge.Weight);
+            var dimmed = GateLook.Washed(3, look);
 
             Assert.That(GateLook.WashShare, Is.GreaterThan(0f).And.LessThan(1f));
             Assert.That(dimmed, Is.Not.EqualTo(plain), "an unreachable arch reads dimmer");
+            Assert.That(Brightness(dimmed), Is.LessThan(Brightness(plain)));
             Assert.That(
                 Brightness(dimmed),
-                Is.GreaterThan(Brightness(flattened)),
-                "an arch is scenery, so it never goes as dark as an unreachable badge plate");
-            Assert.That(Brightness(dimmed), Is.LessThan(Brightness(plain)));
+                Is.GreaterThan(Brightness(plain) * look.Opacity),
+                "an arch is scenery lit by the world, so it takes only a share of the fade a badge plate takes");
+        }
+
+        [Test]
+        public void AFadedGateHoldsTheHueTheFactorGaveIt()
+        {
+            foreach (var mark in new[] { TargetMark.Idle, TargetMark.Aside, TargetMark.Unreachable })
+            {
+                var look = TargetMarks.Look(mark);
+
+                for (var factor = GateArch.SmallestFactor; factor <= GateArch.MostPips; factor++)
+                {
+                    var plain = GateLook.Of(factor);
+                    var dimmed = GateLook.Washed(factor, look);
+                    var dimming = GateLook.Dimming(look);
+
+                    Assert.That(dimmed.Red, Is.EqualTo(plain.Red * dimming).Within(1e-5f), mark + " " + factor);
+                    Assert.That(dimmed.Green, Is.EqualTo(plain.Green * dimming).Within(1e-5f), mark + " " + factor);
+                    Assert.That(dimmed.Blue, Is.EqualTo(plain.Blue * dimming).Within(1e-5f), mark + " " + factor);
+                }
+            }
         }
 
         [Test]
