@@ -37,6 +37,8 @@ namespace Game.EditorTooling
 
         const float SerrationBound = 0.05f;
 
+        const float JoinBite = 0.02f;
+
         static readonly int Slices = StaircaseFlight.PackCrestFromItsOriginOnward.Count;
 
         public static void Check()
@@ -176,23 +178,42 @@ namespace Game.EditorTooling
                     drift,
                     Epsilon));
 
-            var fitted = box.size.y * ModelPose.ScaleOf(AStaircasePart()).Y;
+            var fit = ModelPose.ScaleOf(AStaircasePart()).Y;
+            var walked = DungeonPack.StaircaseTread * fit;
+            var mass = box.size.y * fit;
 
             failures += Plinth(models, report);
 
             failures += Assert(
                 report,
-                Math.Abs(fitted - IsoProjection.StepHeight) <= Epsilon,
-                "the fitted staircase rises exactly the one elevation step a staircase tile stands above "
-                + "the terrace below it",
+                Math.Abs(walked - IsoProjection.StepHeight) <= Epsilon,
+                "the fitted staircase walks up exactly the one elevation step a staircase tile stands above "
+                + "the terrace below it, measured on the tread the foot lands on rather than on the parapet "
+                + "above it",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "{0:0.#####} pack units are squashed to {1:0.#####} against a step of {2:0.#####}, "
-                    + "and two of those steps make the {3:0.#####} between one terrace and the next",
-                    DungeonPack.StaircasePackHeight,
-                    fitted,
+                    "the top tread's {0:0.#####} pack units are fitted to {1:0.#####} against a step of "
+                    + "{2:0.#####}, and two of those steps make the {3:0.#####} between one terrace and the "
+                    + "next",
+                    DungeonPack.StaircasePackTread,
+                    walked,
                     IsoProjection.StepHeight,
                     Terraces.Rise * IsoProjection.StepHeight));
+
+            failures += Assert(
+                report,
+                Math.Abs(mass - walked - DungeonPack.StaircaseParapet) <= Epsilon
+                && Math.Abs(DungeonPack.StaircaseParapet - DungeonPack.HeightOf(PartModel.WallPanel))
+                    <= Epsilon,
+                "what the flight carries over its own top tread is a parapet of exactly the height the "
+                + "pack's barrier stands, so a flight fences itself the way a terrace edge does",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0:0.#####} of fitted mass stands {1:0.#####} over the tread against a barrier of "
+                    + "{2:0.#####}",
+                    mass,
+                    mass - walked,
+                    DungeonPack.HeightOf(PartModel.WallPanel)));
 
             return failures;
         }
@@ -289,6 +310,8 @@ namespace Game.EditorTooling
 
             failures += EveryFootingWearsTheMeshItAsksFor(models, graph, byName, report);
             failures += EveryFlightCrestsAtTheHeadOfItsOwnClimb(graph, byName, report);
+            failures += EveryFlightHandsItsTopStepToTheFloorItClimbsTo(graph, byName, report);
+            failures += NoPanelHangsBesideAFlight(graph, byName, report);
             failures += NoTileWearsAFootingItsGridDidNotAskFor(graph, byName, report);
             failures += NoLevelRunIsSerratedUnderneath(graph, byName, report);
             failures += EveryStaircaseSitsInItsDrop(graph, byName, report);
@@ -606,6 +629,264 @@ namespace Game.EditorTooling
                     complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
         }
 
+        static int EveryFlightHandsItsTopStepToTheFloorItClimbsTo(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var flights = 0;
+            var flush = 0;
+            var abutting = 0;
+            var complaint = new List<string>();
+            var edge = IsoProjection.TileEdge;
+            var step = IsoProjection.StepHeight;
+            var inward = edge * 0.5f - JoinBite;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                Transform instance;
+                if (TileFootings.Under(graph.Tiles, tile.Position) != TileFooting.Flight
+                    || !byName.TryGetValue(PartNames.Stair(tile.Position), out instance))
+                {
+                    continue;
+                }
+
+                flights++;
+                var ascent = TileFootings.AscentOf(graph.Tiles, tile.Position);
+                var along = TileSides.Toward(ascent);
+                var ground = IsoProjection.Of(tile.Position);
+                var treads = new List<Vector3[]>();
+                Triangles(instance, treads);
+
+                var top = Underfoot(
+                    treads, ground.X + along.X * inward, ground.Z + along.Z * inward);
+                var bottom = Underfoot(
+                    treads, ground.X - along.X * inward, ground.Z - along.Z * inward);
+                var landing = Landing(graph, tile.Position, ascent);
+
+                if (!float.IsNaN(top)
+                    && !float.IsNaN(bottom)
+                    && Math.Abs(top - ground.Y) <= Epsilon
+                    && bottom - (ground.Y - step) < step * 0.25f
+                    && bottom > ground.Y - step
+                    && (float.IsNaN(landing) || Math.Abs(landing - ground.Y) <= Epsilon))
+                {
+                    flush++;
+                }
+                else if (complaint.Count < Complaints)
+                {
+                    complaint.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} tops out at {1} against the {2:0.#####} its floor sits at, hands over to {3} "
+                        + "and starts at {4} against the {5:0.#####} it leaves",
+                        instance.name,
+                        Standing(top),
+                        ground.Y,
+                        Standing(landing),
+                        Standing(bottom),
+                        ground.Y - step));
+                }
+
+                Transform ahead;
+                var beyond = TileSides.Step(tile.Position, ascent);
+
+                if (!graph.Tiles.ContainsPlace(beyond.X, beyond.Y)
+                    || !byName.TryGetValue(
+                        LevelBlueprintBuilder.WalkingSurfaceOf(graph.Tiles, TileAt(graph, beyond)),
+                        out ahead))
+                {
+                    abutting++;
+                    continue;
+                }
+
+                var box = World(ahead);
+                var near = Math.Abs(along.X) > 0.5f
+                    ? (along.X > 0f ? box.min.x : box.max.x)
+                    : (along.Z > 0f ? box.min.z : box.max.z);
+                var seam = (Math.Abs(along.X) > 0.5f ? ground.X : ground.Z)
+                    + (Math.Abs(along.X) > 0.5f ? along.X : along.Z) * edge * 0.5f;
+
+                if (Math.Abs(near - seam) <= Epsilon)
+                {
+                    abutting++;
+                }
+                else if (complaint.Count < Complaints)
+                {
+                    complaint.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} starts at {1:0.#####} rather than on the {2:0.#####} seam {3} crests at",
+                        ahead.name,
+                        near,
+                        seam,
+                        instance.name));
+                }
+            }
+
+            var failures = Assert(
+                report,
+                flights > 0 && flush == flights,
+                "every flight's top step tops out on the floor it climbs to and its first step leaves the "
+                + "floor below by no more than one riser, so the run is walkable end to end",
+                flush + " of " + flights + " do"
+                + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+
+            failures += Assert(
+                report,
+                flights > 0 && abutting == flights,
+                "the floor of the terrace above begins on the seam the top step ends at, so no floor is "
+                + "laid over the flight and none is held back from it",
+                abutting + " of " + flights + " do");
+
+            return failures;
+        }
+
+        static int NoPanelHangsBesideAFlight(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var panels = 0;
+            var seated = 0;
+            var railed = 0;
+            var complaint = new List<string>();
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                foreach (var side in TileSides.All)
+                {
+                    var name = PartNames.Wall(tile.Position, side);
+                    var flight = TileFootings.Under(graph.Tiles, tile.Position) == TileFooting.Flight;
+                    var rails = flight
+                        && StaircaseFlight.RailsItsOwn(
+                            side, TileFootings.AscentOf(graph.Tiles, tile.Position));
+                    Transform instance;
+
+                    if (!byName.TryGetValue(name, out instance))
+                    {
+                        var beyond = TileSides.Step(tile.Position, side);
+
+                        if (rails && !graph.Tiles.ContainsPlace(beyond.X, beyond.Y))
+                        {
+                            railed++;
+                        }
+
+                        continue;
+                    }
+
+                    panels++;
+                    var standing = StaircaseFlight.HandsOverAt(graph.Tiles, tile.Position, side);
+
+                    if (rails)
+                    {
+                        if (complaint.Count < Complaints)
+                        {
+                            complaint.Add(name + " doubles the parapet the flight under it already carries");
+                        }
+
+                        continue;
+                    }
+
+                    if (Math.Abs(instance.position.y - standing) <= Epsilon)
+                    {
+                        seated++;
+                    }
+                    else if (complaint.Count < Complaints)
+                    {
+                        complaint.Add(string.Format(
+                            CultureInfo.InvariantCulture,
+                            "{0} stands at {1:0.#####} rather than on the {2:0.#####} its tile hands over at",
+                            name,
+                            instance.position.y,
+                            standing));
+                    }
+                }
+            }
+
+            var failures = Assert(
+                report,
+                panels > 0 && seated == panels,
+                "every panel stands on the ground its own tile hands over at that side, so none is left "
+                + "hanging over the slope of a flight",
+                seated + " of " + panels + " do"
+                + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+
+            failures += Assert(
+                report,
+                railed > 0,
+                "a flight fences its own long sides with the parapet the pack cut into it, so no panel is "
+                + "raised there to hang over the slope",
+                railed + " sides of a flight are left to the flight's own parapet");
+
+            return failures;
+        }
+
+        static float Landing(LevelGraph graph, TilePosition position, TileSide ascent)
+        {
+            var beyond = TileSides.Step(position, ascent);
+
+            return graph.Tiles.ContainsPlace(beyond.X, beyond.Y)
+                ? StaircaseFlight.HandsOverAt(
+                    graph.Tiles, TileAt(graph, beyond), TileSides.Opposite(ascent))
+                : float.NaN;
+        }
+
+        static TilePosition TileAt(LevelGraph graph, TilePosition place)
+        {
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                if (tile.Position.X == place.X && tile.Position.Y == place.Y)
+                {
+                    return tile.Position;
+                }
+            }
+
+            throw new InvalidOperationException("No tile stands where " + place + " does.");
+        }
+
+        static float Underfoot(List<Vector3[]> triangles, float x, float z)
+        {
+            var crest = float.NaN;
+
+            foreach (var triangle in triangles)
+            {
+                float height;
+                if (!Over(triangle, x, z, out height))
+                {
+                    continue;
+                }
+
+                crest = float.IsNaN(crest) ? height : Math.Max(crest, height);
+            }
+
+            return crest;
+        }
+
+        static bool Over(Vector3[] triangle, float x, float z, out float height)
+        {
+            var firstX = triangle[0].x - triangle[2].x;
+            var firstZ = triangle[0].z - triangle[2].z;
+            var secondX = triangle[1].x - triangle[2].x;
+            var secondZ = triangle[1].z - triangle[2].z;
+            var area = firstX * secondZ - firstZ * secondX;
+
+            height = 0f;
+
+            if (Math.Abs(area) <= float.Epsilon)
+            {
+                return false;
+            }
+
+            var alongX = x - triangle[2].x;
+            var alongZ = z - triangle[2].z;
+            var first = (alongX * secondZ - alongZ * secondX) / area;
+            var second = (firstX * alongZ - firstZ * alongX) / area;
+            var third = 1f - first - second;
+
+            if (first < 0f || second < 0f || third < 0f)
+            {
+                return false;
+            }
+
+            height = triangle[0].y * first + triangle[1].y * second + triangle[2].y * third;
+            return true;
+        }
+
         static int NoTileWearsAFootingItsGridDidNotAskFor(
             LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
@@ -862,8 +1143,10 @@ namespace Game.EditorTooling
                 var box = World(instance);
                 var ground = IsoProjection.Of(tile.Position);
 
-                if (Math.Abs(box.size.y - step) <= Epsilon
-                    && Math.Abs(box.max.y - ground.Y) <= Epsilon
+                var parapet = DungeonPack.StaircaseParapet;
+
+                if (Math.Abs(box.size.y - (step + parapet)) <= Epsilon
+                    && Math.Abs(box.max.y - (ground.Y + parapet)) <= Epsilon
                     && Math.Abs(box.min.y - (ground.Y - step)) <= Epsilon)
                 {
                     rising++;
@@ -878,9 +1161,9 @@ namespace Game.EditorTooling
                         box.size.y,
                         box.min.y,
                         box.max.y,
-                        step,
+                        step + parapet,
                         ground.Y - step,
-                        ground.Y));
+                        ground.Y + parapet));
                 }
 
                 var ascent = TileFootings.AscentOf(graph.Tiles, tile.Position);
@@ -921,7 +1204,8 @@ namespace Game.EditorTooling
             var failures = Assert(
                 report,
                 climbs > 0 && rising == climbs,
-                "every staircase fills the one step its tile hovers over, topping out flush with its floor",
+                "every staircase fills the one step its tile hovers over and carries its parapet over the "
+                + "floor it tops out at",
                 rising + " of " + climbs + " do");
 
             failures += Assert(
@@ -1109,7 +1393,7 @@ namespace Game.EditorTooling
                     && Math.Abs(reach.size.z - edge) <= Epsilon
                     && Math.Abs(reach.center.x - ground.X) <= Epsilon
                     && Math.Abs(reach.center.z - ground.Z) <= Epsilon
-                    && Math.Abs(reach.max.y - ground.Y) <= Epsilon
+                    && Math.Abs(reach.max.y - (ground.Y + DungeonPack.StaircaseParapet)) <= Epsilon
                     && Math.Abs(reach.min.y - (ground.Y - step)) <= Epsilon)
                 {
                     landing++;

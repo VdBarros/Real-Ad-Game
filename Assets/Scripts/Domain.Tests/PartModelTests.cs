@@ -170,7 +170,12 @@ namespace Game.Domain.Tests
                     var beyond = TileSides.Step(tile.Position, side);
                     var name = PartNames.Wall(tile.Position, side);
 
-                    if (graph.Tiles.ContainsPlace(beyond.X, beyond.Y))
+                    var footing = TileFootings.Under(graph.Tiles, tile.Position);
+                    var railed = footing == TileFooting.Flight
+                        && StaircaseFlight.RailsItsOwn(
+                            side, TileFootings.AscentOf(graph.Tiles, tile.Position));
+
+                    if (graph.Tiles.ContainsPlace(beyond.X, beyond.Y) || railed)
                     {
                         Assert.That(walls.ContainsKey(name), Is.False, name);
                         continue;
@@ -182,12 +187,13 @@ namespace Game.Domain.Tests
                     var wall = walls[name];
                     var here = IsoProjection.Of(tile.Position);
                     var there = IsoProjection.Of(beyond);
+                    var standing = StaircaseFlight.HandsOverAt(graph.Tiles, tile.Position, side);
 
                     Assert.That(
                         wall.Position,
                         Is.EqualTo(new WorldPoint(
                             (here.X + there.X) * 0.5f,
-                            here.Y + IsoProjection.WallHeight * 0.5f,
+                            standing + IsoProjection.WallHeight * 0.5f,
                             (here.Z + there.Z) * 0.5f)),
                         name);
                     Assert.That(

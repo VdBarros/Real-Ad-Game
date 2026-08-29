@@ -20,6 +20,8 @@ namespace Game.Presentation.Pure
 
         public const float StaircasePackHeight = 5.1f;
 
+        public const float StaircasePackTread = 4f;
+
         public const float StaircasePackWidth = GridUnits;
 
         public const float StaircasePackRun = GridUnits;
@@ -60,6 +62,16 @@ namespace Game.Presentation.Pure
         public static float StaircaseRun
         {
             get { return DepthOf(PartModel.Staircase); }
+        }
+
+        public static float StaircaseTread
+        {
+            get { return FillOf(PartModel.Staircase); }
+        }
+
+        public static float StaircaseParapet
+        {
+            get { return HeightOf(PartModel.Staircase) - StaircaseTread; }
         }
 
         public static float FoundationWidth
@@ -142,9 +154,25 @@ namespace Game.Presentation.Pure
             }
         }
 
+        public static float PackFillOf(PartModel model)
+        {
+            switch (model)
+            {
+                case PartModel.Staircase:
+                    return StaircasePackTread;
+                default:
+                    return PackHeightOf(model);
+            }
+        }
+
         public static float HeightOf(PartModel model)
         {
             return PackHeightOf(model) * ImportScale;
+        }
+
+        public static float FillOf(PartModel model)
+        {
+            return PackFillOf(model) * ImportScale;
         }
 
         public static float WidthOf(PartModel model)
@@ -160,7 +188,7 @@ namespace Game.Presentation.Pure
         public static WorldPoint FitOf(PartModel model, WorldPoint size)
         {
             return new WorldPoint(
-                size.X / WidthOf(model), size.Y / HeightOf(model), size.Z / DepthOf(model));
+                size.X / WidthOf(model), size.Y / FillOf(model), size.Z / DepthOf(model));
         }
 
         static ArgumentOutOfRangeException Unmeshed(PartModel model)
