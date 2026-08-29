@@ -6,10 +6,11 @@ namespace Game.Presentation.Pure
     public sealed class Journey : IEquatable<Journey>
     {
         public static readonly Journey Nowhere =
-            new Journey(null, Walk.Nowhere, null, false, Fight.None, TapAim.Nothing);
+            new Journey(null, Walk.Nowhere, null, false, Fight.None, Drain.None, TapAim.Nothing);
 
         readonly bool owesABeat;
         readonly Fight fight;
+        readonly Drain drain;
         readonly int diversion;
 
         Journey(
@@ -18,6 +19,7 @@ namespace Game.Presentation.Pure
             ActionResult arrival,
             bool owesABeat,
             Fight fight,
+            Drain drain,
             int diversion)
         {
             State = state;
@@ -25,6 +27,7 @@ namespace Game.Presentation.Pure
             Arrival = arrival;
             this.owesABeat = owesABeat;
             this.fight = fight;
+            this.drain = drain;
             this.diversion = diversion;
         }
 
@@ -47,6 +50,7 @@ namespace Game.Presentation.Pure
                 null,
                 false,
                 Fight.None,
+                Drain.None,
                 TapAim.Nothing);
         }
 
@@ -78,7 +82,17 @@ namespace Game.Presentation.Pure
 
         public bool HoldsForAFight
         {
-            get { return IsWaiting && !fight.IsSettled; }
+            get { return IsWaiting && (!fight.IsSettled || drain.IsRunning); }
+        }
+
+        public Drain Drain
+        {
+            get { return drain; }
+        }
+
+        public bool IsDraining
+        {
+            get { return IsWaiting && drain.IsRunning; }
         }
 
         public int Diversion
@@ -96,15 +110,19 @@ namespace Game.Presentation.Pure
             if (IsWaiting)
             {
                 var fought = fight.Advanced(deltaSeconds);
-                return fought.Equals(fight)
-                    ? this
-                    : new Journey(State, Walk, Arrival, owesABeat, fought, diversion);
+                var draining = drain.Advanced(deltaSeconds);
+                if (fought.Equals(fight) && draining.Equals(drain))
+                {
+                    return this;
+                }
+
+                return new Journey(Bled(draining), Walk, Arrival, owesABeat, fought, draining, diversion);
             }
 
             var walked = Walk.Advanced(deltaSeconds);
             if (!walked.IsWaiting)
             {
-                return new Journey(State, walked, null, false, Fight.None, diversion);
+                return new Journey(State, walked, null, false, Fight.None, Drain.None, diversion);
             }
 
             var reached = walked.ArrivedNodeId;
@@ -118,12 +136,25 @@ namespace Game.Presentation.Pure
                 resolved,
                 spendsAMultiplier,
                 Fight.Of(resolved.Outcome),
+                Drains(resolved) ? Drain.Against(resolved.State.Power) : Drain.None,
                 diversion);
+        }
+
+        static bool Drains(ActionResult resolved)
+        {
+            return resolved.Outcome == ActionOutcome.Tie || resolved.Outcome == ActionOutcome.Loss;
+        }
+
+        RunState Bled(Drain draining)
+        {
+            var left = draining.Power;
+
+            return draining.IsHeld && left < State.Power ? State.Drained(left) : State;
         }
 
         public Journey Resumed()
         {
-            if (!IsWaiting || !fight.IsSettled)
+            if (!IsWaiting || !fight.IsSettled || drain.IsRunning)
             {
                 return this;
             }
@@ -134,6 +165,7 @@ namespace Game.Presentation.Pure
                 null,
                 false,
                 Fight.None,
+                Drain.None,
                 diversion);
         }
 
@@ -170,6 +202,7 @@ namespace Game.Presentation.Pure
                 Arrival,
                 owesABeat,
                 fight,
+                drain.Stopped(),
                 nextNodeId);
         }
 
@@ -189,6 +222,7 @@ namespace Game.Presentation.Pure
                 && owesABeat == other.owesABeat
                 && diversion == other.diversion
                 && fight.Equals(other.fight)
+                && drain.Equals(other.drain)
                 && ReferenceEquals(Arrival, other.Arrival)
                 && (State == null ? other.State == null : State.Equals(other.State));
         }
@@ -205,6 +239,7 @@ namespace Game.Presentation.Pure
                 var hash = Walk.GetHashCode();
                 hash = (hash * 397) ^ (owesABeat ? 1 : 0);
                 hash = (hash * 397) ^ fight.GetHashCode();
+                hash = (hash * 397) ^ drain.GetHashCode();
                 hash = (hash * 397) ^ diversion;
                 hash = (hash * 397) ^ (State == null ? 0 : State.GetHashCode());
                 return hash;

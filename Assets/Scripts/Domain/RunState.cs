@@ -135,6 +135,23 @@ namespace Game.Domain
             return type == NodeType.Enemy || type == NodeType.Boss;
         }
 
+        public RunState Drained(int power)
+        {
+            if (power < Drain.Floor)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(power), power, "A drain leaves the run standing on the floor, never under it.");
+            }
+
+            if (power > Power)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(power), power, "A drain only ever takes power away.");
+            }
+
+            return power == Power ? this : new RunState(Level, PositionNodeId, power, CopyConsumed());
+        }
+
         internal bool[] CopyConsumed()
         {
             return (bool[])consumed.Clone();

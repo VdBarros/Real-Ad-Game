@@ -328,12 +328,14 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ATiedFightLeavesTheRunStateByteIdenticalAndWalksBack()
+        public void ATiedFightDrainsThePlayerAndWalksBack()
         {
             var opening = RunFixture.Begin(RunFixture.DoorstepEnemyValue);
             var journey = Ran(Journey.Toward(opening, RunFixture.DoorstepEnemy), null);
 
-            Assert.That(journey.State, Is.EqualTo(opening));
+            Assert.That(journey.State.Power, Is.EqualTo(Drain.Floor));
+            Assert.That(journey.State.Power, Is.LessThan(opening.Power));
+            Assert.That(journey.State.ConsumedNodes.Count, Is.EqualTo(0));
             Assert.That(journey.State.PositionNodeId, Is.EqualTo(RunFixture.Start));
         }
 
@@ -425,18 +427,111 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ATieAndALossRunTheirFightsAndStillLeaveTheRunByteIdentical()
+        public void ATieAndALossBothCostPowerAndTakeNothingOffTheBoard()
         {
             foreach (var power in new[] { RunFixture.DoorstepEnemyValue, RunFixture.DoorstepEnemyValue - 1 })
             {
                 var opening = RunFixture.Begin(power);
                 var fought = Ran(Journey.Toward(opening, RunFixture.DoorstepEnemy), null);
 
-                Assert.That(fought.State, Is.EqualTo(opening));
-                Assert.That(fought.State.Power, Is.EqualTo(power));
-                Assert.That(fought.State.ConsumedNodes.Count, Is.EqualTo(0));
-                Assert.That(fought.State.PositionNodeId, Is.EqualTo(RunFixture.Start));
+                Assert.That(fought.State.Power, Is.EqualTo(Drain.Floor), power.ToString());
+                Assert.That(fought.State.Power, Is.LessThanOrEqualTo(power), power.ToString());
+                Assert.That(fought.State.ConsumedNodes.Count, Is.EqualTo(0), power.ToString());
+                Assert.That(fought.State.PositionNodeId, Is.EqualTo(RunFixture.Start), power.ToString());
+                Assert.That(
+                    fought.State.Level.Decisions.Node(RunFixture.DoorstepEnemy).Value,
+                    Is.EqualTo(RunFixture.DoorstepEnemyValue),
+                    power.ToString());
             }
+        }
+
+        static Journey AgainstTheWall(int wall)
+        {
+            var level = LevelSketch.Branching(additive: 20, gateEnemy: wall).Build();
+
+            return UntilAFight(Journey.Toward(RunState.Begin(level, 2), LevelSketch.GateEnemyNodeId));
+        }
+
+        [Test]
+        public void WalkingIntoAWallHoldsTheContactAndBleedsThePowerAway()
+        {
+            var wall = AgainstTheWall(60);
+
+            Assert.That(wall.Arrival.Outcome, Is.EqualTo(ActionOutcome.Loss));
+            Assert.That(wall.State.Power, Is.EqualTo(22));
+            Assert.That(wall.IsDraining, Is.True);
+            Assert.That(wall.Drain.From, Is.EqualTo(22));
+
+            var bled = Walked(wall, 30);
+
+            Assert.That(bled.State.Power, Is.LessThan(22));
+            Assert.That(bled.IsDraining, Is.True);
+            Assert.That(bled.HoldsForAFight, Is.True);
+            Assert.That(bled.Resumed(), Is.SameAs(bled));
+        }
+
+        [Test]
+        public void ATieHoldsTheSameContactAndBleedsJustAsALossDoes()
+        {
+            var tied = AgainstTheWall(22);
+
+            Assert.That(tied.Arrival.Outcome, Is.EqualTo(ActionOutcome.Tie));
+            Assert.That(tied.IsDraining, Is.True);
+            Assert.That(Walked(tied, 30).State.Power, Is.LessThan(22));
+            Assert.That(Ran(tied, null).State.Power, Is.EqualTo(Drain.Floor));
+        }
+
+        [Test]
+        public void TheDrainStopsOnTheFloorAndTheWalkBacksOffFromThere()
+        {
+            var settled = Ran(AgainstTheWall(60), null);
+
+            Assert.That(settled.IsOver, Is.True);
+            Assert.That(settled.State.Power, Is.EqualTo(Drain.Floor));
+            Assert.That(settled.State.PositionNodeId, Is.EqualTo(LevelSketch.AdditiveNodeId));
+            Assert.That(settled.State.IsConsumed(LevelSketch.GateEnemyNodeId), Is.False);
+            Assert.That(
+                settled.State.Level.Decisions.Node(LevelSketch.GateEnemyNodeId).Value,
+                Is.EqualTo(60),
+                "The wall never gives a number back while it is eating one.");
+        }
+
+        [Test]
+        public void ATapMidDrainStopsTheBleedAndKeepsWhateverIsLeft()
+        {
+            var brushed = Walked(AgainstTheWall(60), 24);
+            var left = brushed.State.Power;
+
+            Assert.That(left, Is.LessThan(22));
+            Assert.That(left, Is.GreaterThan(Drain.Floor));
+
+            var settled = Ran(brushed.DivertedTo(LevelSketch.StartNodeId), null);
+
+            Assert.That(settled.State.Power, Is.EqualTo(left));
+            Assert.That(settled.IsOver, Is.True);
+            Assert.That(settled.Onward().State.Power, Is.EqualTo(left));
+        }
+
+        [Test]
+        public void AShortBrushAgainstAWallCostsLessThanALongLean()
+        {
+            var brushed = Ran(Walked(AgainstTheWall(60), 24).Cancelled(), null);
+            var leaned = Ran(Walked(AgainstTheWall(60), 66).Cancelled(), null);
+
+            Assert.That(brushed.State.Power, Is.GreaterThan(leaned.State.Power));
+            Assert.That(22 - brushed.State.Power, Is.GreaterThan(0));
+            Assert.That(leaned.State.Power, Is.GreaterThan(Drain.Floor));
+        }
+
+        [Test]
+        public void AWonFightBleedsNothing()
+        {
+            var journey = Reached(Journey.Toward(RunFixture.Begin(3), RunFixture.DoorstepEnemy));
+
+            Assert.That(journey.Fight.Outcome, Is.EqualTo(ActionOutcome.Win));
+            Assert.That(journey.Drain.IsHeld, Is.False);
+            Assert.That(journey.IsDraining, Is.False);
+            Assert.That(Ran(journey, null).State.Power, Is.EqualTo(3 + RunFixture.DoorstepEnemyValue));
         }
 
         [Test]
