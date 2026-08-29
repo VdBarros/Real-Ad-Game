@@ -18,7 +18,7 @@ namespace Game.Domain.Tests
             var blueprint = BadgeBlueprintBuilder.Build(graph, StartingPower);
 
             var wearers = graph.Decisions.Nodes
-                .Where(node => node.Type != NodeType.Empty)
+                .Where(node => node.Type != NodeType.Empty && node.Type != NodeType.Multiplier)
                 .Select(node => node.Id)
                 .ToList();
 
@@ -34,25 +34,68 @@ namespace Game.Domain.Tests
             var blueprint = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces(), StartingPower);
 
             Assert.That(TextOn(blueprint, NodeType.Additive), Is.EqualTo("+12"));
-            Assert.That(TextOn(blueprint, NodeType.Multiplier), Is.EqualTo("x3"));
             Assert.That(TextOn(blueprint, NodeType.Enemy), Is.EqualTo("4"));
             Assert.That(TextOn(blueprint, NodeType.Boss), Is.EqualTo("30"));
             Assert.That(TextOn(blueprint, NodeType.Start), Is.EqualTo("2"));
         }
 
         [Test]
-        public void EnemiesWearAPillAndEverythingElseARoundedRect()
+        public void TheThreeBadgeMeaningsWearThreeShapesOfTheirOwn()
         {
             var blueprint = BadgeBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces(), StartingPower);
 
             foreach (var badge in blueprint.Badges)
             {
-                var expected = badge.Style == BadgeStyle.Enemy || badge.Style == BadgeStyle.Boss
-                    ? BadgeShape.Pill
-                    : BadgeShape.RoundedRect;
+                BadgeShape expected;
+                switch (badge.Style)
+                {
+                    case BadgeStyle.Enemy:
+                    case BadgeStyle.Boss:
+                        expected = BadgeShape.Pill;
+                        break;
+                    case BadgeStyle.Additive:
+                        expected = BadgeShape.Tag;
+                        break;
+                    default:
+                        expected = BadgeShape.RoundedRect;
+                        break;
+                }
 
                 Assert.That(badge.Shape, Is.EqualTo(expected), badge.ToString());
             }
+        }
+
+        [Test]
+        public void AGainIsNeitherTheShapeNorTheColourOfThePlayersOwnBadge()
+        {
+            Assert.That(
+                BadgeStyles.ShapeOf(BadgeStyle.Additive),
+                Is.Not.EqualTo(BadgeStyles.ShapeOf(BadgeStyle.Player)));
+            Assert.That(
+                BadgeTints.Of(BadgeStyle.Additive),
+                Is.Not.EqualTo(BadgeTints.Of(BadgeStyle.Player)));
+        }
+
+        [Test]
+        public void NoMultiplierGateCarriesABadgeOfAnyKind()
+        {
+            var graph = LevelGenerator.Generate(20250824L, MazePreset.Ship).Graph;
+            var blueprint = BadgeBlueprintBuilder.Build(graph, StartingPower);
+            var gates = graph.Decisions.Nodes
+                .Where(node => node.Type == NodeType.Multiplier)
+                .Select(node => node.Id)
+                .ToList();
+
+            Assert.That(gates, Is.Not.Empty);
+
+            foreach (var gate in gates)
+            {
+                Assert.That(blueprint.Badges.Select(badge => badge.NodeId), Has.No.Member(gate));
+                Assert.That(blueprint.Badges.Select(badge => badge.Name), Has.No.Member(PartNames.Badge(gate)));
+            }
+
+            BadgeStyle style;
+            Assert.That(BadgeStyles.TryOf(NodeType.Multiplier, out style), Is.False);
         }
 
         [Test]

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -35,6 +36,20 @@ namespace Game.EditorTooling
         const int AdditiveValue = 5;
 
         const int MultiplierValue = 3;
+
+        const int EnemyValue = 4;
+
+        const string GatePath = "dev/scratch/t-138-";
+
+        const float GalleryCentre = 3f;
+
+        const float GalleryLift = 0.5f;
+
+        const float GalleryRange = 16f;
+
+        const float GallerySize = 5f;
+
+        const float ColourReach = 0.45f;
 
         const int Power = 2;
 
@@ -77,7 +92,9 @@ namespace Game.EditorTooling
                 .Append(Row(addFirst))
                 .Append(Row(multiplyFirst))
                 .Append(TheLidSwingsUpBeforeTheChestThins())
-                .Append(AResumedLevelShowsNothingOfAChestItAlreadyTook());
+                .Append(AResumedLevelShowsNothingOfAChestItAlreadyTook())
+                .Append(AMultiplierIsAnArchOnTheGroundAndNotABadge())
+                .Append(TheFourNumericMeaningsWearFourDifferentForms());
 
             TheOrderShowsInTheResult(addFirst, multiplyFirst);
 
@@ -293,8 +310,8 @@ namespace Game.EditorTooling
                 if (target != null && target.gameObject.activeSelf)
                 {
                     Debug.LogError(
-                        "Node " + nodeId + " kept its badge once taken, so an empty tile still "
-                        + "advertises a number the player cannot have.");
+                        "Node " + nodeId + " kept the thing the player tapped once taken, so an empty "
+                        + "tile still advertises a reward that cannot be had.");
                 }
             }
         }
@@ -480,6 +497,295 @@ namespace Game.EditorTooling
 
             return "\n  a level resumed on power " + power.ToString(CultureInfo.InvariantCulture)
                 + " shows nothing of node " + Additive + " and never replays its take";
+        }
+
+        static string AMultiplierIsAnArchOnTheGroundAndNotABadge()
+        {
+            var graph = Arena();
+            var rig = CameraRig.Raise();
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var gateName = PartNames.Node(Multiplier);
+            var gate = Find(root, gateName);
+            var arch = gate == null ? null : gate.GetComponent<GateProp>();
+
+            if (gate == null || arch == null)
+            {
+                Debug.LogError(
+                    "FAIL: node " + Multiplier + " raised no " + gateName
+                    + " carrying a gate arch, so a multiplier is still whatever it used to be.");
+                Clear(root, rig, builder);
+                return "\n  the gate never rose";
+            }
+
+            foreach (var badge in gate.GetComponentsInChildren<NumberBadge>(true))
+            {
+                Debug.LogError(
+                    "FAIL: the multiplier gate carries a badge named " + badge.name
+                    + " showing " + badge.Value + ", so it is still a number to be read.");
+            }
+
+            foreach (var text in gate.GetComponentsInChildren<TMPro.TMP_Text>(true))
+            {
+                Debug.LogError(
+                    "FAIL: the multiplier gate carries the text " + text.text
+                    + ", so its factor is still written out rather than built.");
+            }
+
+            foreach (var sprite in gate.GetComponentsInChildren<SpriteRenderer>(true))
+            {
+                Debug.LogError(
+                    "FAIL: the multiplier gate carries the sprite " + sprite.name
+                    + ", so a badge plate is still hanging on it.");
+            }
+
+            foreach (var badge in root.GetComponentsInChildren<NumberBadge>(true))
+            {
+                if (badge.name == PartNames.Badge(Multiplier))
+                {
+                    Debug.LogError(
+                        "FAIL: the level raised " + badge.name
+                        + " somewhere else in the hierarchy, so the gate badge only moved house.");
+                }
+            }
+
+            if (arch.Pips != MultiplierValue)
+            {
+                Debug.LogError(
+                    "FAIL: an x" + MultiplierValue + " gate counts " + arch.Pips
+                    + " pips along its lintel, so its factor cannot be read off the object.");
+            }
+
+            if (arch.Factor != MultiplierValue)
+            {
+                Debug.LogError(
+                    "FAIL: the gate glows for a factor of " + arch.Factor + " rather than "
+                    + MultiplierValue + ".");
+            }
+
+            var target = builder.Targets.Of(Multiplier);
+
+            if (target == null)
+            {
+                Debug.LogError("FAIL: the multiplier gate is no longer a tap target at all.");
+            }
+            else
+            {
+                if (target.Gate == null)
+                {
+                    Debug.LogError("FAIL: the multiplier target marks something other than the arch.");
+                }
+
+                if (target.Badge != null)
+                {
+                    Debug.LogError("FAIL: the multiplier target still wears its mark on a badge.");
+                }
+            }
+
+            var box = Stands(gate.GetComponent<PickupProp>());
+            var floor = IsoProjection.Of(graph.Decisions.Node(Multiplier).Position).Y;
+            var span = box.size.x > box.size.z ? box.size.x : box.size.z;
+            var stands = box.max.y - floor;
+
+            if (stands < LevelBlueprintBuilder.FigureScale * 2f)
+            {
+                Debug.LogError(
+                    "FAIL: the arch stands only " + stands.ToString("F3", CultureInfo.InvariantCulture)
+                    + " over its tile, which the player is taller than, so nothing is walked through.");
+            }
+
+            if (box.min.y > floor + Tolerance)
+            {
+                Debug.LogError(
+                    "FAIL: the arch floats " + (box.min.y - floor).ToString("F3", CultureInfo.InvariantCulture)
+                    + " over its tile rather than standing on it.");
+            }
+
+            var walkway = Walkway(gate);
+
+            if (walkway < LevelBlueprintBuilder.FigureScale)
+            {
+                Debug.LogError(
+                    "FAIL: the posts leave a gap of " + walkway.ToString("F3", CultureInfo.InvariantCulture)
+                    + ", which the player cannot pass through.");
+            }
+
+            var eye = PreviewFilm.Rig(gate.position, CloseUpRange, CloseUpSize);
+            PreviewFilm.Shoot(eye, GatePath + "arch.png");
+            WorldObjects.Destroy(eye.gameObject);
+            Clear(root, rig, builder);
+
+            return new StringBuilder("\n  the x")
+                .Append(MultiplierValue.ToString(CultureInfo.InvariantCulture))
+                .Append(" gate is an arch ")
+                .Append(span.ToString("F3", CultureInfo.InvariantCulture))
+                .Append(" across and ")
+                .Append(stands.ToString("F3", CultureInfo.InvariantCulture))
+                .Append(" tall, walked through a ")
+                .Append(walkway.ToString("F3", CultureInfo.InvariantCulture))
+                .Append(" gap, wearing ")
+                .Append(arch.Pips.ToString(CultureInfo.InvariantCulture))
+                .Append(" pips and no badge, sprite or glyph of any kind")
+                .ToString();
+        }
+
+        static string TheFourNumericMeaningsWearFourDifferentForms()
+        {
+            var graph = Gallery();
+            var rig = CameraRig.Raise();
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph, Power);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var shapes = new Dictionary<BadgeStyle, BadgeShape>();
+            var colours = new Dictionary<BadgeStyle, Color>();
+
+            foreach (var badge in root.GetComponentsInChildren<NumberBadge>(true))
+            {
+                if (badge.GetComponent<SpriteRenderer>() == null)
+                {
+                    Debug.LogError("FAIL: badge " + badge.name + " draws no plate behind its number.");
+                }
+
+                shapes[badge.Style] = BadgeStyles.ShapeOf(badge.Style);
+                colours[badge.Style] = BadgePalette.Of(badge.Style);
+            }
+
+            foreach (var pair in shapes)
+            {
+                foreach (var other in shapes)
+                {
+                    if (Family(pair.Key) == Family(other.Key))
+                    {
+                        continue;
+                    }
+
+                    if (pair.Value == other.Value && Near(colours[pair.Key], colours[other.Key]))
+                    {
+                        Debug.LogError(
+                            "FAIL: a " + pair.Key + " badge and a " + other.Key + " badge are both a "
+                            + pair.Value + " in the same colour, so only their numbers tell them apart.");
+                    }
+                }
+            }
+
+            if (!shapes.ContainsKey(BadgeStyle.Player)
+                || !shapes.ContainsKey(BadgeStyle.Additive)
+                || !shapes.ContainsKey(BadgeStyle.Enemy))
+            {
+                Debug.LogError(
+                    "FAIL: the gallery raised only " + shapes.Count
+                    + " of the three badge meanings, so it proves nothing about telling them apart.");
+            }
+
+            var gates = 0;
+            foreach (var arch in root.GetComponentsInChildren<GateProp>(true))
+            {
+                gates++;
+
+                if (arch.GetComponentInChildren<NumberBadge>(true) != null)
+                {
+                    Debug.LogError("FAIL: a gallery gate wears a badge.");
+                }
+            }
+
+            if (gates == 0)
+            {
+                Debug.LogError("FAIL: the gallery raised no gate at all.");
+            }
+
+            var eye = PreviewFilm.Rig(
+                new Vector3(GalleryCentre, GalleryLift, 0f), GalleryRange, GallerySize);
+            PreviewFilm.Shoot(eye, GatePath + "four-meanings.png");
+            WorldObjects.Destroy(eye.gameObject);
+            Clear(root, rig, builder);
+
+            var line = new StringBuilder("\n  four meanings, four forms: ")
+                .Append(gates.ToString(CultureInfo.InvariantCulture))
+                .Append(" multiplier gate(s) wearing no badge, plus");
+
+            foreach (var pair in shapes)
+            {
+                line.Append(' ')
+                    .Append(pair.Key.ToString())
+                    .Append(" as a ")
+                    .Append(pair.Value.ToString())
+                    .Append(" in ")
+                    .Append(Hex(colours[pair.Key]))
+                    .Append(';');
+            }
+
+            return line.ToString();
+        }
+
+        static LevelGraph Gallery()
+        {
+            var builder = new LevelGraphBuilder(Seed, Preset);
+
+            for (var x = 0; x < 7; x++)
+            {
+                builder.AddTile(At(x), regionId: 0);
+            }
+
+            builder.AddNode(At(0), NodeType.Additive, AdditiveValue);
+            builder.AddNode(At(2), NodeType.Start);
+            builder.AddNode(At(4), NodeType.Multiplier, MultiplierValue);
+            builder.AddNode(At(6), NodeType.Enemy, EnemyValue);
+
+            builder.Connect(At(2), At(0), new[] { At(1) });
+            builder.Connect(At(2), At(4), new[] { At(3) });
+            builder.Connect(At(4), At(6), new[] { At(5) });
+
+            return builder.Build();
+        }
+
+        static string Family(BadgeStyle style)
+        {
+            return style == BadgeStyle.Boss ? BadgeStyle.Enemy.ToString() : style.ToString();
+        }
+
+        static bool Near(Color left, Color right)
+        {
+            return Mathf.Abs(left.r - right.r) + Mathf.Abs(left.g - right.g) + Mathf.Abs(left.b - right.b)
+                < ColourReach;
+        }
+
+        static string Hex(Color colour)
+        {
+            return "#" + ColorUtility.ToHtmlStringRGB(colour);
+        }
+
+        static float Walkway(Transform gate)
+        {
+            var left = gate.Find(PartNames.GateLeftPost);
+            var right = gate.Find(PartNames.GateRightPost);
+
+            if (left == null || right == null)
+            {
+                return 0f;
+            }
+
+            return Vector3.Distance(left.position, right.position)
+                - (left.lossyScale.x + right.lossyScale.x) * 0.5f;
+        }
+
+        static Transform Find(GameObject root, string name)
+        {
+            foreach (var part in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (part.name == name)
+                {
+                    return part;
+                }
+            }
+
+            return null;
         }
 
         static float LidHeight(PickupProp pickup)

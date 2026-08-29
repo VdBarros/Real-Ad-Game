@@ -220,18 +220,21 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheTwoRewardPropsStandTheSameHeightAndAreFittedByDifferentAmounts()
+        public void AChestIsFittedToItsCubeAndAGateIsPosedExactlyAsTheBlueprintDrewIt()
         {
             var chest = Pickup(PartStyle.Additive);
-            var hoard = Pickup(PartStyle.Multiplier);
+            var gate = Pickup(PartStyle.Multiplier);
 
             Assert.That(chest.Model, Is.EqualTo(PartModel.Chest));
-            Assert.That(hoard.Model, Is.EqualTo(PartModel.CoinStack));
             Assert.That(
                 ModelPose.ScaleOf(chest).Y * DungeonPack.HeightOf(PartModel.Chest),
-                Is.EqualTo(ModelPose.ScaleOf(hoard).Y * DungeonPack.HeightOf(PartModel.CoinStack))
-                    .Within(Tolerance));
-            Assert.That(ModelPose.ScaleOf(chest).Y, Is.Not.EqualTo(ModelPose.ScaleOf(hoard).Y));
+                Is.EqualTo(LevelBlueprintBuilder.PickupScale).Within(Tolerance));
+
+            Assert.That(gate.Model, Is.EqualTo(PartModel.None));
+            Assert.That(gate.Shape, Is.EqualTo(PartShape.Gate));
+            Assert.That(ModelPose.PositionOf(gate), Is.EqualTo(gate.Position));
+            Assert.That(ModelPose.RotationOf(gate), Is.EqualTo(gate.Rotation));
+            Assert.That(ModelPose.ScaleOf(gate), Is.EqualTo(gate.Scale));
         }
 
         [Test]
@@ -255,11 +258,6 @@ namespace Game.Domain.Tests
 
             Assert.That(refused.X, Is.EqualTo(refused.Y).Within(Tolerance));
             Assert.That(refused.Z, Is.EqualTo(refused.Y).Within(Tolerance));
-
-            var hoard = ModelPose.ScaleOf(Pickup(PartStyle.Multiplier));
-
-            Assert.That(hoard.X, Is.EqualTo(hoard.Y).Within(Tolerance));
-            Assert.That(hoard.Z, Is.EqualTo(hoard.Y).Within(Tolerance));
         }
 
         [Test]

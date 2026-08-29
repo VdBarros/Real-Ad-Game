@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Game.Presentation.Pure;
 using NUnit.Framework;
 
@@ -8,7 +9,7 @@ namespace Game.Domain.Tests
         [Test]
         public void EveryShapeIsSolidThroughItsMiddle()
         {
-            foreach (var shape in new[] { BadgeShape.RoundedRect, BadgeShape.Pill })
+            foreach (var shape in AllShapes)
             {
                 var centre = BadgeShapeField.CellPixels / 2;
                 Assert.That(BadgeShapeField.Coverage(shape, centre, centre), Is.EqualTo(1f), shape.ToString());
@@ -21,7 +22,7 @@ namespace Game.Domain.Tests
         {
             var last = BadgeShapeField.CellPixels - 1;
 
-            foreach (var shape in new[] { BadgeShape.RoundedRect, BadgeShape.Pill })
+            foreach (var shape in AllShapes)
             {
                 Assert.That(BadgeShapeField.Coverage(shape, 0, 0), Is.EqualTo(0f), shape.ToString());
                 Assert.That(BadgeShapeField.Coverage(shape, last, 0), Is.EqualTo(0f), shape.ToString());
@@ -31,19 +32,20 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void APillIsRounderThanARoundedRect()
+        public void EachShapeCutsItsCornersByADifferentAmount()
         {
             var eighth = BadgeShapeField.CellPixels / 8;
 
             Assert.That(BadgeShapeField.Coverage(BadgeShape.RoundedRect, eighth, eighth), Is.EqualTo(1f));
             Assert.That(BadgeShapeField.Coverage(BadgeShape.Pill, eighth, eighth), Is.EqualTo(0f));
+            Assert.That(BadgeShapeField.Coverage(BadgeShape.Tag, eighth, eighth), Is.EqualTo(0f));
             Assert.That(BadgeShapeField.PillRadius, Is.GreaterThan(BadgeShapeField.RoundedRectRadius));
         }
 
         [Test]
         public void CoverageStaysBetweenNothingAndEverything()
         {
-            foreach (var shape in new[] { BadgeShape.RoundedRect, BadgeShape.Pill })
+            foreach (var shape in AllShapes)
             {
                 for (var y = 0; y < BadgeShapeField.CellPixels; y++)
                 {
@@ -59,21 +61,83 @@ namespace Game.Domain.Tests
         [Test]
         public void TheNineSliceBordersLeaveAStretchableMiddle()
         {
-            foreach (var shape in new[] { BadgeShape.RoundedRect, BadgeShape.Pill })
+            foreach (var shape in AllShapes)
             {
                 Assert.That(BadgeShapeField.BorderOf(shape) * 2, Is.LessThan(BadgeShapeField.CellPixels));
             }
         }
 
         [Test]
-        public void TheTwoCellsDoNotTouch()
+        public void NoTwoCellsTouchAndEveryOneFitsTheStrip()
         {
-            Assert.That(
-                BadgeShapeField.OriginX(BadgeShape.Pill),
-                Is.GreaterThanOrEqualTo(BadgeShapeField.CellPixels + BadgeShapeField.GutterPixels));
-            Assert.That(
-                BadgeShapeField.OriginX(BadgeShape.Pill) + BadgeShapeField.CellPixels,
-                Is.LessThanOrEqualTo(BadgeShapeField.TextureWidth));
+            var taken = new List<int>();
+
+            foreach (var shape in AllShapes)
+            {
+                var origin = BadgeShapeField.OriginX(shape);
+
+                Assert.That(origin, Is.GreaterThanOrEqualTo(0), shape.ToString());
+                Assert.That(
+                    origin + BadgeShapeField.CellPixels,
+                    Is.LessThanOrEqualTo(BadgeShapeField.TextureWidth),
+                    shape.ToString());
+
+                foreach (var other in taken)
+                {
+                    Assert.That(
+                        System.Math.Abs(origin - other),
+                        Is.GreaterThanOrEqualTo(BadgeShapeField.CellPixels + BadgeShapeField.GutterPixels),
+                        shape.ToString());
+                }
+
+                taken.Add(origin);
+            }
+
+            Assert.That(taken, Has.Count.EqualTo(BadgeShapeField.Cells));
         }
+
+        [Test]
+        public void EveryShapeAnyBadgeStyleAsksForHasACellOfItsOwn()
+        {
+            foreach (BadgeStyle style in System.Enum.GetValues(typeof(BadgeStyle)))
+            {
+                Assert.That(AllShapes, Contains.Item(BadgeStyles.ShapeOf(style)), style.ToString());
+            }
+        }
+
+        [Test]
+        public void NoTwoShapesDrawTheSameSilhouette()
+        {
+            for (var first = 0; first < AllShapes.Length; first++)
+            {
+                for (var second = first + 1; second < AllShapes.Length; second++)
+                {
+                    Assert.That(
+                        Silhouette(AllShapes[first]),
+                        Is.Not.EqualTo(Silhouette(AllShapes[second])),
+                        AllShapes[first] + " against " + AllShapes[second]);
+                }
+            }
+        }
+
+        static string Silhouette(BadgeShape shape)
+        {
+            var drawn = new System.Text.StringBuilder();
+
+            for (var y = 0; y < BadgeShapeField.CellPixels; y++)
+            {
+                for (var x = 0; x < BadgeShapeField.CellPixels; x++)
+                {
+                    drawn.Append(BadgeShapeField.Coverage(shape, x, y) > 0.5f ? '#' : '.');
+                }
+            }
+
+            return drawn.ToString();
+        }
+
+        static readonly BadgeShape[] AllShapes =
+        {
+            BadgeShape.RoundedRect, BadgeShape.Pill, BadgeShape.Tag
+        };
     }
 }

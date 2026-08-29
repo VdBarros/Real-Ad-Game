@@ -3,6 +3,7 @@ namespace Game.Presentation.Pure
     public enum BadgeShape
     {
         RoundedRect,
-        Pill
+        Pill,
+        Tag
     }
 }

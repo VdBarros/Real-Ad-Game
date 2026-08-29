@@ -45,19 +45,20 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AnAdditiveNodeWantsAChestAndAMultiplierWantsACoinStack()
+        public void AnAdditiveNodeWantsAChestAndAMultiplierWantsNoMeshAtAll()
         {
             var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
             Assert.That(Prop(graph, blueprint, NodeType.Additive).Model, Is.EqualTo(PartModel.Chest));
-            Assert.That(Prop(graph, blueprint, NodeType.Multiplier).Model, Is.EqualTo(PartModel.CoinStack));
+            Assert.That(Prop(graph, blueprint, NodeType.Multiplier).Model, Is.EqualTo(PartModel.None));
         }
 
         [Test]
         public void TheTwoRewardKindsWantDifferentModels()
         {
             Assert.That(PartModels.Of(PartStyle.Additive), Is.Not.EqualTo(PartModels.Of(PartStyle.Multiplier)));
+            Assert.That(PartModels.Of(PartStyle.Multiplier), Is.EqualTo(PartModel.None));
         }
 
         [Test]
