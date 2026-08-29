@@ -53,7 +53,7 @@ namespace Game.EditorTooling
 
         static readonly PartStyle[] StillPrimitive =
         {
-            PartStyle.Pillar, PartStyle.Trail, PartStyle.Spark, PartStyle.Multiplier
+            PartStyle.Pillar, PartStyle.Trail, PartStyle.Spark, PartStyle.Multiplier, PartStyle.Landmark
         };
 
         public static void Check()
@@ -217,8 +217,9 @@ namespace Game.EditorTooling
             failures += Assert(
                 report,
                 string.Join(", ", primitive.ToArray()) == string.Join(", ", expected.ToArray()),
-                "exactly the cutscene pillar, the two effects and the multiplier gate the builder "
-                + "assembles out of blocks want no pack mesh, and nothing else does",
+                "exactly the cutscene pillar, the two effects, the multiplier gate and the navigation "
+                + "landmark the builder assembles out of primitives want no pack mesh, and nothing "
+                + "else does",
                 "still primitive: " + string.Join(", ", primitive.ToArray())
                 + "; expected exactly: " + string.Join(", ", expected.ToArray()));
 
