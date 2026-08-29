@@ -20,6 +20,8 @@ namespace Game.Presentation.Pure
 
         public const float KnightPackBase = -0.1678f;
 
+        public const float StandingPerPackUnit = StandingScales / KnightPackHeight;
+
         public static float ImportScale
         {
             get { return IsoProjection.TileEdge / GridUnits; }

@@ -9,7 +9,11 @@ namespace Game.Presentation
 
         WorldPoint ground;
 
+        WorldPoint restPose;
+
         PartModel worn;
+
+        FigureTurn turning;
 
         bool stood;
 
@@ -37,6 +41,26 @@ namespace Game.Presentation
             get { return ground; }
         }
 
+        public float RestYaw
+        {
+            get { return restPose.Y; }
+        }
+
+        public float Yaw
+        {
+            get { return turning.Yaw; }
+        }
+
+        public float FacingYaw
+        {
+            get { return turning.Wanted; }
+        }
+
+        public bool IsTurning
+        {
+            get { return !turning.IsSettled; }
+        }
+
         internal void Stand(Transform hangingBadge, PartModel mesh)
         {
             badge = hangingBadge;
@@ -47,6 +71,10 @@ namespace Game.Presentation
             var standing = transform.localPosition;
             ground = new WorldPoint(
                 standing.x, standing.y - BaseScale * FigureFit.LiftOf(worn), standing.z);
+
+            var angles = transform.localEulerAngles;
+            restPose = new WorldPoint(angles.x, FigureFacing.Normalised(angles.y), angles.z);
+            turning = FigureTurn.Facing(restPose.Y);
             stood = true;
         }
 
@@ -54,6 +82,37 @@ namespace Game.Presentation
         {
             ground = tile;
             Replant();
+        }
+
+        public void Face(WorldPoint heading)
+        {
+            if (!stood || !FigureFacing.IsAimed(heading))
+            {
+                return;
+            }
+
+            turning = turning.Toward(FigureFacing.Composed(restPose.Y, heading));
+        }
+
+        public void Confront(Figure other)
+        {
+            if (other == null)
+            {
+                return;
+            }
+
+            Face(FigureFacing.Between(ground, other.Ground));
+        }
+
+        public void Turn(float deltaSeconds)
+        {
+            if (!stood)
+            {
+                return;
+            }
+
+            turning = turning.Advanced(deltaSeconds);
+            transform.localEulerAngles = new Vector3(restPose.X, turning.Yaw, restPose.Z);
         }
 
         protected void Hide()
