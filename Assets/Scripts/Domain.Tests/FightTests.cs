@@ -10,6 +10,8 @@ namespace Game.Domain.Tests
     {
         const float Frame = 1f / 60f;
 
+        const float Tolerance = 1e-4f;
+
         static readonly ActionOutcome[] Fights =
         {
             ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss
@@ -51,11 +53,11 @@ namespace Game.Domain.Tests
             return peak;
         }
 
-        static float Apart(Tint first, Tint second)
+        static Fight AtContact(ActionOutcome outcome)
         {
-            return Math.Abs(first.Red - second.Red)
-                + Math.Abs(first.Green - second.Green)
-                + Math.Abs(first.Blue - second.Blue);
+            var fight = Fight.Of(outcome);
+
+            return fight.Advanced(fight.ContactAt + Fight.ThrowSeconds);
         }
 
         [Test]
@@ -66,6 +68,11 @@ namespace Game.Domain.Tests
             Assert.That(Fight.None.IsJoined, Is.False);
             Assert.That(Fight.None.IsSettled, Is.True);
             Assert.That(Fight.None.Seconds, Is.EqualTo(0f));
+            Assert.That(Fight.None.BlowBeat, Is.EqualTo(0f));
+            Assert.That(Fight.None.FallBeat, Is.EqualTo(0f));
+            Assert.That(Fight.None.Impact, Is.EqualTo(0f));
+            Assert.That(Fight.None.HasStruck, Is.False);
+            Assert.That(Fight.None.IsExecuting, Is.False);
         }
 
         [Test]
@@ -103,7 +110,7 @@ namespace Game.Domain.Tests
 
                 Assert.That(settled.Shove, Is.EqualTo(0f), outcome.ToString());
                 Assert.That(settled.Recoil, Is.EqualTo(0f), outcome.ToString());
-                Assert.That(settled.Spark.IsLit, Is.False, outcome.ToString());
+                Assert.That(settled.Impact, Is.EqualTo(0f), outcome.ToString());
             }
         }
 
@@ -132,10 +139,27 @@ namespace Game.Domain.Tests
         {
             foreach (var outcome in Fights)
             {
-                var struck = Fight.Of(outcome).Advanced(Fight.BlowSeconds * 0.5f);
+                var fight = Fight.Of(outcome);
+                var widest = 0f;
+                var widestAt = 0f;
+                var at = 0f;
 
-                Assert.That(struck.Spark.IsLit, Is.True, outcome.ToString());
-                Assert.That(struck.Recoil - struck.Shove, Is.GreaterThan(0.4f), outcome.ToString());
+                foreach (var frame in Reel(outcome))
+                {
+                    var apart = frame.Recoil - frame.Shove;
+                    if (apart > widest)
+                    {
+                        widest = apart;
+                        widestAt = at;
+                    }
+
+                    at += Frame;
+                }
+
+                Assert.That(AtContact(outcome).HasStruck, Is.True, outcome.ToString());
+                Assert.That(widest, Is.GreaterThan(0.4f), outcome.ToString());
+                Assert.That(
+                    widestAt, Is.GreaterThanOrEqualTo(fight.ContactAt - Frame), outcome.ToString());
             }
         }
 
@@ -144,8 +168,8 @@ namespace Game.Domain.Tests
         {
             var win = Fight.Of(ActionOutcome.Win);
 
-            Assert.That(win.Seconds, Is.EqualTo(VictoryStages.BlockingSeconds).Within(1e-4f));
-            Assert.That(win.Seconds, Is.EqualTo(1.2f).Within(1e-4f));
+            Assert.That(win.Seconds, Is.EqualTo(VictoryStages.BlockingSeconds).Within(Tolerance));
+            Assert.That(win.Seconds, Is.EqualTo(1.2f).Within(Tolerance));
             Assert.That(win.Stage, Is.EqualTo(VictoryStage.Clash));
             Assert.That(win.Advanced(VictoryStages.ClashSeconds).Stage, Is.EqualTo(VictoryStage.Dissolve));
             Assert.That(win.Advanced(win.Seconds).Stage, Is.EqualTo(VictoryStage.OrbFlight));
@@ -157,79 +181,135 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AWonClashIsAnExchangeOfBlowsThrownByBothFightersInTurn()
+        public void AWonClashIsOneBlowThePlayerThrowsAndTheEnemyNeverAnswers()
         {
-            var thrown = new List<bool>();
-            var lit = new List<float>();
-            var fight = Fight.Of(ActionOutcome.Win);
+            var win = Fight.Of(ActionOutcome.Win);
 
-            for (var blow = 0; blow < Fight.Blows; blow++)
+            Assert.That(win.ContactAt, Is.EqualTo(Fight.ExecutionAt).Within(Tolerance));
+            Assert.That(win.ContactAt, Is.LessThan(VictoryStages.ClashSeconds));
+
+            var struck = 0;
+            var lunging = 0;
+            var thrown = 0;
+
+            foreach (var frame in Reel(ActionOutcome.Win))
             {
-                var landing = fight.Advanced(Fight.BlowOpensAt(blow) + Fight.BlowSeconds * 0.5f);
+                if (frame.Impact > 0f)
+                {
+                    struck++;
+                }
 
-                Assert.That(landing.IsTrading, Is.True, "blow " + blow);
-                Assert.That(landing.Spark.IsLit, Is.True, "blow " + blow);
-                Assert.That(landing.ThePlayerThrewIt, Is.EqualTo(Fight.BlowIsThePlayers(blow)), "blow " + blow);
+                if (frame.Shove > 0f)
+                {
+                    lunging++;
+                }
 
-                thrown.Add(landing.ThePlayerThrewIt);
-                lit.Add(landing.Spark.Sway);
+                if (frame.Recoil > 0f)
+                {
+                    thrown++;
+                }
+
+                Assert.That(frame.Shove, Is.GreaterThanOrEqualTo(0f), frame.ToString());
+                Assert.That(frame.Recoil, Is.GreaterThanOrEqualTo(0f), frame.ToString());
             }
 
-            Assert.That(Fight.Blows, Is.GreaterThanOrEqualTo(3));
-            Assert.That(thrown, Does.Contain(true));
-            Assert.That(thrown, Does.Contain(false));
+            Assert.That(struck, Is.GreaterThan(0));
+            Assert.That(lunging, Is.GreaterThan(0));
+            Assert.That(thrown, Is.GreaterThan(0));
+            Assert.That(
+                Peak(Reel(ActionOutcome.Win), frame => frame.Recoil),
+                Is.EqualTo(Fight.BlowTiles).Within(0.01f));
+            Assert.That(
+                Peak(Reel(ActionOutcome.Win), frame => frame.Shove),
+                Is.LessThan(Fight.BlowTiles * 0.5f));
+        }
 
-            for (var blow = 1; blow < thrown.Count; blow++)
+        [Test]
+        public void TheWinnersBlowRunsTheWholeClashAndTheLosersFallRunsToTheEndOfTheDissolve()
+        {
+            var win = Fight.Of(ActionOutcome.Win);
+
+            Assert.That(win.BlowBeat, Is.EqualTo(VictoryStages.ClashSeconds).Within(Tolerance));
+            Assert.That(
+                win.FallBeat,
+                Is.EqualTo(VictoryStages.BlockingSeconds - Fight.ExecutionAt).Within(Tolerance));
+            Assert.That(win.ContactAt + win.FallBeat, Is.EqualTo(win.Seconds).Within(Tolerance));
+
+            var loss = Fight.Of(ActionOutcome.Loss);
+
+            Assert.That(loss.BlowBeat, Is.EqualTo(loss.Seconds).Within(Tolerance));
+            Assert.That(loss.FallBeat, Is.EqualTo(Fight.LossSeconds).Within(Tolerance));
+            Assert.That(loss.ContactAt + loss.FallBeat, Is.EqualTo(loss.Seconds).Within(Tolerance));
+
+            var tie = Fight.Of(ActionOutcome.Tie);
+
+            Assert.That(tie.BlowBeat, Is.EqualTo(tie.Seconds).Within(Tolerance));
+            Assert.That(tie.FallBeat, Is.EqualTo(0f));
+        }
+
+        [Test]
+        public void NobodyHasBeenStruckBeforeContactAndEverybodyHasAfterIt()
+        {
+            foreach (var outcome in Fights)
             {
-                Assert.That(thrown[blow], Is.Not.EqualTo(thrown[blow - 1]), "blow " + blow);
-                Assert.That(lit[blow] * lit[blow - 1], Is.LessThan(0f), "blow " + blow);
+                var fight = Fight.Of(outcome);
+
+                Assert.That(fight.HasStruck, Is.False, outcome.ToString());
+                Assert.That(
+                    fight.Advanced(fight.ContactAt - Frame).HasStruck, Is.False, outcome.ToString());
+                Assert.That(fight.Advanced(fight.ContactAt).HasStruck, Is.True, outcome.ToString());
+                Assert.That(
+                    fight.Advanced(fight.Seconds).HasStruck, Is.False, outcome.ToString());
             }
         }
 
         [Test]
-        public void TheBlowsFillTheClashAndNoneOfThemOutlivesIt()
+        public void OnlyAWinIsAnExecutionAndOnlyForAsLongAsTheClashRuns()
         {
-            var filled = 0f;
+            var win = Fight.Of(ActionOutcome.Win);
 
-            for (var blow = 0; blow < Fight.Blows; blow++)
-            {
-                Assert.That(Fight.BlowOpensAt(blow), Is.EqualTo(filled).Within(1e-4f), "blow " + blow);
-                Assert.That(Fight.BlowSecondsOf(blow), Is.GreaterThan(Fight.BlowSeconds), "blow " + blow);
-
-                filled += Fight.BlowSecondsOf(blow);
-            }
-
-            Assert.That(filled, Is.EqualTo(VictoryStages.ClashSeconds).Within(1e-4f));
-            Assert.Throws<ArgumentOutOfRangeException>(() => Fight.BlowOpensAt(Fight.Blows));
-            Assert.Throws<ArgumentOutOfRangeException>(() => Fight.BlowSecondsOf(-1));
-            Assert.Throws<ArgumentOutOfRangeException>(() => Fight.BlowIsThePlayers(Fight.Blows));
+            Assert.That(win.IsExecuting, Is.True);
+            Assert.That(win.Advanced(VictoryStages.ClashSeconds - Frame).IsExecuting, Is.True);
+            Assert.That(win.Advanced(VictoryStages.ClashSeconds).IsExecuting, Is.False);
+            Assert.That(win.Advanced(win.Seconds).IsExecuting, Is.False);
+            Assert.That(Fight.Of(ActionOutcome.Tie).IsExecuting, Is.False);
+            Assert.That(Fight.Of(ActionOutcome.Loss).IsExecuting, Is.False);
+            Assert.That(Fight.None.IsExecuting, Is.False);
         }
 
         [Test]
-        public void EveryBlowOfTheClashThrowsTheStruckFighterAndBothStandAgainByTheNextOne()
+        public void ContactRingsThroughTheCameraAndDiesAwayInsideItsOwnWindow()
         {
-            var fight = Fight.Of(ActionOutcome.Win);
-
-            for (var blow = 0; blow < Fight.Blows; blow++)
+            foreach (var outcome in Fights)
             {
-                var landing = fight.Advanced(Fight.BlowOpensAt(blow) + Fight.BlowSeconds * 0.5f);
-                var thrower = Fight.BlowIsThePlayers(blow);
-                var struck = thrower ? landing.Recoil : landing.Shove;
-                var lunging = thrower ? landing.Shove : landing.Recoil;
+                var fight = Fight.Of(outcome);
 
-                Assert.That(Math.Abs(struck), Is.GreaterThan(0.4f), "blow " + blow);
-                Assert.That(Math.Abs(struck), Is.GreaterThan(Math.Abs(lunging) * 2f), "blow " + blow);
-                Assert.That(landing.Recoil - landing.Shove, Is.GreaterThan(0.4f), "blow " + blow);
+                Assert.That(fight.Impact, Is.EqualTo(0f), outcome.ToString());
+                Assert.That(
+                    fight.Advanced(fight.ContactAt - Frame).Impact, Is.EqualTo(0f), outcome.ToString());
 
-                var over = fight.Advanced(
-                    Fight.BlowOpensAt(blow) + Fight.BlowSecondsOf(blow) - 1e-5f);
+                var struck = fight.Advanced(fight.ContactAt).Impact;
 
-                Assert.That(Math.Abs(over.Shove), Is.LessThan(0.01f), "blow " + blow);
-                Assert.That(Math.Abs(over.Recoil), Is.LessThan(0.01f), "blow " + blow);
+                Assert.That(struck, Is.EqualTo(1f).Within(Tolerance), outcome.ToString());
+                Assert.That(
+                    fight.Advanced(fight.ContactAt + Fight.ImpactSeconds * 0.5f).Impact,
+                    Is.LessThan(struck),
+                    outcome.ToString());
+                Assert.That(
+                    fight.Advanced(fight.ContactAt + Fight.ImpactSeconds).Impact,
+                    Is.EqualTo(0f),
+                    outcome.ToString());
+
+                var ringing = 0f;
+                foreach (var frame in Reel(outcome))
+                {
+                    Assert.That(frame.Impact, Is.InRange(0f, 1f), outcome.ToString());
+                    ringing += frame.Impact > 0f ? Frame : 0f;
+                }
+
+                Assert.That(ringing, Is.LessThanOrEqualTo(Fight.ImpactSeconds + Frame), outcome.ToString());
+                Assert.That(ringing, Is.GreaterThan(0f), outcome.ToString());
             }
-
-            Assert.That(Peak(Reel(ActionOutcome.Win), frame => frame.Shove), Is.GreaterThan(0.4f));
-            Assert.That(Settled(ActionOutcome.Win).Shove, Is.EqualTo(0f));
         }
 
         [Test]
@@ -245,7 +325,7 @@ namespace Game.Domain.Tests
             var opening = fight.Advanced(VictoryStages.ClashSeconds);
             var closing = fight.Advanced(VictoryStages.BlockingSeconds - Frame);
 
-            Assert.That(opening.Fade, Is.EqualTo(1f).Within(1e-4f));
+            Assert.That(opening.Fade, Is.EqualTo(1f).Within(Tolerance));
             Assert.That(closing.Fade, Is.LessThan(0.1f));
             Assert.That(closing.Fade, Is.GreaterThan(0f));
             Assert.That(Settled(ActionOutcome.Win).Fade, Is.EqualTo(0f));
@@ -319,7 +399,7 @@ namespace Game.Domain.Tests
                 var broken = Fight.Of(outcome).Advanced(0.05f).Broken();
 
                 Assert.That(broken.IsSettled, Is.True, outcome.ToString());
-                Assert.That(broken.Spark.IsLit, Is.False, outcome.ToString());
+                Assert.That(broken.Impact, Is.EqualTo(0f), outcome.ToString());
                 Assert.That(broken.Shove, Is.EqualTo(0f), outcome.ToString());
                 Assert.That(broken.Recoil, Is.EqualTo(0f), outcome.ToString());
                 Assert.That(broken.Broken(), Is.EqualTo(broken), outcome.ToString());
@@ -330,15 +410,35 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ATieShovesBothFightersAndALossOnlyEverShovesThePlayer()
+        public void ALostFightThrowsThePlayerBackWhileTheEnemyStepsIn()
         {
-            var tie = Reel(ActionOutcome.Tie);
             var loss = Reel(ActionOutcome.Loss);
 
-            Assert.That(Peak(tie, frame => frame.Recoil), Is.GreaterThan(0f));
-            Assert.That(Peak(loss, frame => frame.Recoil), Is.EqualTo(0f));
-            Assert.That(Peak(tie, frame => frame.Shove), Is.GreaterThan(0f));
-            Assert.That(Peak(loss, frame => frame.Shove), Is.GreaterThan(0f));
+            Assert.That(Peak(loss, frame => frame.Shove), Is.EqualTo(Fight.KnockbackTiles).Within(0.01f));
+            Assert.That(Peak(loss, frame => frame.Recoil), Is.EqualTo(Fight.LungeTiles).Within(0.01f));
+
+            foreach (var frame in loss)
+            {
+                Assert.That(frame.Shove, Is.LessThanOrEqualTo(0f), frame.ToString());
+                Assert.That(frame.Recoil, Is.LessThanOrEqualTo(0f), frame.ToString());
+                Assert.That(frame.Recoil, Is.GreaterThanOrEqualTo(frame.Shove), frame.ToString());
+            }
+        }
+
+        [Test]
+        public void ATieShovesBothFightersApartAndNeitherOfThemFalls()
+        {
+            var tie = Reel(ActionOutcome.Tie);
+
+            Assert.That(Peak(tie, frame => frame.Recoil), Is.EqualTo(Fight.ClashTiles).Within(0.01f));
+            Assert.That(Peak(tie, frame => frame.Shove), Is.EqualTo(Fight.ClashTiles).Within(0.01f));
+            Assert.That(Fight.Of(ActionOutcome.Tie).FallBeat, Is.EqualTo(0f));
+
+            foreach (var frame in tie)
+            {
+                Assert.That(frame.Shove, Is.LessThanOrEqualTo(0f), frame.ToString());
+                Assert.That(frame.Recoil, Is.GreaterThanOrEqualTo(0f), frame.ToString());
+            }
         }
 
         [Test]
@@ -362,17 +462,12 @@ namespace Game.Domain.Tests
             var tie = Fight.Of(ActionOutcome.Tie);
             var loss = Fight.Of(ActionOutcome.Loss);
 
-            Assert.That(tie.Spark.Sway, Is.Not.EqualTo(loss.Spark.Sway));
-            Assert.That(Apart(tie.Spark.Tint, loss.Spark.Tint), Is.GreaterThan(0.5f));
-
             var told = 0;
             var frames = 0;
 
             while (!tie.IsSettled || !loss.IsSettled)
             {
-                if (!tie.Shove.Equals(loss.Shove)
-                    || !tie.Recoil.Equals(loss.Recoil)
-                    || tie.Spark.IsLit != loss.Spark.IsLit)
+                if (!tie.Shove.Equals(loss.Shove) || !tie.Recoil.Equals(loss.Recoil))
                 {
                     told++;
                 }
@@ -383,45 +478,6 @@ namespace Game.Domain.Tests
             }
 
             Assert.That(told, Is.GreaterThan(frames / 2));
-        }
-
-        [Test]
-        public void TheSparkMarksWhoTookTheBlow()
-        {
-            Assert.That(Fight.Of(ActionOutcome.Win).Spark.Sway, Is.GreaterThan(0f));
-            Assert.That(Fight.Of(ActionOutcome.Tie).Spark.Sway, Is.EqualTo(0f));
-            Assert.That(Fight.Of(ActionOutcome.Loss).Spark.Sway, Is.LessThan(0f));
-
-            foreach (var outcome in Fights)
-            {
-                foreach (var other in Fights)
-                {
-                    if (outcome == other)
-                    {
-                        continue;
-                    }
-
-                    Assert.That(
-                        Apart(Fight.Of(outcome).Spark.Tint, Fight.Of(other).Spark.Tint),
-                        Is.GreaterThan(0.3f),
-                        outcome + " against " + other);
-                }
-            }
-        }
-
-        [Test]
-        public void ASparkIsLitForTheBlowAndForNothingElse()
-        {
-            Assert.That(Fight.None.Spark.IsLit, Is.False);
-
-            foreach (var outcome in Fights)
-            {
-                var fight = Fight.Of(outcome);
-
-                Assert.That(fight.Spark.IsLit, Is.False, outcome.ToString());
-                Assert.That(fight.Advanced(Fight.BlowSeconds * 0.5f).Spark.IsLit, Is.True, outcome.ToString());
-                Assert.That(fight.Advanced(Fight.BlowSeconds).Spark.IsLit, Is.False, outcome.ToString());
-            }
         }
 
         [Test]

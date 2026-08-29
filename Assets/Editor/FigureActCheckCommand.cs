@@ -50,6 +50,10 @@ namespace Game.EditorTooling
 
         const int Limbs = 16;
 
+        const int SwungLimbs = 12;
+
+        const int GuardLimbs = 4;
+
         const string BaseMap = "_BaseMap";
 
         const string BaseColour = "_BaseColor";
@@ -58,9 +62,20 @@ namespace Game.EditorTooling
 
         const int SettleFrames = 20;
 
+        const PlayerWeapon Gripped = PlayerWeapon.Axe;
+
         static readonly ActionOutcome[] FoughtOutcomes =
         {
             ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss
+        };
+
+        static readonly PlayerWeapon[] Grips =
+        {
+            PlayerWeapon.None,
+            PlayerWeapon.Shortsword,
+            PlayerWeapon.Axe,
+            PlayerWeapon.Spear,
+            PlayerWeapon.Greatsword
         };
 
         public static void Check()
@@ -77,8 +92,8 @@ namespace Game.EditorTooling
                 failures += Imported(models, report);
                 failures += TheWholeCastCarriesTheSameClips(models, report);
                 failures += Cut(models, report);
-                failures += Answered(models, report);
-                failures += Traded(models, report);
+                failures += Executed(models, report);
+                failures += Moved(models, report);
                 failures += Degrades(models, report);
                 failures += Walked(models, report);
                 failures += Faced(report);
@@ -276,14 +291,24 @@ namespace Game.EditorTooling
             foreach (var outcome in FoughtOutcomes)
             {
                 var fight = Fight.Of(outcome);
-                failures += Fits(models, report, worn, FigureCues.Striking(fight), fight.Beat, outcome + " fight");
+                var landing = fight.Advanced(fight.ContactAt);
+                var blow = FigureCues.Striking(landing, Gripped);
+                var reply = FigureCues.Answering(landing);
+
+                failures += Fits(models, report, worn, blow, blow.Beat, outcome + " fight, the player");
+                failures += Fits(models, report, worn, reply, reply.Beat, outcome + " fight, the enemy");
+
                 rows.Add(string.Format(
                     CultureInfo.InvariantCulture,
-                    "{0} opens on {1} cut to {2:0.###}s of a {3:0.###}s fight",
+                    "{0} lands {1:0.###}s into a {2:0.###}s fight, the player on {3} cut to {4:0.###}s "
+                    + "and the enemy on {5} cut to {6:0.###}s",
                     outcome,
-                    FigureCues.Striking(fight).Act,
-                    fight.Beat,
-                    fight.Seconds));
+                    fight.ContactAt,
+                    fight.Seconds,
+                    blow.Act,
+                    blow.Beat,
+                    reply.Act,
+                    reply.Beat));
             }
 
             failures += Fits(
@@ -299,7 +324,7 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                FigureCues.Of(null).Act == FigureAct.Idle
+                FigureCues.Of(null, Gripped).Act == FigureAct.Idle
                 && FigureCue.Still.Loops
                 && FigureCue.Walking.Act == FigureAct.Walk
                 && FigureCue.Walking.Loops
@@ -309,7 +334,7 @@ namespace Game.EditorTooling
                 string.Format(
                     CultureInfo.InvariantCulture,
                     "no journey cues {0}, walking cues {1} looping {2}, a take cues looping {3}",
-                    FigureCues.Of(null).Act,
+                    FigureCues.Of(null, Gripped).Act,
                     FigureCue.Walking.Act,
                     FigureCue.Walking.Loops,
                     FigureCue.Within(FigureAct.Take, Take.Seconds).Loops));
@@ -441,79 +466,7 @@ namespace Game.EditorTooling
                 + (complaint.Count == 0 ? string.Empty : "; " + string.Join("; ", complaint.ToArray())));
         }
 
-        static int Answered(WorldModels models, StringBuilder report)
-        {
-            var meshes = Rigged();
-            var pairs = 0;
-            var fitted = 0;
-            var mirrored = 0;
-            var complaint = new List<string>();
-            var rows = new List<string>();
-
-            foreach (var outcome in FoughtOutcomes)
-            {
-                var fight = Fight.Of(outcome);
-                var blow = FigureCues.Striking(fight);
-                var reply = FigureCues.Answering(fight);
-
-                if (reply.Act == FigureCues.Answered(blow.Act)
-                    && Math.Abs(reply.Beat - fight.Beat) <= Epsilon
-                    && (reply.Act == FigureAct.Clash) == (blow.Act == FigureAct.Clash))
-                {
-                    mirrored++;
-                }
-
-                rows.Add(string.Format(
-                    CultureInfo.InvariantCulture,
-                    "a {0} is {1} on the player and {2} on the enemy over the same {3:0.###}s",
-                    outcome,
-                    blow.Act,
-                    reply.Act,
-                    fight.Beat));
-
-                foreach (var mesh in meshes)
-                {
-                    pairs++;
-                    var clip = models.ClipOf(mesh, reply.Clip);
-                    var seconds = clip == null ? 0f : clip.length;
-
-                    if (clip != null
-                        && reply.EndsWithin(seconds)
-                        && Math.Abs(reply.TimeIn(seconds, fight.Beat) - seconds) <= Epsilon)
-                    {
-                        fitted++;
-                    }
-                    else if (complaint.Count < 6)
-                    {
-                        complaint.Add(
-                            mesh + " answering a " + outcome + " with " + reply.Clip + " runs "
-                            + seconds.ToString("0.###", CultureInfo.InvariantCulture) + "s against a beat of "
-                            + fight.Beat.ToString("0.###", CultureInfo.InvariantCulture) + "s");
-                    }
-                }
-            }
-
-            var failures = Assert(
-                report,
-                mirrored == FoughtOutcomes.Length,
-                "the enemy's cue is the mirror of the player's over the same beat - a win is answered by a "
-                + "recoil, a loss by a strike, a tie by a clash on both sides - and that mirroring is a pure "
-                + "decision the Unity side only plays",
-                mirrored + " of " + FoughtOutcomes.Length + " outcomes mirror: "
-                + string.Join("; ", rows.ToArray()));
-
-            failures += Assert(
-                report,
-                pairs > 0 && fitted == pairs,
-                "every answering clip ends inside the fight's own beat on every mesh in the cast, which is the "
-                + "clip being cut to the beat rather than the beat to the clip",
-                fitted + " of " + pairs + " mesh and outcome pairs do"
-                + (complaint.Count == 0 ? string.Empty : "; " + string.Join("; ", complaint.ToArray())));
-
-            return failures;
-        }
-
-        static int Traded(WorldModels models, StringBuilder report)
+        static int Executed(WorldModels models, StringBuilder report)
         {
             var win = Fight.Of(ActionOutcome.Win);
 
@@ -539,72 +492,171 @@ namespace Game.EditorTooling
                     VictoryStages.BlockingSeconds,
                     win.Seconds));
 
-            var meshes = Rigged();
             var blows = new List<FigureAct>();
             var replies = new List<FigureAct>();
-            var sparked = 0;
-            var traded = 0;
-            var fitted = 0;
-            var pairs = 0;
+            var struck = FigureMotion.Still;
+            var restarts = 0;
+            var counters = 0;
 
-            for (var blow = 0; blow < Fight.Blows; blow++)
+            for (var frame = 0; frame * Frame < VictoryStages.ClashSeconds; frame++)
             {
-                var landing = win.Advanced(Fight.BlowOpensAt(blow) + Fight.BlowSeconds * 0.5f);
-                var struck = FigureCues.Striking(landing);
-                var answered = FigureCues.Answering(landing);
+                var playing = win.Advanced(frame * Frame);
+                var blow = FigureCues.Striking(playing, Gripped);
+                var reply = FigureCues.Answering(playing);
 
-                if (landing.Spark.IsLit)
+                struck = struck.Cued(blow);
+
+                if (frame > 0 && struck.Elapsed == 0f)
                 {
-                    sparked++;
+                    restarts++;
                 }
 
-                if (landing.IsTrading
-                    && landing.ThePlayerThrewIt == Fight.BlowIsThePlayers(blow)
-                    && struck.Act == (Fight.BlowIsThePlayers(blow) ? FigureAct.Strike : FigureAct.Recoil)
-                    && answered.Act == FigureCues.Answered(struck.Act)
-                    && (blow == 0 || struck.Act != blows[blow - 1]))
+                if (IsBlow(reply.Act))
                 {
-                    traded++;
+                    counters++;
                 }
 
-                blows.Add(struck.Act);
-                replies.Add(answered.Act);
-
-                foreach (var mesh in meshes)
+                if (blows.Count == 0 || blows[blows.Count - 1] != blow.Act)
                 {
-                    pairs += 2;
-                    fitted += Cued(models, mesh, struck) + Cued(models, mesh, answered);
+                    blows.Add(blow.Act);
+                }
+
+                if (replies.Count == 0 || replies[replies.Count - 1] != reply.Act)
+                {
+                    replies.Add(reply.Act);
+                }
+
+                struck = struck.Advanced(Frame);
+            }
+
+            failures += Assert(
+                report,
+                restarts == 0
+                && counters == 0
+                && blows.Count == 1
+                && blows[0] == FigureCues.FinisherOf(Gripped)
+                && replies.Count == 2
+                && replies[0] == FigureAct.Idle
+                && replies[1] == FigureAct.Fall,
+                "a won clash is one finisher the player throws and never restarts, and the enemy answers it "
+                + "with no blow of its own - it stands until the blow lands and then falls",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "over {0:0.###}s the player played {1} restarting {2} times while the enemy played {3}, "
+                    + "throwing {4} blows back",
+                    VictoryStages.ClashSeconds,
+                    string.Join("/", Named(blows)),
+                    restarts,
+                    string.Join("/", Named(replies)),
+                    counters));
+
+            var loss = Fight.Of(ActionOutcome.Loss);
+            var floored = new List<FigureAct>();
+            var swung = new List<FigureAct>();
+
+            for (var frame = 0; frame * Frame < loss.Seconds; frame++)
+            {
+                var playing = loss.Advanced(frame * Frame);
+                var blow = FigureCues.Striking(playing, Gripped);
+                var reply = FigureCues.Answering(playing);
+
+                if (floored.Count == 0 || floored[floored.Count - 1] != blow.Act)
+                {
+                    floored.Add(blow.Act);
+                }
+
+                if (swung.Count == 0 || swung[swung.Count - 1] != reply.Act)
+                {
+                    swung.Add(reply.Act);
                 }
             }
 
             failures += Assert(
                 report,
-                Fight.Blows >= 3 && traded == Fight.Blows && sparked == Fight.Blows,
-                "a won clash is an exchange of blows rather than one shove: the blow passes from fighter to "
-                + "fighter, each one restarts both figures on a new clip, and each one strikes its own spark",
+                floored.Count == 2
+                && floored[0] == FigureAct.Idle
+                && floored[1] == FigureAct.Fall
+                && swung.Count == 1
+                && swung[0] == FigureAct.Strike,
+                "a lost fight is the enemy's blow landing on the player, and the player answers it with "
+                + "neither a block nor a hit reaction - it goes down",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "{0} blows over {1:0.###}s, {2} of them handed over cleanly and {3} of them lit: the "
-                    + "player plays {4} while the enemy plays {5}",
-                    Fight.Blows,
-                    VictoryStages.ClashSeconds,
-                    traded,
-                    sparked,
-                    string.Join("/", Named(blows)),
-                    string.Join("/", Named(replies))));
+                    "over {0:0.###}s the player played {1} while the enemy played {2}",
+                    loss.Seconds,
+                    string.Join("/", Named(floored)),
+                    string.Join("/", Named(swung))));
+
+            var tie = Fight.Of(ActionOutcome.Tie);
+
+            failures += Assert(
+                report,
+                FigureCues.Striking(tie, Gripped).Act == FigureAct.Clash
+                && FigureCues.Answering(tie).Act == FigureAct.Clash
+                && Math.Abs(FigureCues.Striking(tie, Gripped).Beat - tie.BlowBeat) <= Epsilon
+                && Math.Abs(FigureCues.Answering(tie).Beat - tie.BlowBeat) <= Epsilon,
+                "a tie is the one outcome still traded, because neither number beat the other and neither "
+                + "figure falls",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the player plays {0} and the enemy plays {1} over the same {2:0.###}s",
+                    FigureCues.Striking(tie, Gripped).Act,
+                    FigureCues.Answering(tie).Act,
+                    tie.BlowBeat));
+
+            var meshes = Rigged();
+            var cues = new List<FigureCue>();
+
+            foreach (var weapon in Grips)
+            {
+                cues.Add(FigureCues.Striking(win.Advanced(win.ContactAt), weapon));
+            }
+
+            cues.Add(FigureCues.Answering(win.Advanced(win.ContactAt)));
+            cues.Add(FigureCues.Striking(loss.Advanced(loss.ContactAt), Gripped));
+            cues.Add(FigureCues.Answering(loss));
+            cues.Add(FigureCues.Striking(tie, Gripped));
+            cues.Add(FigureCues.Answering(tie));
+
+            var pairs = 0;
+            var fitted = 0;
+            var complaint = new List<string>();
+
+            foreach (var mesh in meshes)
+            {
+                foreach (var cue in cues)
+                {
+                    pairs++;
+                    var fits = Cued(models, mesh, cue);
+                    fitted += fits;
+
+                    if (fits == 0 && complaint.Count < 6)
+                    {
+                        var clip = models.ClipOf(mesh, cue.Clip);
+
+                        complaint.Add(
+                            mesh + " playing " + cue.Clip + " runs "
+                            + (clip == null ? 0f : clip.length).ToString("0.###", CultureInfo.InvariantCulture)
+                            + "s against a beat of "
+                            + cue.Beat.ToString("0.###", CultureInfo.InvariantCulture) + "s");
+                    }
+                }
+            }
 
             failures += Assert(
                 report,
                 pairs > 0 && fitted == pairs,
-                "every clip of the exchange ends inside the blow it is cut to, on both sides and on every "
-                + "mesh the cast wears",
-                fitted + " of " + pairs + " mesh and blow pairs do");
+                "every clip either side of a fight can be cued - a finisher for each of the "
+                + Grips.Length + " grips, the loser's death, the enemy's blow and the tie's clash - ends "
+                + "inside its own beat on every mesh the cast wears",
+                fitted + " of " + pairs + " mesh and cue pairs do"
+                + (complaint.Count == 0 ? string.Empty : "; " + string.Join("; ", complaint.ToArray())));
 
             var solid = true;
             for (var at = 0f; at < VictoryStages.ClashSeconds; at += Frame)
             {
                 var during = win.Advanced(at);
-                solid &= during.Fade >= 1f && FigureCues.Striking(during).Act != FigureAct.Idle;
+                solid &= during.Fade >= 1f && FigureCues.Striking(during, Gripped).Act != FigureAct.Idle;
             }
 
             var opening = win.Advanced(VictoryStages.ClashSeconds);
@@ -614,22 +666,24 @@ namespace Game.EditorTooling
             failures += Assert(
                 report,
                 solid
-                && !opening.IsTrading
-                && FigureCues.Striking(opening).Equals(FigureCue.Still)
-                && FigureCues.Answering(opening).Equals(FigureCue.Still)
+                && !opening.IsExecuting
+                && FigureCues.Striking(opening, Gripped).Equals(FigureCue.Still)
+                && FigureCues.Answering(opening).Act == FigureAct.Fall
+                && FigureCues.Answering(gone).Equals(FigureCue.Still)
                 && closing.Fade < 0.1f
                 && closing.Fade > 0f
                 && gone.Fade <= 0f,
-                "the enemy holds its own skin for the whole exchange and only then fades out over the "
-                + "dissolve, which is the stage that stands both figures still",
+                "the enemy holds its own skin for the whole clash and only then fades out over the "
+                + "dissolve, which is the stage that stands the player down and leaves the enemy falling",
                 string.Format(
                     CultureInfo.InvariantCulture,
                     "the enemy reads at {0:0.###} through the clash, {1:0.###} as the dissolve opens, "
-                    + "{2:0.###} a frame from its end and {3:0.###} at the end",
+                    + "{2:0.###} a frame from its end and {3:0.###} at the end, playing {4} over it",
                     solid ? 1f : 0f,
                     opening.Fade,
                     closing.Fade,
-                    gone.Fade));
+                    gone.Fade,
+                    FigureCues.Answering(opening).Act));
 
             var clock = 0d;
             var carried = 0f;
@@ -669,6 +723,193 @@ namespace Game.EditorTooling
                     VictoryStages.BlockingSeconds));
 
             return failures;
+        }
+
+        static bool IsBlow(FigureAct act)
+        {
+            if (act == FigureAct.Strike || act == FigureAct.Clash || act == FigureAct.Recoil)
+            {
+                return true;
+            }
+
+            foreach (var weapon in Grips)
+            {
+                if (FigureCues.FinisherOf(weapon) == act)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static int Moved(WorldModels models, StringBuilder report)
+        {
+            var worn = PartModels.Of(PartStyle.Start);
+            var asset = models.Of(worn);
+
+            if (asset == null)
+            {
+                return Assert(
+                    report, false, "the cast's own mesh loads to be animated", worn + " loaded nothing");
+            }
+
+            var stand = UnityEngine.Object.Instantiate(asset);
+            var driven = FigureAnimator.Raise(stand, worn, models);
+
+            if (driven == null)
+            {
+                WorldObjects.Destroy(stand);
+
+                return Assert(
+                    report, false, "the cast's own mesh carries a rig to animate", "it carries none");
+            }
+
+            var joints = Joints(stand.transform);
+            var acts = new List<FigureAct>();
+
+            foreach (var weapon in Grips)
+            {
+                acts.Add(FigureCues.FinisherOf(weapon));
+            }
+
+            acts.Add(FigureAct.Fall);
+            acts.Add(FigureAct.Clash);
+
+            var poses = new List<Quaternion[]>();
+            var rows = new List<string>();
+            var frozen = new List<string>();
+            var guarded = 0;
+
+            foreach (var act in acts)
+            {
+                var beat = VictoryStages.ClashSeconds;
+                var cue = FigureCue.Within(act, beat);
+                var frames = (int)(beat / Frame) - 1;
+
+                driven.Cue(cue);
+                driven.Advance(Frame);
+
+                var opening = Pose(joints);
+                var widest = new float[joints.Length];
+                var halfway = opening;
+
+                for (var frame = 1; frame <= frames; frame++)
+                {
+                    driven.Advance(Frame);
+
+                    for (var slot = 0; slot < joints.Length; slot++)
+                    {
+                        widest[slot] = Math.Max(
+                            widest[slot], Quaternion.Angle(opening[slot], joints[slot].localRotation));
+                    }
+
+                    if (frame == frames / 2)
+                    {
+                        halfway = Pose(joints);
+                    }
+                }
+
+                var turned = 0;
+                var deepest = 0f;
+
+                foreach (var swung in widest)
+                {
+                    if (swung > LimbTurn)
+                    {
+                        turned++;
+                    }
+
+                    deepest = Math.Max(deepest, swung);
+                }
+
+                if (act == FigureAct.Clash)
+                {
+                    guarded = turned;
+                }
+                else if (turned < SwungLimbs)
+                {
+                    frozen.Add(act + " turned only " + turned + " joints");
+                }
+
+                poses.Add(halfway);
+                rows.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} on {1} swung {2} joints past {3:0.#} degrees, the widest by {4:0.#}",
+                    act,
+                    AdventurerClips.NameOf(act),
+                    turned,
+                    LimbTurn,
+                    deepest));
+            }
+
+            var failures = Assert(
+                report,
+                frozen.Count == 0,
+                "every clip either outcome plays - a finisher for each of the " + Grips.Length
+                + " grips and the loser's death - turns at least " + SwungLimbs
+                + " of the rig's own bones past " + LimbTurn + " degrees rather than sliding a figure "
+                + "frozen in the pose the import gave it, measured as joint rotation off the clip's first "
+                + "frame rather than off the clip's name",
+                string.Join("; ", rows.ToArray())
+                + (frozen.Count == 0 ? string.Empty : "; " + string.Join("; ", frozen.ToArray())));
+
+            failures += Assert(
+                report,
+                guarded >= GuardLimbs,
+                "the tie's block moves the rig too, though it is a guard rather than a swing and turns "
+                + "fewer bones than any finisher does",
+                guarded + " joints past " + LimbTurn + " degrees against the " + GuardLimbs
+                + " a guard owes and the " + SwungLimbs + " a finisher owes");
+
+            var closest = float.MaxValue;
+            var nearest = string.Empty;
+
+            for (var first = 0; first < Grips.Length; first++)
+            {
+                for (var second = first + 1; second < Grips.Length; second++)
+                {
+                    var apart = Apart(poses[first], poses[second]);
+
+                    if (apart >= closest)
+                    {
+                        continue;
+                    }
+
+                    closest = apart;
+                    nearest = Grips[first] + " against " + Grips[second];
+                }
+            }
+
+            failures += Assert(
+                report,
+                closest > joints.Length,
+                "the finisher differs across every pair of weapon tiers by the pose it puts the rig in "
+                + "halfway through, not only by the clip it names",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the closest pair, {0}, still stands {1:0.#} degrees apart summed over {2} joints, "
+                    + "against the {2} degrees this asks for",
+                    nearest,
+                    closest,
+                    joints.Length));
+
+            WorldObjects.Destroy(driven);
+            WorldObjects.Destroy(stand);
+
+            return failures;
+        }
+
+        static float Apart(Quaternion[] one, Quaternion[] other)
+        {
+            var turned = 0f;
+
+            for (var slot = 0; slot < one.Length && slot < other.Length; slot++)
+            {
+                turned += Quaternion.Angle(one[slot], other[slot]);
+            }
+
+            return turned;
         }
 
         static int Cued(WorldModels models, PartModel mesh, FigureCue cue)
@@ -1623,30 +1864,29 @@ namespace Game.EditorTooling
 
             switch (act)
             {
-                case FigureAct.Strike:
-                    Blows(beats);
-                    break;
                 case FigureAct.Clash:
-                    beats.Add(Fight.Of(ActionOutcome.Tie).Seconds);
+                    beats.Add(Fight.Of(ActionOutcome.Tie).BlowBeat);
                     break;
-                case FigureAct.Recoil:
-                    Blows(beats);
-                    beats.Add(Fight.Of(ActionOutcome.Loss).Seconds);
+                case FigureAct.Strike:
+                    beats.Add(Fight.Of(ActionOutcome.Loss).BlowBeat);
+                    break;
+                case FigureAct.Fall:
+                    beats.Add(Fight.Of(ActionOutcome.Loss).FallBeat);
+                    beats.Add(Fight.Of(ActionOutcome.Win).FallBeat);
                     break;
                 case FigureAct.Take:
                     beats.Add(Take.Seconds);
                     break;
+                default:
+                    if (IsBlow(act))
+                    {
+                        beats.Add(Fight.Of(ActionOutcome.Win).BlowBeat);
+                    }
+
+                    break;
             }
 
             return beats;
-        }
-
-        static void Blows(List<float> beats)
-        {
-            for (var blow = 0; blow < Fight.Blows; blow++)
-            {
-                beats.Add(Fight.BlowSecondsOf(blow));
-            }
         }
 
         static string Cost(

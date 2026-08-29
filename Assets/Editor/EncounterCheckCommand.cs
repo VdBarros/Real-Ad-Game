@@ -57,12 +57,23 @@ namespace Game.EditorTooling
 
         const int Second = 2;
 
+        const float LimbTurn = 20f;
+
+        const int SwungLimbs = 12;
+
         sealed class Tally
         {
             public ActionOutcome Outcome;
             public float PlayerPeak;
             public float EnemyPeak;
-            public int LitFrames;
+            public int StruckFrames;
+            public float DeepestJolt;
+            public int PlayerLimbs;
+            public int EnemyLimbs;
+            public float PlayerWidestLimb;
+            public float EnemyWidestLimb;
+            public readonly HashSet<string> StrayProps = new HashSet<string>(StringComparer.Ordinal);
+            public PlayerWeapon Gripped;
             public bool WeaponFlew;
             public bool EnemyFell;
             public bool Rebanded;
@@ -129,13 +140,21 @@ namespace Game.EditorTooling
             report.Append(Bled(tie, "tie"));
             report.Append(Bled(loss, "loss"));
 
-            BothSidesRead(
-                win,
-                "win",
-                new[] { FigureAct.Strike, FigureAct.Recoil },
-                new[] { FigureAct.Recoil, FigureAct.Strike });
+            BothSidesRead(win, "win", new[] { FigureCues.FinisherOf(win.Gripped) }, new[] { FigureAct.Fall });
             BothSidesRead(tie, "tie", new[] { FigureAct.Clash }, new[] { FigureAct.Clash });
-            BothSidesRead(loss, "loss", new[] { FigureAct.Recoil }, new[] { FigureAct.Strike });
+            BothSidesRead(loss, "loss", new[] { FigureAct.Fall }, new[] { FigureAct.Strike });
+
+            TheFightMovedBothRigs(win, "win");
+            TheFightMovedBothRigs(tie, "tie");
+            TheFightMovedBothRigs(loss, "loss");
+
+            NoBoxWasSpawned(win, "win");
+            NoBoxWasSpawned(tie, "tie");
+            NoBoxWasSpawned(loss, "loss");
+
+            ContactShookTheCamera(win, "win");
+            ContactShookTheCamera(tie, "tie");
+            ContactShookTheCamera(loss, "loss");
 
             report.Append(PastTheEnemy(Power, Power - 1, "win"));
             report.Append(PastTheEnemy(Power, Power + 1, "loss"));
@@ -223,6 +242,18 @@ namespace Game.EditorTooling
             var enemyNumbers = OtherNumbers(root, builder);
             var enemyNumbersAtFirst = ValuesOf(enemyNumbers);
 
+            reel.Gripped = builder.Player == null ? PlayerWeapon.None : builder.Player.Gripping;
+
+            var playerJoints = builder.Player == null
+                ? new Transform[0]
+                : Joints(builder.Player.transform);
+            var enemyJoints = figure == null ? new Transform[0] : Joints(figure.transform);
+            var playerWidest = new float[playerJoints.Length];
+            var enemyWidest = new float[enemyJoints.Length];
+            Quaternion[] playerOpening = null;
+            Quaternion[] enemyOpening = null;
+            HashSet<string> standing = null;
+
             var post = IsoProjection.Of(graph.Decisions.Node(Doorstep).Position);
             var enemyPost = figure != null ? figure.Ground : post;
             var band = figure != null ? figure.Band : default(EnemyBand);
@@ -283,6 +314,25 @@ namespace Game.EditorTooling
 
                 reel.HeldFrames++;
 
+                if (playerOpening == null)
+                {
+                    playerOpening = Pose(playerJoints);
+                    enemyOpening = Pose(enemyJoints);
+                    standing = Children(root);
+                }
+
+                Widen(playerWidest, playerJoints, playerOpening);
+                Widen(enemyWidest, enemyJoints, enemyOpening);
+                Stray(reel, root, standing);
+
+                var jolted = rig.Jolted;
+                if (jolted > 0f)
+                {
+                    reel.StruckFrames++;
+                    reel.DeepestJolt = jolted > reel.DeepestJolt ? jolted : reel.DeepestJolt;
+                    PreviewFilm.Shoot(lens, ShotPath + leg + ".png");
+                }
+
                 if (figure != null && figure.IsGhost && !figure.HasFallen)
                 {
                     var haunting = figure.GhostAlpha;
@@ -299,14 +349,10 @@ namespace Game.EditorTooling
                 reel.WeaponFlew |= builder.Player.IsFlying;
                 reel.EnemyFell |= figure != null && figure.HasFallen;
 
-                if (!builder.Fights.IsSparkLit)
-                {
-                    continue;
-                }
-
-                reel.LitFrames++;
-                PreviewFilm.Shoot(lens, ShotPath + leg + ".png");
             }
+
+            reel.PlayerLimbs = Swung(playerWidest, out reel.PlayerWidestLimb);
+            reel.EnemyLimbs = Swung(enemyWidest, out reel.EnemyWidestLimb);
 
             if (walker.IsWalking)
             {
@@ -328,9 +374,9 @@ namespace Game.EditorTooling
                     + "s after the walk ended.");
             }
 
-            if (builder.Fights.IsSparkLit)
+            if (rig.Jolted > 0f)
             {
-                Debug.LogError("The " + leg + " ended with its spark still lit.");
+                Debug.LogError("The " + leg + " ended with the camera still kicked off its framing.");
             }
 
             if (input.IsLocked)
@@ -506,15 +552,17 @@ namespace Game.EditorTooling
                 Debug.LogError("A tie left the enemy standing perfectly still, so it reads as a loss.");
             }
 
-            if (loss.EnemyPeak > 0f)
+            if (loss.EnemyPeak >= tie.EnemyPeak || loss.EnemyPeak >= loss.PlayerPeak)
             {
                 Debug.LogError(
-                    "A loss moved the enemy " + loss.EnemyPeak + " tiles, so it reads as a tie.");
+                    "A loss moved the enemy " + loss.EnemyPeak + " tiles against the " + tie.EnemyPeak
+                    + " a tie moves it and the " + loss.PlayerPeak + " it throws the player. The enemy "
+                    + "steps into its own blow, it is never thrown by one.");
             }
 
-            if (tie.LitFrames == 0 || loss.LitFrames == 0)
+            if (tie.StruckFrames == 0 || loss.StruckFrames == 0)
             {
-                Debug.LogError("A fight that struck no spark is a fight the player never saw.");
+                Debug.LogError("A fight whose contact never reached the camera is one the player never saw.");
             }
         }
 
@@ -975,7 +1023,146 @@ namespace Game.EditorTooling
 
         static bool IsBlow(FigureAct act)
         {
-            return act == FigureAct.Strike || act == FigureAct.Clash || act == FigureAct.Recoil;
+            return act != FigureAct.Idle
+                && act != FigureAct.Walk
+                && act != FigureAct.Retreat
+                && act != FigureAct.Take;
+        }
+
+        static Transform[] Joints(Transform figure)
+        {
+            var joints = new List<Transform>();
+
+            foreach (var node in figure.GetComponentsInChildren<Transform>(true))
+            {
+                if (!ReferenceEquals(node, figure))
+                {
+                    joints.Add(node);
+                }
+            }
+
+            return joints.ToArray();
+        }
+
+        static Quaternion[] Pose(Transform[] joints)
+        {
+            var pose = new Quaternion[joints.Length];
+
+            for (var slot = 0; slot < joints.Length; slot++)
+            {
+                pose[slot] = joints[slot].localRotation;
+            }
+
+            return pose;
+        }
+
+        static void Widen(float[] widest, Transform[] joints, Quaternion[] opening)
+        {
+            if (opening == null)
+            {
+                return;
+            }
+
+            for (var slot = 0; slot < joints.Length; slot++)
+            {
+                var turned = Quaternion.Angle(opening[slot], joints[slot].localRotation);
+
+                widest[slot] = turned > widest[slot] ? turned : widest[slot];
+            }
+        }
+
+        static int Swung(float[] widest, out float deepest)
+        {
+            var turned = 0;
+            deepest = 0f;
+
+            foreach (var swung in widest)
+            {
+                if (swung > LimbTurn)
+                {
+                    turned++;
+                }
+
+                deepest = swung > deepest ? swung : deepest;
+            }
+
+            return turned;
+        }
+
+        static HashSet<string> Children(GameObject root)
+        {
+            var named = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (Transform child in root.transform)
+            {
+                named.Add(child.name);
+            }
+
+            return named;
+        }
+
+        static void Stray(Tally reel, GameObject root, HashSet<string> standing)
+        {
+            if (standing == null)
+            {
+                return;
+            }
+
+            foreach (Transform child in root.transform)
+            {
+                if (!standing.Contains(child.name))
+                {
+                    reel.StrayProps.Add(child.name);
+                }
+            }
+        }
+
+        static void TheFightMovedBothRigs(Tally reel, string leg)
+        {
+            if (reel.PlayerLimbs < SwungLimbs || reel.EnemyLimbs < SwungLimbs)
+            {
+                Debug.LogError(
+                    "The " + leg + " turned " + reel.PlayerLimbs + " of the player's joints and "
+                    + reel.EnemyLimbs + " of the enemy's past " + LimbTurn + " degrees, where a fight "
+                    + "that moves limbs rather than sliding two figures owes " + SwungLimbs
+                    + " on each side. The widest were "
+                    + reel.PlayerWidestLimb.ToString("0.#", CultureInfo.InvariantCulture) + " and "
+                    + reel.EnemyWidestLimb.ToString("0.#", CultureInfo.InvariantCulture) + " degrees.");
+            }
+        }
+
+        static void NoBoxWasSpawned(Tally reel, string leg)
+        {
+            if (reel.StrayProps.Count == 0)
+            {
+                return;
+            }
+
+            var named = new List<string>(reel.StrayProps);
+            named.Sort(StringComparer.Ordinal);
+
+            Debug.LogError(
+                "The " + leg + " hung " + named.Count + " objects off the level root that were not standing "
+                + "there when the fight opened: " + string.Join(", ", named.ToArray())
+                + ". A fight reads from animation, timing and camera, never from a spawned primitive.");
+        }
+
+        static void ContactShookTheCamera(Tally reel, string leg)
+        {
+            if (reel.StruckFrames == 0 || reel.DeepestJolt <= 0f)
+            {
+                Debug.LogError(
+                    "The " + leg + " kicked the camera on " + reel.StruckFrames + " frames, reaching "
+                    + reel.DeepestJolt.ToString("0.###", CultureInfo.InvariantCulture)
+                    + ", so contact read from nothing at all.");
+            }
+
+            if (reel.StruckFrames * Frame > Fight.ImpactSeconds + Frame * 2f)
+            {
+                Debug.LogError(
+                    "The " + leg + " kicked the camera for " + (reel.StruckFrames * Frame)
+                    + "s, longer than the " + Fight.ImpactSeconds + "s one contact is worth.");
+            }
         }
 
         static void TheWinHeldTheControlsForTheWholeCeremony(Tally win)
@@ -1039,18 +1226,18 @@ namespace Game.EditorTooling
                 Debug.LogError("The " + leg + " played no blow on either side.");
             }
 
-            if (!Exactly(reel.PlayerActs, blows))
+            if (!Only(reel.PlayerActs, blows))
             {
                 Debug.LogError(
                     "The " + leg + " had the player play " + Acts(reel.PlayerActs) + " where it owes "
-                    + Wanted(blows) + ".");
+                    + Wanted(blows) + " and nothing else but the idle it stands on either side of them.");
             }
 
-            if (!Exactly(reel.EnemyActs, replies))
+            if (!Only(reel.EnemyActs, replies))
             {
                 Debug.LogError(
                     "The " + leg + " had the enemy play " + Acts(reel.EnemyActs) + " where it owes "
-                    + Wanted(replies) + ".");
+                    + Wanted(replies) + " and nothing else but the idle it stands on either side of them.");
             }
 
             if (reel.Shot == 0)
@@ -1059,19 +1246,24 @@ namespace Game.EditorTooling
             }
         }
 
-        static bool Exactly(HashSet<FigureAct> acts, FigureAct[] wanted)
+        static bool Only(HashSet<FigureAct> acts, FigureAct[] wanted)
         {
-            if (acts.Count != wanted.Length)
-            {
-                return false;
-            }
-
             foreach (var act in wanted)
             {
                 if (!acts.Contains(act))
                 {
                     return false;
                 }
+            }
+
+            foreach (var act in acts)
+            {
+                if (act == FigureAct.Idle || Array.IndexOf(wanted, act) >= 0)
+                {
+                    continue;
+                }
+
+                return false;
             }
 
             return true;
@@ -1109,14 +1301,26 @@ namespace Game.EditorTooling
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "\n  the {0} read on both sides over {1} blow frames: the player played {2} while the enemy "
-                + "played {3}, photographed as {4} frames at {5}{0}-NN.png",
+                "\n  the {0} read on both sides over {1} blow frames: the player, gripping {6}, played {2} "
+                + "while the enemy played {3}, photographed as {4} frames at {5}{0}-NN.png"
+                + "\n  what moved in the {0}: {7} of the player's joints and {8} of the enemy's turned past "
+                + "{9:0.#} degrees, the widest by {10:0.#} and {11:0.#}, while the camera was kicked on {12} "
+                + "frames to a peak impulse of {13:0.###} and {14} objects were hung off the level root",
                 leg,
                 reel.BlowFrames,
                 Acts(reel.PlayerActs),
                 Acts(reel.EnemyActs),
                 reel.Shot,
-                SidesPath);
+                SidesPath,
+                reel.Gripped,
+                reel.PlayerLimbs,
+                reel.EnemyLimbs,
+                LimbTurn,
+                reel.PlayerWidestLimb,
+                reel.EnemyWidestLimb,
+                reel.StruckFrames,
+                reel.DeepestJolt,
+                reel.StrayProps.Count);
         }
 
         static void Reap(Tally reel, WorldBuilder builder, Walker walker)
@@ -1167,7 +1371,7 @@ namespace Game.EditorTooling
         static void Closest(Tally reel, WorldBuilder builder)
         {
             var ground = builder.Player.Ground;
-            var carrier = new Vector3(ground.X, ground.Y + Spark.Lift, ground.Z);
+            var carrier = new Vector3(ground.X, ground.Y + OrbStream.Lift, ground.Z);
             var site = new Vector3(reel.Site.X, reel.Site.Y, reel.Site.Z);
 
             foreach (Transform bead in builder.Orbs.transform)
@@ -1542,7 +1746,7 @@ namespace Game.EditorTooling
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "\n  {0} against {1}: {2}, player thrown {3:0.###} tiles, enemy {4:0.###}, {5} lit frames,"
+                "\n  {0} against {1}: {2}, player thrown {3:0.###} tiles, enemy {4:0.###}, {5} struck frames,"
                 + " ending on node {6} at power {7}, floor {8} to {9}{10}{11}, movement held {12:0.###}s"
                 + " over {13} frames{14}",
                 startingPower,
@@ -1550,7 +1754,7 @@ namespace Game.EditorTooling
                 reel.Outcome,
                 reel.PlayerPeak,
                 reel.EnemyPeak,
-                reel.LitFrames,
+                reel.StruckFrames,
                 reel.Settled.PositionNodeId,
                 reel.Settled.Power,
                 reel.ClearedBefore,

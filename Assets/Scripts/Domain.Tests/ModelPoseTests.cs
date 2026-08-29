@@ -331,8 +331,11 @@ namespace Game.Domain.Tests
             var scale = ModelPose.ScaleOf(stair);
 
             Assert.That(
-                DungeonPack.HeightOf(PartModel.Staircase) * scale.Y,
+                DungeonPack.StaircaseTread * scale.Y,
                 Is.EqualTo(IsoProjection.StepHeight).Within(Tolerance));
+            Assert.That(
+                DungeonPack.HeightOf(PartModel.Staircase) * scale.Y,
+                Is.EqualTo(IsoProjection.StepHeight + DungeonPack.StaircaseParapet).Within(Tolerance));
             Assert.That(
                 DungeonPack.StaircaseWidth * scale.X,
                 Is.EqualTo(IsoProjection.TileEdge).Within(Tolerance));
@@ -427,13 +430,22 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AStaircaseNeverRisesAboveTheGroundItLeadsToSoItHidesNothing()
+        public void AStaircaseRisesNoHigherOverItsLandingThanTheParapetsBesideIt()
         {
             var stair = FirstStaircase();
+            var scale = ModelPose.ScaleOf(stair);
             var footed = ModelPose.PositionOf(stair);
-            var top = footed.Y + DungeonPack.HeightOf(PartModel.Staircase) * ModelPose.ScaleOf(stair).Y;
+            var landing = stair.Position.Y + IsoProjection.StepHeight * 0.5f;
+            var tread = footed.Y + DungeonPack.StaircaseTread * scale.Y;
+            var top = footed.Y + DungeonPack.HeightOf(PartModel.Staircase) * scale.Y;
 
-            Assert.That(top, Is.EqualTo(stair.Position.Y + IsoProjection.StepHeight * 0.5f).Within(Tolerance));
+            Assert.That(tread, Is.EqualTo(landing).Within(Tolerance));
+            Assert.That(
+                top - landing,
+                Is.EqualTo(DungeonPack.HeightOf(PartModel.WallPanel)).Within(Tolerance));
+            Assert.That(
+                IsoProjection.SightReach(top - landing),
+                Is.LessThan(IsoProjection.OcclusionBound));
             Assert.That(IsoProjection.SightReach(0f), Is.EqualTo(0f).Within(Tolerance));
         }
 

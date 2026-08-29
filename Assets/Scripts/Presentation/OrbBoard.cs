@@ -217,7 +217,7 @@ namespace Game.Presentation
             }
 
             var ground = player.Ground;
-            return new WorldPoint(ground.X, ground.Y + Spark.Lift, ground.Z);
+            return new WorldPoint(ground.X, ground.Y + OrbStream.Lift, ground.Z);
         }
 
         GameObject Bead()
