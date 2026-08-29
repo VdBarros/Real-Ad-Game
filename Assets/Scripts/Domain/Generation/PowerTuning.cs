@@ -9,6 +9,8 @@ namespace Game.Domain
 
         public const double EliteShare = 0.15;
 
+        public const double MultiplierShare = 0.5;
+
         static readonly int[] Ladder = { 2, 3, 4 };
 
         public static readonly PowerTuning Tiny =
@@ -93,6 +95,11 @@ namespace Game.Domain
         public static IReadOnlyList<int> MultiplierLadder
         {
             get { return Ladder; }
+        }
+
+        public long MultiplierProductCap
+        {
+            get { return (long)Math.Floor(MultiplierShare * StripTarget / StartingPower); }
         }
 
         public int StartingPower { get; }

@@ -132,6 +132,7 @@ watch is that `PartStyle.Staircase`'s own material never survives a built level
 [#113]: https://github.com/VdBarros/Real-Ad-Game/issues/113
 [#114]: https://github.com/VdBarros/Real-Ad-Game/issues/114
 [#117]: https://github.com/VdBarros/Real-Ad-Game/issues/117
+[#129]: https://github.com/VdBarros/Real-Ad-Game/issues/129
 
 ### Calls I made — override any of these if you disagree
 
@@ -232,6 +233,21 @@ The generator additionally asserts **nothing is gated behind the boss** —
 reachability with the boss treated impassable must still cover every content
 node — and places the boss-room treasure **in front of** the boss rather than
 inside the room, which would be unreachable.
+
+**The gate product is capped** — `M ≤ 0.5 * strip target / P₀`, checked at
+placement and again by the validator, and rejected into the same retry loop as
+every other reason ([#129]). Gates come off a fixed `{2, 3, 4}` ladder cycled
+over however many the recipe asks for, placed without regard to where they sit,
+so it is the product that explodes rather than any one factor. Capping `Π` over
+*every* multiplier in the level, ignoring routes, is an upper bound on the
+product any single route can collect: conservative, never wrong in the
+dangerous direction, and free — where an exact per-route bound is a
+subset-selection search over a cyclic decision graph, since gates are consumed
+once. It costs nothing today. The ladder cannot mint more than 24 on `tiny` and
+`ship` or 96 on `stress`, against caps of 50, 150 and 500, so the
+ten-thousand-seed sweep turns away no attempt at all and the per-reason
+histogram is unchanged. What it buys is a guard on the recipe: a fourth gate on
+`tiny` and a fifth on `ship` are refused on two ladder shuffles in three.
 
 **Invariant C — boss requires a detour**
 

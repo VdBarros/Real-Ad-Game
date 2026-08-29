@@ -88,6 +88,18 @@ namespace Game.Domain.Tests
             EveryBossStaysUnderItsBound(PlanSweep(levelNumber));
         }
 
+        [TestCaseSource(nameof(EveryPreset))]
+        public void NoLevelAnyPresetShipsMintsAGateProductBeyondItsCap(MazePreset preset)
+        {
+            NoGateProductPassesTheCap(Sweep(preset));
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void NoLevelAnyPlanShipsMintsAGateProductBeyondItsCap(int levelNumber)
+        {
+            NoGateProductPassesTheCap(PlanSweep(levelNumber));
+        }
+
         [TestCaseSource(nameof(EveryPlanOnTheCurve))]
         public void TheRejectionRateOfEveryPlanStaysUnderTheBar(int levelNumber)
         {
@@ -509,6 +521,20 @@ namespace Game.Domain.Tests
                 Console.WriteLine("  opening " + sweep.Opening());
                 Console.WriteLine("  boosts " + sweep.Pickups());
                 Console.WriteLine("  par " + sweep.Rating());
+                Console.WriteLine("  gates " + sweep.Multipliers());
+            }
+        }
+
+        static void NoGateProductPassesTheCap(FuzzSweep sweep)
+        {
+            foreach (var accepted in sweep.Accepted)
+            {
+                Assert.That(
+                    MultiplierProduct.Of(accepted.Level.Graph),
+                    Is.LessThanOrEqualTo(accepted.Level.Tuning.MultiplierProductCap),
+                    "Seed " + accepted.Level.AttemptSeed + " shipped a gate product of "
+                        + MultiplierProduct.Of(accepted.Level.Graph) + " over a cap of "
+                        + accepted.Level.Tuning.MultiplierProductCap + ".");
             }
         }
 
@@ -665,6 +691,7 @@ namespace Game.Domain.Tests
                 var sweep = Sweep(preset);
                 Console.WriteLine(sweep.ToString());
                 Console.WriteLine("  spread P_max/P_min " + sweep.Spread());
+                Console.WriteLine("  gates " + sweep.Multipliers());
             }
 
             Console.WriteLine(Mutants() + ", one enemy at a time inflated "

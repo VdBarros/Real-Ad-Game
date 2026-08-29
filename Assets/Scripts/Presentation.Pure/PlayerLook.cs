@@ -28,7 +28,7 @@ namespace Game.Presentation.Pure
 
         public static PlayerLook Of(int power)
         {
-            var tier = VisualTier.Of(power);
+            var tier = PlayerTier.Of(power);
             var scale = BaseScale;
             for (var step = 0; step < tier; step++)
             {
