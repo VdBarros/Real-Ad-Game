@@ -19,6 +19,18 @@ namespace Game.Presentation.Pure
 
         public const string Take = "PickUp";
 
+        public const string Kick = "Unarmed_Melee_Attack_Kick";
+
+        public const string Slice = "1H_Melee_Attack_Slice_Diagonal";
+
+        public const string Cleave = "2H_Melee_Attack_Chop";
+
+        public const string Thrust = "2H_Melee_Attack_Stab";
+
+        public const string Sweep = "2H_Melee_Attack_Spin";
+
+        public const string Fall = "Death_A";
+
         readonly struct Playing
         {
             public Playing(FigureAct act, string clip, bool loops)
@@ -43,7 +55,13 @@ namespace Game.Presentation.Pure
             new Playing(FigureAct.Strike, Strike, false),
             new Playing(FigureAct.Clash, Clash, false),
             new Playing(FigureAct.Recoil, Recoil, false),
-            new Playing(FigureAct.Take, Take, false)
+            new Playing(FigureAct.Take, Take, false),
+            new Playing(FigureAct.Kick, Kick, false),
+            new Playing(FigureAct.Slice, Slice, false),
+            new Playing(FigureAct.Cleave, Cleave, false),
+            new Playing(FigureAct.Thrust, Thrust, false),
+            new Playing(FigureAct.Sweep, Sweep, false),
+            new Playing(FigureAct.Fall, Fall, false)
         };
 
         static readonly string[] names = Named();

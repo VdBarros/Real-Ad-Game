@@ -11,10 +11,6 @@ namespace Game.Presentation
 
         PlayerFigure player;
 
-        Material paint;
-
-        GameObject spark;
-
         EnemyFigure joined;
 
         int joinedNodeId = TapAim.Nothing;
@@ -24,11 +20,6 @@ namespace Game.Presentation
         WorldPoint playerPost;
 
         WorldPoint enemyPost;
-
-        public bool IsSparkLit
-        {
-            get { return spark != null && spark.activeSelf; }
-        }
 
         public bool IsTurning
         {
@@ -51,16 +42,6 @@ namespace Game.Presentation
             }
         }
 
-        public void Dress(Material material)
-        {
-            if (material == null)
-            {
-                throw new ArgumentNullException(nameof(material));
-            }
-
-            paint = material;
-        }
-
         internal void Begin(int nodeCount, PlayerFigure figure, IReadOnlyList<EnemyFigure> enemies)
         {
             if (enemies == null)
@@ -77,8 +58,6 @@ namespace Game.Presentation
             {
                 byNode[enemy.NodeId] = enemy;
             }
-
-            Douse();
         }
 
         public EnemyFigure Of(int nodeId)
@@ -96,7 +75,7 @@ namespace Game.Presentation
             }
 
             var ground = enemy.Ground;
-            return new WorldPoint(ground.X, ground.Y + Spark.Lift, ground.Z);
+            return new WorldPoint(ground.X, ground.Y + OrbStream.Lift, ground.Z);
         }
 
         public void Turn(float deltaSeconds)
@@ -184,82 +163,26 @@ namespace Game.Presentation
                 player.StandOn(Along(playerPost, fight.Shove));
             }
 
-            if (joined != null && !joined.HasFallen)
+            if (joined == null || joined.HasFallen)
             {
-                joined.StandOn(Along(enemyPost, fight.Recoil));
-                joined.Answer(FigureCues.Answering(fight));
-                joined.Dissolve(fight.Fade);
+                return;
             }
 
-            Flash(fight.Spark);
+            joined.StandOn(Along(enemyPost, fight.Recoil));
+            joined.Answer(FigureCues.Answering(fight));
+            joined.Dissolve(fight.Fade);
         }
 
         void Leave()
         {
             joined = null;
             joinedNodeId = TapAim.Nothing;
-            Douse();
-        }
-
-        void Flash(Spark lit)
-        {
-            if (!lit.IsLit)
-            {
-                Douse();
-                return;
-            }
-
-            var carrier = Strike();
-            var at = Along(enemyPost, lit.Sway);
-            var edge = Spark.Edge * lit.Scale;
-
-            carrier.transform.localPosition = new Vector3(at.X, at.Y + Spark.Lift, at.Z);
-            carrier.transform.localScale = new Vector3(edge, edge, edge);
-            carrier.SetActive(true);
-            Tints.Wash(carrier.GetComponent<Renderer>(), lit.Tint);
-        }
-
-        void Douse()
-        {
-            if (spark != null)
-            {
-                spark.SetActive(false);
-            }
-        }
-
-        GameObject Strike()
-        {
-            if (spark != null)
-            {
-                return spark;
-            }
-
-            if (paint == null)
-            {
-                throw new InvalidOperationException(
-                    "A fight strikes a spark from a material it has neither been dressed with "
-                    + "nor outlived. Call Dress.");
-            }
-
-            spark = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            spark.name = PartNames.Spark;
-            spark.transform.SetParent(transform, worldPositionStays: false);
-            spark.GetComponent<Renderer>().sharedMaterial = paint;
-            WorldObjects.Destroy(spark.GetComponent<Collider>());
-            spark.SetActive(false);
-            return spark;
         }
 
         WorldPoint Along(WorldPoint post, float distance)
         {
             return new WorldPoint(
                 post.X + axis.X * distance, post.Y + axis.Y * distance, post.Z + axis.Z * distance);
-        }
-
-        void OnDestroy()
-        {
-            WorldObjects.Destroy(spark);
-            spark = null;
         }
 
         void RequireABeginning()

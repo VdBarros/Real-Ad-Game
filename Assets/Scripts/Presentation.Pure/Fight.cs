@@ -5,13 +5,17 @@ namespace Game.Presentation.Pure
 {
     public readonly struct Fight : IEquatable<Fight>
     {
-        public const float BlowSeconds = 0.09f;
-
         public const float ShoveSeconds = 0.08f;
 
         public const float TieSeconds = 0.24f;
 
         public const float LossSeconds = 0.44f;
+
+        public const float ExecutionAt = 0.34f;
+
+        public const float ThrowSeconds = 0.12f;
+
+        public const float ImpactSeconds = 0.20f;
 
         public const float ClashTiles = 0.26f;
 
@@ -21,30 +25,13 @@ namespace Game.Presentation.Pure
 
         public const float BlowTiles = 0.68f;
 
-        static readonly float[] blowsAt = { 0f, 0.32f, 0.58f };
-
-        static readonly bool[] thrownByThePlayer = { true, false, true };
-
-        static readonly Spark playersBlow = new Spark(0.25f, 0.95f, new Tint(1f, 0.95f, 0.72f));
-
-        static readonly Spark enemysBlow = new Spark(-0.45f, 0.86f, new Tint(0.78f, 0.87f, 0.98f));
-
         static readonly float[] recoveries = { 0f, 0f, 0f, TieSeconds, LossSeconds };
 
         static readonly float[] shoves = { 0f, 0f, 0f, -ClashTiles, -KnockbackTiles };
 
-        static readonly float[] recoils = { 0f, 0f, 0f, ClashTiles, 0f };
+        static readonly float[] recoils = { 0f, 0f, 0f, ClashTiles, -LungeTiles };
 
         static readonly bool[] dissolves = { false, false, true, false, false };
-
-        static readonly Spark[] sparks =
-        {
-            Spark.None,
-            Spark.None,
-            Spark.None,
-            new Spark(0f, 0.72f, new Tint(0.78f, 0.87f, 0.98f)),
-            new Spark(-0.45f, 0.86f, new Tint(0.92f, 0.18f, 0.14f))
-        };
 
         readonly ActionOutcome outcome;
         readonly float elapsed;
@@ -64,29 +51,6 @@ namespace Game.Presentation.Pure
         {
             var joined = new Fight(outcome, 0f);
             return joined.IsJoined ? joined : None;
-        }
-
-        public static int Blows
-        {
-            get { return blowsAt.Length; }
-        }
-
-        public static float BlowOpensAt(int blow)
-        {
-            return blowsAt[Thrown(blow)];
-        }
-
-        public static float BlowSecondsOf(int blow)
-        {
-            var slot = Thrown(blow);
-            var closes = slot + 1 < blowsAt.Length ? blowsAt[slot + 1] : VictoryStages.ClashSeconds;
-
-            return closes - blowsAt[slot];
-        }
-
-        public static bool BlowIsThePlayers(int blow)
-        {
-            return thrownByThePlayer[Thrown(blow)];
         }
 
         public ActionOutcome Outcome
@@ -129,21 +93,22 @@ namespace Game.Presentation.Pure
             get { return Timeline.Stage; }
         }
 
-        public bool IsTrading
+        public float ContactAt
         {
-            get { return Blow() >= 0; }
+            get { return Won ? ExecutionAt : ShoveSeconds; }
         }
 
-        public bool ThePlayerThrewIt
+        public bool HasStruck
         {
-            get
-            {
-                var blow = Blow();
-                return blow < 0 || thrownByThePlayer[blow];
-            }
+            get { return IsJoined && !IsSettled && elapsed >= ContactAt; }
         }
 
-        public float Beat
+        public bool IsExecuting
+        {
+            get { return Won && !IsSettled && Timeline.Stage == VictoryStage.Clash; }
+        }
+
+        public float BlowBeat
         {
             get
             {
@@ -152,42 +117,56 @@ namespace Game.Presentation.Pure
                     return 0f;
                 }
 
-                if (!Won)
+                return Won ? VictoryStages.ClashSeconds : Seconds;
+            }
+        }
+
+        public float FallBeat
+        {
+            get
+            {
+                if (!IsJoined)
                 {
-                    return Seconds;
+                    return 0f;
                 }
 
-                var blow = Blow();
-                return blow < 0 ? 0f : BlowSecondsOf(blow);
+                if (Won)
+                {
+                    return VictoryStages.BlockingSeconds - ExecutionAt;
+                }
+
+                return outcome == ActionOutcome.Loss ? Seconds - ShoveSeconds : 0f;
+            }
+        }
+
+        public float Impact
+        {
+            get
+            {
+                if (!IsJoined || IsSettled)
+                {
+                    return 0f;
+                }
+
+                var into = elapsed - ContactAt;
+                if (into < 0f || into >= ImpactSeconds)
+                {
+                    return 0f;
+                }
+
+                var left = 1f - into / ImpactSeconds;
+                return left * left;
             }
         }
 
         public float Shove
         {
-            get
-            {
-                if (!Won)
-                {
-                    return Swung(shoves[Slot()]);
-                }
-
-                var blow = Blow();
-                return blow < 0 ? 0f : Landed(blow, thrownByThePlayer[blow] ? LungeTiles : -BlowTiles);
-            }
+            get { return Won ? Lunged(LungeTiles) : Swung(shoves[Slot()]); }
         }
 
         public float Recoil
         {
-            get
-            {
-                if (!Won)
-                {
-                    return Swung(recoils[Slot()]);
-                }
-
-                var blow = Blow();
-                return blow < 0 ? 0f : Landed(blow, thrownByThePlayer[blow] ? BlowTiles : -LungeTiles);
-            }
+            get { return Won ? Thrown(BlowTiles) : Swung(recoils[Slot()]); }
         }
 
         public bool Dissolves
@@ -216,26 +195,6 @@ namespace Game.Presentation.Pure
                 }
 
                 return 1f - EaseOut(timeline.Through);
-            }
-        }
-
-        public Spark Spark
-        {
-            get
-            {
-                if (Won)
-                {
-                    return Struck();
-                }
-
-                var flash = sparks[Slot()];
-                if (!IsJoined || elapsed <= 0f || elapsed >= BlowSeconds)
-                {
-                    return flash.Sized(0f);
-                }
-
-                var struck = elapsed / BlowSeconds;
-                return flash.Sized(flash.Scale * 4f * struck * (1f - struck));
             }
         }
 
@@ -270,68 +229,42 @@ namespace Game.Presentation.Pure
             get { return outcome == ActionOutcome.Win; }
         }
 
-        int Blow()
+        float Lunged(float peak)
         {
-            if (!Won || Timeline.Stage != VictoryStage.Clash)
+            if (IsSettled || Timeline.Stage != VictoryStage.Clash)
             {
-                return -1;
+                return 0f;
             }
 
             var at = Timeline.StageElapsed;
-            var thrown = 0;
-
-            for (var slot = 1; slot < blowsAt.Length; slot++)
-            {
-                if (at >= blowsAt[slot])
-                {
-                    thrown = slot;
-                }
-            }
-
-            return thrown;
-        }
-
-        Spark Struck()
-        {
-            var blow = Blow();
-            if (blow < 0)
-            {
-                return Spark.None;
-            }
-
-            var flash = thrownByThePlayer[blow] ? playersBlow : enemysBlow;
-            var into = Timeline.StageElapsed - blowsAt[blow];
-
-            if (into <= 0f || into >= BlowSeconds)
-            {
-                return flash.Sized(0f);
-            }
-
-            var struck = into / BlowSeconds;
-            return flash.Sized(flash.Scale * 4f * struck * (1f - struck));
-        }
-
-        float Landed(int blow, float peak)
-        {
-            var into = Timeline.StageElapsed - blowsAt[blow];
-            if (peak == 0f || into <= 0f)
+            if (at <= 0f)
             {
                 return 0f;
             }
 
-            if (into < BlowSeconds)
+            if (at < ExecutionAt)
             {
-                return peak * EaseOut(into / BlowSeconds);
+                return peak * EaseOut(at / ExecutionAt);
             }
 
-            var recovering = BlowSecondsOf(blow) - BlowSeconds;
-            if (recovering <= 0f)
-            {
-                return 0f;
-            }
-
-            var settling = (into - BlowSeconds) / recovering;
+            var settling = (at - ExecutionAt) / (VictoryStages.ClashSeconds - ExecutionAt);
             return settling >= 1f ? 0f : peak * (1f - EaseOut(settling));
+        }
+
+        float Thrown(float peak)
+        {
+            if (IsSettled)
+            {
+                return 0f;
+            }
+
+            var into = elapsed - ExecutionAt;
+            if (into <= 0f)
+            {
+                return 0f;
+            }
+
+            return into >= ThrowSeconds ? peak : peak * EaseOut(into / ThrowSeconds);
         }
 
         int Slot()
@@ -360,17 +293,6 @@ namespace Game.Presentation.Pure
 
             var recovering = (elapsed - ShoveSeconds) / recoveries[Slot()];
             return recovering >= 1f ? 0f : peak * (1f - EaseOut(recovering));
-        }
-
-        static int Thrown(int blow)
-        {
-            if (blow < 0 || blow >= blowsAt.Length)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(blow), blow, "The clash throws no such blow.");
-            }
-
-            return blow;
         }
 
         static float EaseOut(float t)

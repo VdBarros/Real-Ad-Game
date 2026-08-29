@@ -18,7 +18,14 @@ namespace Game.Presentation
 
         CameraFraming applied;
 
+        float jolt;
+
         bool staged;
+
+        public float Jolted
+        {
+            get { return jolt; }
+        }
 
         public bool IsBusy
         {
@@ -73,10 +80,22 @@ namespace Game.Presentation
         {
             staged = false;
             applied = framing;
-            transform.position = new Vector3(framing.Position.X, framing.Position.Y, framing.Position.Z);
+            Place();
             Lens().orthographicSize = framing.OrthographicSize;
             Refit();
             enabled = false;
+        }
+
+        public void Jolt(float impulse)
+        {
+            var kicked = CameraJolt.Clamped(impulse);
+            if (kicked.Equals(jolt))
+            {
+                return;
+            }
+
+            jolt = kicked;
+            Place();
         }
 
         public void Follow(WorldPoint subject)
@@ -178,9 +197,16 @@ namespace Game.Presentation
             }
 
             applied = framing;
-            transform.position = new Vector3(framing.Position.X, framing.Position.Y, framing.Position.Z);
+            Place();
             Lens().orthographicSize = framing.OrthographicSize;
             Refit();
+        }
+
+        void Place()
+        {
+            var at = CameraJolt.Jolted(applied.Position, jolt);
+
+            transform.position = new Vector3(at.X, at.Y, at.Z);
         }
 
         void Refit()

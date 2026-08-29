@@ -72,6 +72,11 @@ namespace Game.Interaction
             get { return journey.Walk; }
         }
 
+        public Fight Fight
+        {
+            get { return journey.Fight; }
+        }
+
         public static Walker Raise(CameraRig framing, WorldBuilder world, TapInput taps, RunState opening)
         {
             if (world == null)
@@ -337,8 +342,13 @@ namespace Game.Interaction
         {
             if (acting != null)
             {
-                acting.Cue(FigureCues.Of(journey));
+                acting.Cue(FigureCues.Of(journey, Gripped));
             }
+        }
+
+        PlayerWeapon Gripped
+        {
+            get { return figure == null ? PlayerWeapon.None : figure.Gripping; }
         }
 
         void ReleaseTheBeat()
@@ -364,6 +374,7 @@ namespace Game.Interaction
             }
 
             Act();
+            rig.Jolt(journey.Fight.Impact);
 
             if (fights != null)
             {
@@ -405,6 +416,7 @@ namespace Game.Interaction
         void Settle()
         {
             enabled = IsTheCastStillTurning();
+            rig.Jolt(0f);
 
             if (acting != null)
             {

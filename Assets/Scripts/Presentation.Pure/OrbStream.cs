@@ -11,6 +11,8 @@ namespace Game.Presentation.Pure
 
         public const float Size = 0.17f;
 
+        public const float Lift = 0.55f;
+
         public const float Spread = 0.55f;
 
         public const float Arc = 0.70f;

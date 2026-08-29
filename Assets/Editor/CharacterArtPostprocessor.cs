@@ -29,7 +29,7 @@ namespace Game.EditorTooling
 
         public override uint GetVersion()
         {
-            return 4;
+            return 5;
         }
 
         void OnPreprocessModel()

@@ -8,6 +8,12 @@ namespace Game.Presentation.Pure
         Strike,
         Clash,
         Recoil,
-        Take
+        Take,
+        Kick,
+        Slice,
+        Cleave,
+        Thrust,
+        Sweep,
+        Fall
     }
 }
