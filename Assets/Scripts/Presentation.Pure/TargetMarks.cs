@@ -5,15 +5,23 @@ namespace Game.Presentation.Pure
 {
     public static class TargetMarks
     {
+        public const float Solid = 1f;
+
+        public const float AsideOpacity = 0.7f;
+
+        public const float UnreachableOpacity = 0.4f;
+
+        static readonly Tint Unpainted = new Tint(1f, 1f, 1f);
+
         static readonly MarkLook[] looks =
         {
-            new MarkLook(new Tint(1f, 1f, 1f), 0f, 1f),
-            new MarkLook(new Tint(0.24f, 0.26f, 0.30f), 0.45f, 1f),
-            new MarkLook(new Tint(0.10f, 0.10f, 0.12f), 0.92f, 0.86f),
-            new MarkLook(new Tint(0.92f, 0.96f, 1f), 0.55f, 1.18f),
-            new MarkLook(new Tint(0.25f, 0.80f, 0.35f), 1f, 1.18f),
-            new MarkLook(new Tint(0.98f, 0.76f, 0.20f), 1f, 1.18f),
-            new MarkLook(new Tint(0.92f, 0.16f, 0.16f), 1f, 0.88f)
+            new MarkLook(Unpainted, 0f, 1f, Solid),
+            new MarkLook(Unpainted, 0f, 1f, AsideOpacity),
+            new MarkLook(Unpainted, 0f, 0.86f, UnreachableOpacity),
+            new MarkLook(new Tint(0.92f, 0.96f, 1f), 0.55f, 1.18f, Solid),
+            new MarkLook(new Tint(0.25f, 0.80f, 0.35f), 1f, 1.18f, Solid),
+            new MarkLook(new Tint(0.98f, 0.76f, 0.20f), 1f, 1.18f, Solid),
+            new MarkLook(new Tint(0.92f, 0.16f, 0.16f), 1f, 0.88f, Solid)
         };
 
         public static TargetMark Of(RunState state, int nodeId, TargetPreview preview)

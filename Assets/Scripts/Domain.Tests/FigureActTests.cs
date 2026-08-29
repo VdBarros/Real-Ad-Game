@@ -105,7 +105,7 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EveryFoughtOutcomeCuesItsOwnClipCutToTheFightsOwnSeconds()
+        public void EveryFoughtOutcomeCuesItsOwnClipCutToTheFightsOwnBeat()
         {
             var seen = new List<FigureAct>();
 
@@ -116,7 +116,8 @@ namespace Game.Domain.Tests
 
                 Assert.That(fight.IsJoined, Is.True, outcome.ToString());
                 Assert.That(cue.Loops, Is.False, outcome.ToString());
-                Assert.That(cue.Beat, Is.EqualTo(fight.Seconds).Within(Tolerance), outcome.ToString());
+                Assert.That(cue.Beat, Is.EqualTo(fight.Beat).Within(Tolerance), outcome.ToString());
+                Assert.That(cue.Beat, Is.GreaterThan(0f), outcome.ToString());
                 Assert.That(seen.Contains(cue.Act), Is.False, outcome.ToString());
 
                 seen.Add(cue.Act);
@@ -145,7 +146,7 @@ namespace Game.Domain.Tests
 
                 Assert.That(reply.Loops, Is.False, outcome.ToString());
                 Assert.That(reply.Beat, Is.EqualTo(blow.Beat).Within(Tolerance), outcome.ToString());
-                Assert.That(reply.Beat, Is.EqualTo(fight.Seconds).Within(Tolerance), outcome.ToString());
+                Assert.That(reply.Beat, Is.EqualTo(fight.Beat).Within(Tolerance), outcome.ToString());
                 Assert.That(reply.Act, Is.EqualTo(FigureCues.Answered(blow.Act)), outcome.ToString());
             }
 
@@ -174,9 +175,78 @@ namespace Game.Domain.Tests
             var win = Fight.Of(ActionOutcome.Win);
             var loss = Fight.Of(ActionOutcome.Loss);
 
-            Assert.That(Math.Abs(win.Seconds - loss.Seconds), Is.GreaterThan(Tolerance));
-            Assert.That(FigureCues.Answering(win).Beat, Is.EqualTo(win.Seconds).Within(Tolerance));
-            Assert.That(FigureCues.Answering(loss).Beat, Is.EqualTo(loss.Seconds).Within(Tolerance));
+            Assert.That(Math.Abs(win.Beat - loss.Beat), Is.GreaterThan(Tolerance));
+            Assert.That(FigureCues.Answering(win).Beat, Is.EqualTo(win.Beat).Within(Tolerance));
+            Assert.That(FigureCues.Answering(loss).Beat, Is.EqualTo(loss.Beat).Within(Tolerance));
+        }
+
+        [Test]
+        public void AWonClashCuesAStrikeAndAHitInTurnOnBothSidesAndRestartsOnEveryBlow()
+        {
+            var fight = Fight.Of(ActionOutcome.Win);
+            var struck = FigureMotion.Still;
+            var answered = FigureMotion.Still;
+            var blows = new List<FigureAct>();
+            var replies = new List<FigureAct>();
+            var restarts = 0;
+
+            for (var frame = 0; frame * Frame < VictoryStages.ClashSeconds; frame++)
+            {
+                var playing = fight.Advanced(frame * Frame);
+                var wanted = FigureCues.Striking(playing);
+
+                struck = struck.Cued(wanted);
+                answered = answered.Cued(FigureCues.Answering(playing));
+
+                if (struck.Elapsed == 0f && frame > 0)
+                {
+                    restarts++;
+                }
+
+                if (blows.Count == 0 || blows[blows.Count - 1] != wanted.Act)
+                {
+                    blows.Add(wanted.Act);
+                    replies.Add(FigureCues.Answering(playing).Act);
+                }
+
+                struck = struck.Advanced(Frame);
+                answered = answered.Advanced(Frame);
+            }
+
+            Assert.That(blows.Count, Is.EqualTo(Fight.Blows));
+            Assert.That(blows[0], Is.EqualTo(FigureAct.Strike));
+            Assert.That(restarts, Is.EqualTo(Fight.Blows - 1));
+
+            for (var blow = 0; blow < blows.Count; blow++)
+            {
+                Assert.That(
+                    blows[blow],
+                    Is.EqualTo(Fight.BlowIsThePlayers(blow) ? FigureAct.Strike : FigureAct.Recoil),
+                    "blow " + blow);
+
+                Assert.That(replies[blow], Is.EqualTo(FigureCues.Answered(blows[blow])), "blow " + blow);
+
+                if (blow > 0)
+                {
+                    Assert.That(blows[blow], Is.Not.EqualTo(blows[blow - 1]), "blow " + blow);
+                }
+            }
+        }
+
+        [Test]
+        public void TheDissolveCuesNothingButTheIdleClipOnBothSides()
+        {
+            var fight = Fight.Of(ActionOutcome.Win);
+
+            for (var at = VictoryStages.ClashSeconds; at < VictoryStages.BlockingSeconds; at += Frame)
+            {
+                var dissolving = fight.Advanced(at);
+
+                Assert.That(dissolving.Stage, Is.EqualTo(VictoryStage.Dissolve), at.ToString());
+                Assert.That(dissolving.IsTrading, Is.False, at.ToString());
+                Assert.That(FigureCues.Striking(dissolving), Is.EqualTo(FigureCue.Still), at.ToString());
+                Assert.That(FigureCues.Answering(dissolving), Is.EqualTo(FigureCue.Still), at.ToString());
+            }
         }
 
         [Test]

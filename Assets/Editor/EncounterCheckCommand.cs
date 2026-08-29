@@ -23,7 +23,7 @@ namespace Game.EditorTooling
 
         const int Sequence = 6;
 
-        const int EveryNthFrame = 3;
+        const int EveryNthFrame = 8;
 
         const float CloseRange = 6f;
 
@@ -62,6 +62,10 @@ namespace Game.EditorTooling
             public readonly HashSet<FigureAct> PlayerActs = new HashSet<FigureAct>();
             public readonly HashSet<FigureAct> EnemyActs = new HashSet<FigureAct>();
             public int BlowFrames;
+            public int HeldFrames;
+            public bool WentGhost;
+            public float GhostHigh;
+            public float GhostLow = 1f;
             public int Shot;
             public bool PlayerActing;
             public bool EnemyActing;
@@ -101,9 +105,13 @@ namespace Game.EditorTooling
             report.Append(Bled(tie, "tie"));
             report.Append(Bled(loss, "loss"));
 
-            BothSidesRead(win, "win", FigureAct.Strike, FigureAct.Recoil);
-            BothSidesRead(tie, "tie", FigureAct.Clash, FigureAct.Clash);
-            BothSidesRead(loss, "loss", FigureAct.Recoil, FigureAct.Strike);
+            BothSidesRead(
+                win,
+                "win",
+                new[] { FigureAct.Strike, FigureAct.Recoil },
+                new[] { FigureAct.Recoil, FigureAct.Strike });
+            BothSidesRead(tie, "tie", new[] { FigureAct.Clash }, new[] { FigureAct.Clash });
+            BothSidesRead(loss, "loss", new[] { FigureAct.Recoil }, new[] { FigureAct.Strike });
 
             report.Append(PastTheEnemy(Power, Power - 1, "win"));
             report.Append(PastTheEnemy(Power, Power + 1, "loss"));
@@ -113,6 +121,10 @@ namespace Game.EditorTooling
             OnlyThePowerMoved(loss, Power);
             TheWinPaidExactly(win, Power, Power - 1);
             TheWinCostNothing(win);
+            TheWinHeldTheControlsForTheWholeCeremony(win);
+            TheWinDissolvedAGhost(win);
+            NoGhostHaunts(tie);
+            NoGhostHaunts(loss);
 
             report.Append(TheBrushCostsLessThanTheLean());
 
@@ -230,6 +242,17 @@ namespace Game.EditorTooling
                 if (!walker.Walk.IsWaiting)
                 {
                     continue;
+                }
+
+                reel.HeldFrames++;
+
+                if (figure != null && figure.IsGhost && !figure.HasFallen)
+                {
+                    var haunting = figure.GhostAlpha;
+
+                    reel.WentGhost = true;
+                    reel.GhostHigh = haunting > reel.GhostHigh ? haunting : reel.GhostHigh;
+                    reel.GhostLow = haunting < reel.GhostLow ? haunting : reel.GhostLow;
                 }
 
                 reel.PlayerPeak = Further(reel.PlayerPeak, builder.Player.Ground, post);
@@ -909,7 +932,53 @@ namespace Game.EditorTooling
             return act == FigureAct.Strike || act == FigureAct.Clash || act == FigureAct.Recoil;
         }
 
-        static void BothSidesRead(Tally reel, string leg, FigureAct blow, FigureAct reply)
+        static void TheWinHeldTheControlsForTheWholeCeremony(Tally win)
+        {
+            var held = win.HeldFrames * Frame;
+
+            if (Math.Abs(held - VictoryStages.BlockingSeconds) > Frame * 2f)
+            {
+                Debug.LogError(
+                    "A win held movement for " + held.ToString("0.###", CultureInfo.InvariantCulture)
+                    + "s over " + win.HeldFrames + " frames, where the clash and the dissolve add up to "
+                    + VictoryStages.BlockingSeconds.ToString("0.###", CultureInfo.InvariantCulture) + "s.");
+            }
+        }
+
+        static void TheWinDissolvedAGhost(Tally win)
+        {
+            if (!win.WentGhost)
+            {
+                Debug.LogError(
+                    "A win took the enemy off the board without ever turning it into a ghost, so the "
+                    + "dissolve had nothing to fade.");
+                return;
+            }
+
+            if (win.GhostHigh <= 0f || win.GhostHigh >= 1f || win.GhostHigh > Ghosting.Alpha + 0.001f)
+            {
+                Debug.LogError(
+                    "A win's ghost stood at " + win.GhostHigh + " where a translucent silhouette reads "
+                    + "somewhere above nothing and below the " + Ghosting.Alpha + " the ghost opens on.");
+            }
+
+            if (win.GhostLow > 0.05f)
+            {
+                Debug.LogError(
+                    "A win's ghost never faded past " + win.GhostLow
+                    + ", so the enemy blinked out rather than dissolving.");
+            }
+        }
+
+        static void NoGhostHaunts(Tally reel)
+        {
+            if (reel.WentGhost)
+            {
+                Debug.LogError("A " + reel.Outcome + " turned the enemy it left standing into a ghost.");
+            }
+        }
+
+        static void BothSidesRead(Tally reel, string leg, FigureAct[] blows, FigureAct[] replies)
         {
             if (!reel.PlayerActing || !reel.EnemyActing)
             {
@@ -924,18 +993,18 @@ namespace Game.EditorTooling
                 Debug.LogError("The " + leg + " played no blow on either side.");
             }
 
-            if (!Only(reel.PlayerActs, blow))
+            if (!Exactly(reel.PlayerActs, blows))
             {
                 Debug.LogError(
                     "The " + leg + " had the player play " + Acts(reel.PlayerActs) + " where it owes "
-                    + blow + ".");
+                    + Wanted(blows) + ".");
             }
 
-            if (!Only(reel.EnemyActs, reply))
+            if (!Exactly(reel.EnemyActs, replies))
             {
                 Debug.LogError(
                     "The " + leg + " had the enemy play " + Acts(reel.EnemyActs) + " where it owes "
-                    + reply + ".");
+                    + Wanted(replies) + ".");
             }
 
             if (reel.Shot == 0)
@@ -944,9 +1013,36 @@ namespace Game.EditorTooling
             }
         }
 
-        static bool Only(HashSet<FigureAct> acts, FigureAct wanted)
+        static bool Exactly(HashSet<FigureAct> acts, FigureAct[] wanted)
         {
-            return acts.Count == 1 && acts.Contains(wanted);
+            if (acts.Count != wanted.Length)
+            {
+                return false;
+            }
+
+            foreach (var act in wanted)
+            {
+                if (!acts.Contains(act))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        static string Wanted(FigureAct[] acts)
+        {
+            var names = new List<string>();
+
+            foreach (var act in acts)
+            {
+                names.Add(act.ToString());
+            }
+
+            names.Sort(StringComparer.Ordinal);
+
+            return string.Join("/", names.ToArray());
         }
 
         static string Acts(HashSet<FigureAct> acts)
@@ -982,7 +1078,8 @@ namespace Game.EditorTooling
             return string.Format(
                 CultureInfo.InvariantCulture,
                 "\n  {0} against {1}: {2}, player thrown {3:0.###} tiles, enemy {4:0.###}, {5} lit frames,"
-                + " ending on node {6} at power {7}, floor {8} to {9}{10}{11}",
+                + " ending on node {6} at power {7}, floor {8} to {9}{10}{11}, movement held {12:0.###}s"
+                + " over {13} frames{14}",
                 startingPower,
                 enemyValue,
                 reel.Outcome,
@@ -994,7 +1091,13 @@ namespace Game.EditorTooling
                 reel.ClearedBefore,
                 reel.Cleared,
                 reel.EnemyFell ? ", enemy dissolved" : string.Empty,
-                reel.WeaponFlew ? ", weapon dropped" : string.Empty);
+                reel.WeaponFlew ? ", weapon dropped" : string.Empty,
+                reel.HeldFrames * Frame,
+                reel.HeldFrames,
+                reel.WentGhost
+                    ? ", ghosted from " + reel.GhostHigh.ToString("0.###", CultureInfo.InvariantCulture)
+                        + " down to " + reel.GhostLow.ToString("0.###", CultureInfo.InvariantCulture)
+                    : string.Empty);
         }
     }
 }

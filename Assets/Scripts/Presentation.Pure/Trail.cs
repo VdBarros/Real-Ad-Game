@@ -12,6 +12,35 @@ namespace Game.Presentation.Pure
 
         public const float Lift = 0.04f;
 
+        public const float DangerSize = 0.19f;
+
+        static readonly TrailLook[] looks =
+        {
+            new TrailLook(new Tint(0.97f, 0.93f, 0.55f), Size),
+            new TrailLook(new Tint(1f, 0.27f, 0.14f), DangerSize)
+        };
+
+        public static TrailLook Look(TrailMood mood)
+        {
+            var slot = (int)mood;
+            if (slot < 0 || slot >= looks.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(mood), mood, "No look for that mood.");
+            }
+
+            return looks[slot];
+        }
+
+        public static TrailMood MoodOf(TargetPreview preview)
+        {
+            if (preview == null)
+            {
+                throw new ArgumentNullException(nameof(preview));
+            }
+
+            return preview.IsDangerous ? TrailMood.Dangerous : TrailMood.Safe;
+        }
+
         public static IReadOnlyList<TrailDot> Along(TileRoute route)
         {
             if (route == null)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Game.Presentation.Pure;
 using NUnit.Framework;
 
@@ -84,6 +85,95 @@ namespace Game.Domain.Tests
         {
             Assert.That(() => Trophy.PositionOf(Trophy.Cap), Throws.InstanceOf<ArgumentOutOfRangeException>());
             Assert.That(() => Trophy.RotationOf(-1), Throws.InstanceOf<ArgumentOutOfRangeException>());
+        }
+
+        [Test]
+        public void TheLookCarriesTheWeaponAndCloakItsTierIsDressedIn()
+        {
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                Assert.That(Look(tier).Weapon, Is.EqualTo(PlayerKit.WeaponOf(tier)));
+                Assert.That(Look(tier).Cloak, Is.EqualTo(PlayerKit.CloakedAt(tier)));
+            }
+        }
+
+        [Test]
+        public void EveryTierWearsAStateNoOtherTierWears()
+        {
+            var worn = new List<PlayerLook>();
+
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                var look = Look(tier);
+
+                Assert.That(worn, Has.No.Member(look));
+                worn.Add(look);
+            }
+
+            Assert.That(worn.Count, Is.EqualTo(PlayerTier.Count));
+            Assert.That(worn.Count, Is.GreaterThanOrEqualTo(4));
+        }
+
+        [Test]
+        public void EveryPromotionSwapsAPropAndNotOnlyTheSize()
+        {
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            {
+                var below = Look(tier - 1);
+                var here = Look(tier);
+
+                Assert.That(
+                    here.Weapon != below.Weapon
+                    || here.Cloak != below.Cloak
+                    || here.Trophies != below.Trophies,
+                    Is.True,
+                    "tier " + tier + " is nothing but a larger copy of the tier below it");
+            }
+        }
+
+        [Test]
+        public void EveryStateIsCrossedIntoOnAThresholdOfTheTierTableAndNowhereElse()
+        {
+            for (var index = 0; index < PlayerTier.Thresholds.Count; index++)
+            {
+                var threshold = PlayerTier.Thresholds[index];
+                var before = PlayerLook.Of(threshold - 1);
+                var after = PlayerLook.Of(threshold);
+
+                Assert.That(before, Is.Not.EqualTo(after));
+                Assert.That(after.Tier, Is.EqualTo(index + 1));
+            }
+
+            var swaps = 0;
+            var previous = PlayerLook.Of(1);
+
+            for (var power = 2; power <= 490; power++)
+            {
+                var look = PlayerLook.Of(power);
+
+                if (!look.Equals(previous))
+                {
+                    Assert.That(PlayerTier.Thresholds, Has.Member(power));
+                    swaps++;
+                }
+
+                previous = look;
+            }
+
+            Assert.That(swaps, Is.EqualTo(PlayerTier.Thresholds.Count));
+        }
+
+        [Test]
+        public void TheLookNamesNoColourForAnythingToPaintThePlayerWith()
+        {
+            foreach (var property in typeof(PlayerLook).GetProperties())
+            {
+                Assert.That(property.PropertyType, Is.Not.EqualTo(typeof(Tint)));
+            }
+
+            var source = SourceTree.Read("Presentation.Pure", "PlayerLook.cs");
+
+            Assert.That(source, Does.Not.Contain("Tint"));
         }
 
         static PlayerLook Look(int tier)

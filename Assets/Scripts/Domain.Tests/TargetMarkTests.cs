@@ -168,11 +168,108 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void NoBadgeAnybodyIsNotAimingAtIsEverGreyedOrHueShifted()
+        {
+            foreach (var mark in Resting)
+            {
+                var look = TargetMarks.Look(mark);
+
+                foreach (BadgeStyle style in Enum.GetValues(typeof(BadgeStyle)))
+                {
+                    Assert.That(
+                        BadgeTints.Washed(style, look),
+                        Is.EqualTo(BadgeTints.Of(style)),
+                        mark + " repaints a " + style + " badge, and a badge's colour says what it is.");
+                }
+            }
+        }
+
+        [Test]
+        public void EveryBadgeHoldsAColourNobodyCouldCallGrey()
+        {
+            foreach (TargetMark mark in Enum.GetValues(typeof(TargetMark)))
+            {
+                var look = TargetMarks.Look(mark);
+
+                foreach (BadgeStyle style in Enum.GetValues(typeof(BadgeStyle)))
+                {
+                    Assert.That(
+                        BadgeTints.Chroma(BadgeTints.Washed(style, look)),
+                        Is.GreaterThan(0.2f),
+                        "a " + style + " badge wearing " + mark + " has drained to a grey.");
+                }
+            }
+        }
+
+        [Test]
+        public void ANodeBehindAnUnbeatenEnemyKeepsItsHueAndFadesInstead()
+        {
+            var look = TargetMarks.Look(TargetMark.Unreachable);
+
+            Assert.That(look.Weight, Is.EqualTo(0f), "an unreachable badge is faded, never repainted.");
+            Assert.That(
+                look.Opacity,
+                Is.EqualTo(0.4f).Within(0.1f),
+                "a sealed node reads as about two fifths there.");
+            Assert.That(look.Opacity, Is.LessThan(TargetMarks.Look(TargetMark.Idle).Opacity));
+        }
+
+        [Test]
+        public void AimingAtOneNodeFadesTheRestRatherThanDrainingThem()
+        {
+            var aside = TargetMarks.Look(TargetMark.Aside);
+            var idle = TargetMarks.Look(TargetMark.Idle);
+            var unreachable = TargetMarks.Look(TargetMark.Unreachable);
+
+            Assert.That(aside.Weight, Is.EqualTo(0f), "standing aside is a fade, not a coat of grey.");
+            Assert.That(aside.Opacity, Is.LessThan(idle.Opacity));
+            Assert.That(
+                aside.Opacity,
+                Is.GreaterThan(unreachable.Opacity),
+                "a node merely standing aside is still one the player could have tapped.");
+        }
+
+        [Test]
+        public void ANodeAtRestIsWhollyThereAndAnAimedOneNeverFades()
+        {
+            Assert.That(TargetMarks.Look(TargetMark.Idle).Opacity, Is.EqualTo(1f));
+
+            foreach (TargetMark mark in Enum.GetValues(typeof(TargetMark)))
+            {
+                var look = TargetMarks.Look(mark);
+
+                Assert.That(look.Opacity, Is.InRange(0.0001f, 1f), mark + " fades by an impossible amount.");
+
+                if (TargetMarks.IsAimed(mark))
+                {
+                    Assert.That(
+                        look.Opacity,
+                        Is.EqualTo(1f),
+                        mark + " is the answer under the finger, so it is never the faded one.");
+                }
+            }
+        }
+
+        [Test]
+        public void AFadedMarkIsAFadeAndNothingElse()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => new MarkLook(new Tint(1f, 1f, 1f), 0f, 1f, 0f));
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => new MarkLook(new Tint(1f, 1f, 1f), 0f, 1f, 1.4f));
+        }
+
+        [Test]
         public void AMarkThatDoesNotExistHasNoLook()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => TargetMarks.Look((TargetMark)99));
             Assert.Throws<ArgumentOutOfRangeException>(() => TargetMarks.IsAimed((TargetMark)99));
         }
+
+        static readonly TargetMark[] Resting =
+        {
+            TargetMark.Idle, TargetMark.Aside, TargetMark.Unreachable
+        };
 
         static TargetMark Mark(RunState state, int nodeId)
         {

@@ -124,6 +124,32 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void DivertingMidFightHandsTheControlsBackWithoutWaitingOutTheVictoryClash()
+        {
+            var fought = UntilAFight(Journey.Toward(RunFixture.Begin(40), RunFixture.Boss));
+
+            Assert.That(fought.HoldsForAFight, Is.True);
+            Assert.That(
+                fought.Fight.IsSettled,
+                Is.False,
+                "The fixture has to leave a fight still running, or this proves nothing.");
+
+            var broken = fought.DivertedTo(RunFixture.Additive);
+
+            Assert.That(
+                broken.HoldsForAFight,
+                Is.False,
+                "A tap that breaks off a fight has to hand the controls straight back, rather than "
+                + "holding them for the rest of the victory clash.");
+            Assert.That(broken.Fight.IsSettled, Is.True);
+            Assert.That(
+                fought.Cancelled().HoldsForAFight,
+                Is.True,
+                "Letting go of the screen is not a diversion and still must not call off a fight "
+                + "already joined.");
+        }
+
+        [Test]
         public void WinningTheFightOnTheWayCarriesTheWalkOnToWhatWasTappedFor()
         {
             var arrivals = new List<int>();
