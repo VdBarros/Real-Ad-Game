@@ -9,6 +9,8 @@ namespace Game.Presentation.Pure
         CoinStack,
         Staircase,
         Foundation,
+        Pillar,
+        Candle,
         Knight,
         SkeletonMinion,
         SkeletonRogue,

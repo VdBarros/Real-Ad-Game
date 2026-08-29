@@ -18,6 +18,8 @@ namespace Game.Presentation.Pure
 
         public const string Rig = "CameraRig";
 
+        public const string Backdrop = "Backdrop";
+
         public const string TrailGroup = "Trail";
 
         public const string Spark = "Spark";

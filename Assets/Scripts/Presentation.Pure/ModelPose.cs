@@ -14,6 +14,8 @@ namespace Game.Presentation.Pure
                 case PartModel.Chest:
                 case PartModel.CoinStack:
                 case PartModel.Foundation:
+                case PartModel.Pillar:
+                case PartModel.Candle:
                     return new WorldPoint(
                         part.Position.X, part.Position.Y - part.Scale.Y * 0.5f, part.Position.Z);
                 case PartModel.Staircase:
@@ -55,6 +57,8 @@ namespace Game.Presentation.Pure
                 case PartModel.CoinStack:
                 case PartModel.Staircase:
                 case PartModel.Foundation:
+                case PartModel.Pillar:
+                case PartModel.Candle:
                     return part.Rotation;
                 default:
                     throw new ArgumentOutOfRangeException(
@@ -74,9 +78,10 @@ namespace Game.Presentation.Pure
                 case PartModel.CoinStack:
                     return Fitted(part);
                 case PartModel.Staircase:
-                    return Stepped(part);
                 case PartModel.Foundation:
-                    return Stretched(part);
+                case PartModel.Pillar:
+                case PartModel.Candle:
+                    return Boxed(part);
                 case PartModel.Knight:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
@@ -125,20 +130,9 @@ namespace Game.Presentation.Pure
             return new WorldPoint(part.Scale.X * fit, part.Scale.Y * fit, part.Scale.Z * fit);
         }
 
-        static WorldPoint Stepped(WorldPart part)
+        static WorldPoint Boxed(WorldPart part)
         {
-            return new WorldPoint(
-                part.Scale.X / DungeonPack.StaircaseWidth,
-                part.Scale.Y / DungeonPack.StaircaseTread,
-                part.Scale.Z / DungeonPack.StaircaseRun);
-        }
-
-        static WorldPoint Stretched(WorldPart part)
-        {
-            return new WorldPoint(
-                part.Scale.X / DungeonPack.FoundationWidth,
-                part.Scale.Y / DungeonPack.HeightOf(PartModel.Foundation),
-                part.Scale.Z / DungeonPack.FoundationRun);
+            return DungeonPack.FitOf(part.Model, part.Scale);
         }
 
         static WorldPoint Spanning(WorldPart part)

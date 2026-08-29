@@ -14,6 +14,8 @@ namespace Game.Domain.Tests
 
         static readonly int[] PlayerPowers = { 1, 5, 40, 400, 4000 };
 
+        static readonly int[] PowersAcrossEveryTier = { 1, 8, 30, 100, 300, 4000 };
+
         [Test]
         public void AnEnemysOwnNumberDecidesItsSilhouetteAndTheBandNeverDoes()
         {
@@ -209,6 +211,290 @@ namespace Game.Domain.Tests
 
             Assert.That(heights.Count, Is.EqualTo(4));
             Assert.That(heights.Distinct().Count(), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void NoEnemyAtAnyBandAndAnyPlayerTierFallsBelowTheReadabilityFloor()
+        {
+            var read = 0;
+            var smallest = float.MaxValue;
+            var complaint = new List<string>();
+
+            foreach (var number in EnemyNumbers)
+            {
+                var mesh = CharacterCast.MeshOf(PartStyle.Enemy, number);
+
+                foreach (var power in PowersAcrossEveryTier)
+                {
+                    var band = EnemyBands.Of(number, power);
+                    var scale = LevelBlueprintBuilder.FigureScale * EnemyBands.ScaleOf(band);
+                    var showing = FigureReadability.PixelsShowing(mesh, scale);
+
+                    smallest = Math.Min(smallest, showing);
+                    read++;
+
+                    if (!FigureReadability.Reads(mesh, scale))
+                    {
+                        complaint.Add(
+                            number + " read against " + power + " stands " + band + " at "
+                            + showing.ToString("0.#") + " pixels");
+                    }
+                }
+            }
+
+            foreach (EnemyBand band in Enum.GetValues(typeof(EnemyBand)))
+            {
+                foreach (var mesh in CharacterCast.MeshesOf(PartStyle.Enemy))
+                {
+                    var scale = LevelBlueprintBuilder.FigureScale * EnemyBands.ScaleOf(band);
+
+                    read++;
+                    smallest = Math.Min(smallest, FigureReadability.PixelsShowing(mesh, scale));
+
+                    if (!FigureReadability.Reads(mesh, scale))
+                    {
+                        complaint.Add(mesh + " in band " + band + " falls below the floor");
+                    }
+                }
+            }
+
+            Assert.That(read, Is.GreaterThan(0));
+            Assert.That(complaint, Is.Empty);
+            Assert.That(
+                smallest,
+                Is.GreaterThanOrEqualTo(FigureReadability.ReadablePixels),
+                "the smallest enemy anywhere in the cross product stands " + smallest.ToString("0.#")
+                + " pixels tall");
+        }
+
+        [Test]
+        public void ThePlayersOwnTierMovesNeitherAnEnemysBandNorItsSize()
+        {
+            foreach (var number in EnemyNumbers)
+            {
+                var mesh = CharacterCast.MeshOf(PartStyle.Enemy, number);
+                var byBand = new Dictionary<EnemyBand, float>();
+
+                foreach (var power in PowersAcrossEveryTier)
+                {
+                    var band = EnemyBands.Of(number, power);
+                    var showing = FigureReadability.PixelsShowing(
+                        mesh, LevelBlueprintBuilder.FigureScale * EnemyBands.ScaleOf(band));
+
+                    if (byBand.ContainsKey(band))
+                    {
+                        Assert.That(
+                            byBand[band],
+                            Is.EqualTo(showing).Within(Tolerance),
+                            number + " read against " + power);
+                        continue;
+                    }
+
+                    byBand.Add(band, showing);
+                }
+
+                Assert.That(byBand.Count, Is.GreaterThan(1), "power " + number);
+            }
+        }
+
+        [Test]
+        public void TheReadabilityFloorIsReadOffTheFramingRatherThanPinnedToAScale()
+        {
+            Assert.That(
+                FigureReadability.ShareOfScreen,
+                Is.EqualTo(FigureReadability.ReadablePixels / ScreenFrame.Height).Within(Tolerance));
+            Assert.That(
+                FigureReadability.Height,
+                Is.EqualTo(FigureReadability.ShareOfScreen * 2f * LevelFraming.PlaySize).Within(Tolerance));
+            Assert.That(
+                FigureReadability.ShareOfScreen,
+                Is.LessThan(LevelFraming.FigureHeightFraction),
+                "a figure that reads is allowed to stand shorter than the player #136 framed");
+
+            foreach (var mesh in CharacterCast.MeshesOf(PartStyle.Enemy))
+            {
+                var floor = FigureReadability.ScaleOf(mesh);
+
+                Assert.That(
+                    FigureFit.StandingHeight(mesh, floor),
+                    Is.EqualTo(FigureReadability.Height).Within(Tolerance),
+                    mesh.ToString());
+                Assert.That(
+                    FigureReadability.ShareShowing(mesh, floor),
+                    Is.EqualTo(FigureReadability.ShareOfScreen).Within(Tolerance),
+                    mesh.ToString());
+                Assert.That(FigureReadability.Reads(mesh, floor), Is.True, mesh.ToString());
+                Assert.That(FigureReadability.Reads(mesh, floor * 0.99f), Is.False, mesh.ToString());
+            }
+
+            var wider = LevelFraming.PlaySize * 2f;
+
+            Assert.That(
+                LevelFraming.HeightShowing(FigureReadability.ShareOfScreen, wider),
+                Is.EqualTo(FigureReadability.Height * 2f).Within(Tolerance),
+                "pull the framing out and the floor rises with it, because it is a share of the screen "
+                + "and never a scale");
+            Assert.That(
+                () => LevelFraming.HeightShowing(0f, LevelFraming.PlaySize),
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
+            Assert.That(
+                () => LevelFraming.HeightShowing(FigureReadability.ShareOfScreen, 0f),
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
+        }
+
+        [Test]
+        public void TheBandRampStillSeparatesTheFourBandsWithTheFloorUnderIt()
+        {
+            var trivial = EnemyBands.ScaleOf(EnemyBand.Trivial);
+
+            Assert.That(EnemyBands.ScaleOf(EnemyBand.Close) / trivial, Is.GreaterThan(1.1f));
+            Assert.That(EnemyBands.ScaleOf(EnemyBand.OutOfReach) / trivial, Is.GreaterThan(1.2f));
+
+            foreach (EnemyBand band in Enum.GetValues(typeof(EnemyBand)))
+            {
+                if (band == EnemyBand.Trivial)
+                {
+                    continue;
+                }
+
+                Assert.That(EnemyBands.ScaleOf(band), Is.GreaterThan(trivial), band.ToString());
+            }
+        }
+
+        [Test]
+        public void TheBossOutgrowsEveryEnemyAtEveryPairingOfBands()
+        {
+            var boss = CharacterCast.MeshOf(PartStyle.Boss);
+            var tightest = float.MaxValue;
+
+            foreach (EnemyBand wearing in Enum.GetValues(typeof(EnemyBand)))
+            {
+                var standing = FigureFit.StandingHeight(
+                    boss, LevelBlueprintBuilder.BossScale * EnemyBands.ScaleOf(wearing));
+
+                Assert.That(
+                    FigureReadability.Reads(
+                        boss, LevelBlueprintBuilder.BossScale * EnemyBands.ScaleOf(wearing)),
+                    Is.True,
+                    wearing.ToString());
+
+                foreach (EnemyBand against in Enum.GetValues(typeof(EnemyBand)))
+                {
+                    foreach (var mesh in CharacterCast.MeshesOf(PartStyle.Enemy))
+                    {
+                        var enemy = FigureFit.StandingHeight(
+                            mesh, LevelBlueprintBuilder.FigureScale * EnemyBands.ScaleOf(against));
+
+                        tightest = Math.Min(tightest, standing / enemy);
+
+                        Assert.That(
+                            standing,
+                            Is.GreaterThan(enemy),
+                            "the boss in band " + wearing + " against " + mesh + " in band " + against);
+                    }
+                }
+            }
+
+            Assert.That(
+                tightest,
+                Is.GreaterThan(1.2f),
+                "the tightest pairing leaves the boss " + tightest.ToString("0.###")
+                + " times the height of the enemy");
+        }
+
+        [Test]
+        public void TheSkeletonsStandAtTheRateTheKnightStandsAtAndNoneOfThemIsStretchedToDoIt()
+        {
+            Assert.That(
+                AdventurerPack.StandingPerPackUnit,
+                Is.EqualTo(AdventurerPack.StandingScales / AdventurerPack.KnightPackHeight)
+                    .Within(Tolerance));
+
+            var shortest = float.MaxValue;
+            var shortestMesh = PartModel.None;
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (!SkeletonPack.Carries(model))
+                {
+                    continue;
+                }
+
+                var height = SkeletonPack.PackHeightOf(model);
+
+                Assert.That(
+                    SkeletonPack.StandingScales,
+                    Is.LessThanOrEqualTo(AdventurerPack.StandingPerPackUnit * height),
+                    model + " would have to be stretched past the height its own mesh measures");
+
+                if (height < shortest)
+                {
+                    shortest = height;
+                    shortestMesh = model;
+                }
+            }
+
+            Assert.That(SkeletonPack.ShortestPackHeight, Is.EqualTo(shortest).Within(Tolerance));
+            Assert.That(shortestMesh, Is.EqualTo(PartModel.SkeletonMinion));
+            Assert.That(
+                SkeletonPack.StandingScales,
+                Is.EqualTo(AdventurerPack.StandingPerPackUnit * shortest).Within(Tolerance));
+            Assert.That(
+                SkeletonPack.StandingScales,
+                Is.LessThan(AdventurerPack.StandingScales),
+                "the shortest skeleton mesh is shorter than the Knight's, so the pack stands shorter");
+            Assert.That(
+                SkeletonPack.StandingScales,
+                Is.GreaterThan(1.4f),
+                "and far taller than the 1.3 it was pinned at before the player grew");
+        }
+
+        [Test]
+        public void NoAdversaryTurnedOnItsTileHidesMoreGroundThanTheCapsuleItReplaces()
+        {
+            var tightest = 0f;
+            var where = "nothing";
+
+            foreach (var role in CharacterCast.Roles)
+            {
+                if (role == PartStyle.Start)
+                {
+                    continue;
+                }
+
+                var basis = role == PartStyle.Boss
+                    ? LevelBlueprintBuilder.BossScale
+                    : LevelBlueprintBuilder.FigureScale;
+
+                foreach (var mesh in CharacterCast.MeshesOf(role))
+                {
+                    foreach (EnemyBand band in Enum.GetValues(typeof(EnemyBand)))
+                    {
+                        var scale = basis * EnemyBands.ScaleOf(band);
+                        var turned = FigureFit.TileReachOf(mesh, scale)
+                            * IsoProjection.SightReach(FigureFit.StandingHeight(mesh, scale));
+                        var capsule = FigureFit.HiddenGroundOf(PartModel.None, scale);
+                        var share = turned / capsule;
+
+                        if (share > tightest)
+                        {
+                            tightest = share;
+                            where = role + " wearing " + mesh + " in band " + band;
+                        }
+
+                        Assert.That(
+                            turned,
+                            Is.LessThan(capsule),
+                            role + " wearing " + mesh + " in band " + band);
+                    }
+                }
+            }
+
+            Assert.That(
+                tightest,
+                Is.LessThan(1f),
+                where + " hides " + tightest.ToString("0.###")
+                + " of what its capsule hid, which is the ceiling the standing scales answer to");
         }
 
         [Test]

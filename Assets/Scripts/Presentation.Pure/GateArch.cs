@@ -5,13 +5,15 @@ namespace Game.Presentation.Pure
 {
     public static class GateArch
     {
-        public const float Span = 0.98f;
+        public const PartModel Masonry = PartModel.Pillar;
+
+        public const PartModel Pipwork = PartModel.Candle;
+
+        public const float Headroom = 1.05f;
 
         public const float Depth = 0.14f;
 
-        public const float PostThickness = 0.14f;
-
-        public const float PostHeight = 1f;
+        public const float PostThickness = 0.1f;
 
         public const float LintelThickness = 0.14f;
 
@@ -21,17 +23,67 @@ namespace Game.Presentation.Pure
 
         public const float PipGap = 0.05f;
 
-        public const float Height = PostHeight + LintelThickness + PipHeight;
-
         public const float Yaw = 45f;
 
         public const int SmallestFactor = 2;
 
         public const int MostPips = 5;
 
+        public static PartModel Passer
+        {
+            get { return CharacterCast.MeshOf(PartStyle.Start); }
+        }
+
+        public static float PasserScale
+        {
+            get
+            {
+                var thresholds = PlayerTier.Thresholds;
+
+                return PlayerLook.Of(thresholds[thresholds.Count - 1]).Scale;
+            }
+        }
+
+        public static float TallestPasser
+        {
+            get { return FigureFit.StandingHeight(Passer, PasserScale); }
+        }
+
+        public static float WidestPasser
+        {
+            get { return FigureFit.SpreadOf(Passer, PasserScale); }
+        }
+
+        public static float PostHeight
+        {
+            get { return TallestPasser * Headroom; }
+        }
+
         public static float Walkway
         {
-            get { return Span - 2f * PostThickness; }
+            get { return WidestPasser * Headroom; }
+        }
+
+        public static float Span
+        {
+            get { return Walkway + 2f * PostThickness; }
+        }
+
+        public static float Height
+        {
+            get { return PostHeight + LintelThickness + PipHeight; }
+        }
+
+        public static float TileFootprint
+        {
+            get
+            {
+                var turn = Yaw * Math.PI / 180.0;
+                var across = Math.Abs(Math.Cos(turn));
+                var along = Math.Abs(Math.Sin(turn));
+
+                return (float)Math.Max(Span * across + Depth * along, Span * along + Depth * across);
+            }
         }
 
         public static float PipRowFor(int factor)
@@ -48,16 +100,19 @@ namespace Game.Presentation.Pure
             var post = (Span - PostThickness) * 0.5f;
             var pieces = new List<WorldPart>(factor + 3)
             {
-                Block(
+                Cut(
                     PartNames.GateLeftPost,
+                    Masonry,
                     new WorldPoint(-post, floor + PostHeight * 0.5f, 0f),
                     new WorldPoint(PostThickness, PostHeight, Depth)),
-                Block(
+                Cut(
                     PartNames.GateRightPost,
+                    Masonry,
                     new WorldPoint(post, floor + PostHeight * 0.5f, 0f),
                     new WorldPoint(PostThickness, PostHeight, Depth)),
-                Block(
+                Cut(
                     PartNames.GateLintel,
+                    Masonry,
                     new WorldPoint(0f, floor + PostHeight + LintelThickness * 0.5f, 0f),
                     new WorldPoint(Span, LintelThickness, Depth))
             };
@@ -67,10 +122,11 @@ namespace Game.Presentation.Pure
 
             for (var pip = 0; pip < factor; pip++)
             {
-                pieces.Add(Block(
+                pieces.Add(Cut(
                     PartNames.GatePip(pip),
+                    Pipwork,
                     new WorldPoint((PipSize - row) * 0.5f + pip * (PipSize + PipGap), lift, 0f),
-                    new WorldPoint(PipSize, PipHeight, PipSize)));
+                    new WorldPoint(PipSize, PipHeight, Depth)));
             }
 
             return pieces;
@@ -95,12 +151,12 @@ namespace Game.Presentation.Pure
             return pips;
         }
 
-        static WorldPart Block(string name, WorldPoint position, WorldPoint scale)
+        static WorldPart Cut(string name, PartModel model, WorldPoint position, WorldPoint scale)
         {
             return new WorldPart(
                 name,
-                PartShape.Cube,
-                PartModel.None,
+                PartShape.Gate,
+                model,
                 PartStyle.Multiplier,
                 position,
                 new WorldPoint(0f, 0f, 0f),

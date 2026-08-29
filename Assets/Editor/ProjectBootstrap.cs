@@ -50,6 +50,11 @@ namespace Game.EditorTooling
             {
                 yield return name;
             }
+
+            foreach (var name in WorldBackdrop.ShaderNames)
+            {
+                yield return name;
+            }
         }
 
         public static void KeepRuntimeShadersInTheBuild()

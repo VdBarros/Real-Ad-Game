@@ -54,6 +54,10 @@ namespace Game.EditorTooling
 
         const string BaseColour = "_BaseColor";
 
+        const float YawEpsilon = 0.5f;
+
+        const int SettleFrames = 20;
+
         static readonly ActionOutcome[] FoughtOutcomes =
         {
             ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss
@@ -77,6 +81,7 @@ namespace Game.EditorTooling
                 failures += Traded(models, report);
                 failures += Degrades(models, report);
                 failures += Walked(models, report);
+                failures += Faced(report);
             }
 
             report.Append("\n  t-34: ")
@@ -1134,6 +1139,371 @@ namespace Game.EditorTooling
             return failures;
         }
 
+        static int Faced(StringBuilder report)
+        {
+            var worn = PartModels.Of(PartStyle.Start);
+            var graph = LevelGenerator.Generate(Seed, MazePreset.Ship).Graph;
+            var rig = CameraRig.Raise();
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var opening = RunState.Begin(graph, PowerTuning.For(MazePreset.Ship).StartingPower);
+            var input = TapInput.Raise(rig, builder.Targets, opening);
+            var walker = Walker.Raise(rig, builder, input, opening);
+            var figure = builder.Player;
+            var driven = figure == null ? null : figure.GetComponent<FigureAnimator>();
+
+            if (figure == null)
+            {
+                WorldObjects.Destroy(root);
+                WorldObjects.Destroy(rig.gameObject);
+                builder.Dispose();
+
+                return Assert(report, false, "the world raises a player figure to turn", "it raised none");
+            }
+
+            var failures = Assert(
+                report,
+                Math.Abs(FigureFacing.Shortest(figure.RestYaw, ArtPacks.FacingOf(worn))) <= YawEpsilon
+                && Math.Abs(FigureFacing.Shortest(FigureFacing.RestYaw, ArtPacks.FacingOf(worn)))
+                    <= YawEpsilon,
+                "the world still stands a figure on the pack's own authored offset, and that offset is the "
+                + "yaw the heading back to the camera already carries, which is what a live yaw composes "
+                + "with rather than replacing",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it was built on {0:0.###} against the pack's pinned {1:0.###} and the {2:0.###} the "
+                    + "rest heading carries",
+                    figure.RestYaw,
+                    ArtPacks.FacingOf(worn),
+                    FigureFacing.RestYaw));
+
+            failures += TurnedToEveryCardinal(rig, builder, walker, driven, figure, worn, report);
+            failures += TurnedAlongItsWalk(rig, builder, walker, driven, figure, report);
+            failures += SquaredUpWithTheEnemy(rig, builder, walker, driven, figure, report);
+
+            WorldObjects.Destroy(root);
+            WorldObjects.Destroy(rig.gameObject);
+            builder.Dispose();
+
+            return failures;
+        }
+
+        static int TurnedToEveryCardinal(
+            CameraRig rig,
+            WorldBuilder builder,
+            Walker walker,
+            FigureAnimator driven,
+            PlayerFigure figure,
+            PartModel worn,
+            StringBuilder report)
+        {
+            var cardinals = new List<string>();
+            var off = 0f;
+            var mirrored = 0f;
+            var slowest = 0f;
+
+            foreach (var side in TileSides.All)
+            {
+                var heading = TileSides.Toward(side);
+                figure.Face(heading);
+
+                var frames = 0;
+                for (; frames < FrameCap && figure.IsTurning; frames++)
+                {
+                    Step(rig, builder, walker, driven);
+                }
+
+                var yaw = Yaw(figure);
+                var pointed = FigureFacing.HeadingOf(yaw);
+
+                off = Math.Max(
+                    off, Math.Abs(FigureFacing.Shortest(yaw, FigureFacing.Of(worn, heading))));
+                mirrored = Math.Max(mirrored, 1f - (pointed.X * heading.X + pointed.Z * heading.Z));
+                slowest = Math.Max(slowest, frames * Frame);
+
+                cardinals.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} on {1:0.##} in {2:0.###}s",
+                    side,
+                    yaw,
+                    frames * Frame));
+            }
+
+            var failures = Assert(
+                report,
+                off <= YawEpsilon && mirrored <= 1e-3f,
+                "a figure told to face each of the four cardinals comes round flush along that heading, the "
+                + "pack's offset composed with the live yaw rather than either of them winning outright",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "worst {0:0.####} degrees off the composed yaw and {1:0.####} off flush: {2}",
+                    off,
+                    mirrored,
+                    string.Join(", ", cardinals.ToArray())));
+
+            return failures + Assert(
+                report,
+                slowest > 0f && slowest <= FigureTurn.TileSeconds + Frame,
+                "the widest of those turns eases out inside the time it takes to cross one tile, so a "
+                + "switchback never leaves a figure still swinging when it reaches the next tile",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the slowest took {0:0.###}s against the {1:0.###}s of one tile, at {2:0.#} degrees a "
+                    + "second over a {3:0.###}s half turn",
+                    slowest,
+                    FigureTurn.TileSeconds,
+                    FigureTurn.DegreesPerSecond,
+                    FigureTurn.SecondsToTurn(FigureFacing.HalfTurn)));
+        }
+
+        static int TurnedAlongItsWalk(
+            CameraRig rig,
+            WorldBuilder builder,
+            Walker walker,
+            FigureAnimator driven,
+            PlayerFigure figure,
+            StringBuilder report)
+        {
+            var headings = new HashSet<float>();
+            var wanted = float.NaN;
+            var since = 0;
+            var late = 0;
+            var worst = 0f;
+            var widest = 0f;
+            var walking = 0;
+            var moves = 0;
+            var grace = FigureTurn.TileSeconds + Frame * 2f;
+            var was = Yaw(figure);
+
+            for (var move = 0; move < Moves && !walker.Run.IsLevelComplete; move++)
+            {
+                var target = Furthest(walker.Run);
+                if (target == TapAim.Nothing)
+                {
+                    break;
+                }
+
+                walker.WalkTo(target);
+                if (!walker.IsWalking)
+                {
+                    break;
+                }
+
+                moves++;
+
+                for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
+                {
+                    Step(rig, builder, walker, driven);
+
+                    var yaw = Yaw(figure);
+                    widest = Math.Max(widest, Math.Abs(FigureFacing.Shortest(was, yaw)));
+                    was = yaw;
+
+                    var heading = walker.Walk.Facing;
+                    if (walker.Walk.IsRetreating || !FigureFacing.IsAimed(heading))
+                    {
+                        continue;
+                    }
+
+                    var aim = FigureFacing.Composed(figure.RestYaw, heading);
+
+                    if (float.IsNaN(wanted) || Math.Abs(FigureFacing.Shortest(wanted, aim)) > YawEpsilon)
+                    {
+                        wanted = aim;
+                        since = 0;
+                        continue;
+                    }
+
+                    since++;
+
+                    if (driven == null || driven.Act != FigureAct.Walk)
+                    {
+                        continue;
+                    }
+
+                    walking++;
+                    headings.Add((float)Math.Round(FigureFacing.YawOf(heading)));
+
+                    if (since * Frame <= grace)
+                    {
+                        continue;
+                    }
+
+                    var strayed = Math.Abs(FigureFacing.Shortest(yaw, aim));
+                    if (strayed > YawEpsilon)
+                    {
+                        late++;
+                        worst = Math.Max(worst, strayed);
+                    }
+                }
+
+                if (headings.Count > 1)
+                {
+                    break;
+                }
+            }
+
+            for (var frame = 0; frame < SettleFrames; frame++)
+            {
+                Step(rig, builder, walker, driven);
+            }
+
+            var stopped = Yaw(figure);
+            var held = 0f;
+
+            for (var frame = 0; frame < SettleFrames * 4; frame++)
+            {
+                Step(rig, builder, walker, driven);
+                held = Math.Max(held, Math.Abs(FigureFacing.Shortest(stopped, Yaw(figure))));
+            }
+
+            var failures = Assert(
+                report,
+                walking > 0 && headings.Count > 1 && late == 0,
+                "every frame the walk clip runs on, once the heading has been held for one tile, finds the "
+                + "mesh turned onto that heading rather than sliding sideways along it",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} walking frames over {1} moves and {2} headings left {3} of them facing the wrong "
+                    + "way, the worst by {4:0.##} degrees, measured {5:0.###}s after each change of heading",
+                    walking,
+                    moves,
+                    headings.Count,
+                    late,
+                    worst,
+                    grace));
+
+            failures += Assert(
+                report,
+                widest > YawEpsilon
+                && widest <= FigureTurn.DegreesPerSecond * Frame * 1.6f,
+                "the turn is eased rather than snapped, so no single frame of the walk swings the mesh "
+                + "further than an eased turn at its rate could carry it",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the widest single frame turned {0:0.##} degrees against the {1:0.##} allowed",
+                    widest,
+                    FigureTurn.DegreesPerSecond * Frame * 1.6f));
+
+            return failures + Assert(
+                report,
+                held <= YawEpsilon
+                && Math.Abs(FigureFacing.Shortest(stopped, figure.RestYaw)) > YawEpsilon,
+                "a figure that stops holds the facing it walked in on over the whole idle loop rather than "
+                + "swinging back to the camera-facing pose the world built it in",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it stopped on {0:0.##}, {1:0.##} degrees off the {2:0.##} it was built in, and drifted "
+                    + "{3:0.####} degrees over {4} idle frames",
+                    stopped,
+                    Math.Abs(FigureFacing.Shortest(stopped, figure.RestYaw)),
+                    figure.RestYaw,
+                    held,
+                    SettleFrames * 4));
+        }
+
+        static int SquaredUpWithTheEnemy(
+            CameraRig rig,
+            WorldBuilder builder,
+            Walker walker,
+            FigureAnimator driven,
+            PlayerFigure figure,
+            StringBuilder report)
+        {
+            EnemyFigure enemy = null;
+            var approach = default(WorldPoint);
+
+            for (var move = 0; move < Moves && enemy == null && !walker.Run.IsLevelComplete; move++)
+            {
+                var target = Furthest(walker.Run);
+                if (target == TapAim.Nothing)
+                {
+                    break;
+                }
+
+                walker.WalkTo(target);
+
+                for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
+                {
+                    Step(rig, builder, walker, driven);
+
+                    if (enemy != null || !walker.Walk.IsWaiting)
+                    {
+                        continue;
+                    }
+
+                    var standing = builder.Fights.Of(walker.Walk.ArrivedNodeId);
+                    if (standing == null || standing.HasFallen
+                        || !FigureFacing.IsAimed(walker.Walk.Facing))
+                    {
+                        continue;
+                    }
+
+                    enemy = standing;
+                    approach = walker.Walk.Facing;
+                    break;
+                }
+            }
+
+            if (enemy == null)
+            {
+                return Assert(
+                    report,
+                    false,
+                    "an enemy the player walks into is facing the player when the fight opens",
+                    "no fight came up over " + Moves + " greedy moves");
+            }
+
+            var atThePlayer = FigureFacing.Composed(enemy.RestYaw, FigureFacing.Reversed(approach));
+            var atTheEnemy = FigureFacing.Composed(figure.RestYaw, approach);
+            var asked = Math.Abs(FigureFacing.Shortest(enemy.RestYaw, atThePlayer));
+            var closestEnemy = float.MaxValue;
+            var closestPlayer = float.MaxValue;
+            var acts = new HashSet<FigureAct>();
+
+            for (var frame = 0; frame < SettleFrames + 5; frame++)
+            {
+                Step(rig, builder, walker, driven);
+
+                closestEnemy = Math.Min(
+                    closestEnemy, Math.Abs(FigureFacing.Shortest(Yaw(enemy), atThePlayer)));
+                closestPlayer = Math.Min(
+                    closestPlayer, Math.Abs(FigureFacing.Shortest(Yaw(figure), atTheEnemy)));
+
+                if (driven != null)
+                {
+                    acts.Add(driven.Act);
+                }
+            }
+
+            return Assert(
+                report,
+                closestEnemy <= YawEpsilon && closestPlayer <= YawEpsilon && asked > YawEpsilon,
+                "a fight turns the two of them onto each other inside a tile of it opening, so the blows "
+                + "land between two figures that are looking at one another",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the enemy came {0:0.####} degrees off the {1:0.##} that faces the player, {2:0.##} "
+                    + "degrees round from the {3:0.##} it was built in, while the player came {4:0.####} "
+                    + "off the {5:0.##} that faces it, over {6}",
+                    closestEnemy,
+                    atThePlayer,
+                    asked,
+                    enemy.RestYaw,
+                    closestPlayer,
+                    atTheEnemy,
+                    string.Join("/", Names(acts))));
+        }
+
+        static float Yaw(Figure figure)
+        {
+            return FigureFacing.Normalised(figure.transform.localEulerAngles.y);
+        }
+
         static int FellBack(
             CameraRig rig,
             WorldBuilder builder,
@@ -1155,10 +1525,18 @@ namespace Game.EditorTooling
                 Step(rig, builder, walker, driven);
             }
 
+            var figure = builder.Player;
+            var forward = walker.Walk.Facing;
+            var aiming = figure == null ? float.NaN : figure.FacingYaw;
+            var backwards = figure == null || !FigureFacing.IsAimed(forward)
+                ? float.NaN
+                : FigureFacing.Composed(figure.RestYaw, FigureFacing.Reversed(forward));
+
             walker.Cancel();
 
             var acts = new HashSet<FigureAct>();
             var frames = 0;
+            var retargeted = 0;
 
             for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
             {
@@ -1168,6 +1546,12 @@ namespace Game.EditorTooling
                 {
                     acts.Add(driven.Act);
                     frames++;
+
+                    if (figure != null
+                        && Math.Abs(FigureFacing.Shortest(aiming, figure.FacingYaw)) > YawEpsilon)
+                    {
+                        retargeted++;
+                    }
                 }
             }
 
@@ -1177,8 +1561,9 @@ namespace Game.EditorTooling
             }
 
             var back = driven.Act;
+            var ended = figure == null ? float.NaN : Yaw(figure);
 
-            return Assert(
+            var failures = Assert(
                 report,
                 frames > 0 && acts.Count == 1 && acts.Contains(FigureAct.Retreat) && back == FigureAct.Idle,
                 "a figure falling back to the tile it came from plays the backwards walk rather than striding "
@@ -1189,6 +1574,27 @@ namespace Game.EditorTooling
                     frames,
                     string.Join("/", Names(acts)),
                     back));
+
+            return failures + Assert(
+                report,
+                figure != null
+                && frames > 0
+                && retargeted == 0
+                && !float.IsNaN(backwards)
+                && Math.Abs(FigureFacing.Shortest(ended, aiming)) <= YawEpsilon
+                && Math.Abs(FigureFacing.Shortest(ended, backwards)) > 90f,
+                "and it holds the facing it set out with the whole way back, so the backwards clip reads as "
+                + "walking backwards rather than as a figure that turned round and strode off",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it was aimed at {0:0.##} when it was sent back, was aimed somewhere new on {1} of its "
+                    + "{2} falling-back frames, and ended on {3:0.##} against the {4:0.##} the retreat "
+                    + "heading would have wanted",
+                    aiming,
+                    retargeted,
+                    frames,
+                    ended,
+                    backwards));
         }
 
         static float BeatOf(FigureAct act, float held)
