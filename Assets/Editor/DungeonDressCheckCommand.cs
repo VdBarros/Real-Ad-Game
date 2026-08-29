@@ -738,10 +738,10 @@ namespace Game.EditorTooling
                     "the ship seed raised no pair to photograph");
             }
 
-            var tile = ScreenFrame.TileGroundPixels(IsoProjection.OrthographicSize);
+            var tile = ScreenFrame.TileGroundPixels(LevelFraming.PlaySize);
 
             report.Append("\n  at gameplay zoom ")
-                .Append(IsoProjection.OrthographicSize.ToString("0.#", CultureInfo.InvariantCulture))
+                .Append(LevelFraming.PlaySize.ToString("0.#", CultureInfo.InvariantCulture))
                 .Append(" one tile of ground covers ")
                 .Append(tile.ToString("0", CultureInfo.InvariantCulture))
                 .Append(" of the ")
@@ -812,7 +812,7 @@ namespace Game.EditorTooling
                 return reading;
             }
 
-            var camera = PreviewFilm.Rig(instance.position, ShotDistance, IsoProjection.OrthographicSize);
+            var camera = PreviewFilm.Rig(instance.position, ShotDistance, LevelFraming.PlaySize);
             PreviewFilm.Warm(camera);
 
             var silhouette = Silhouette(instance, camera);

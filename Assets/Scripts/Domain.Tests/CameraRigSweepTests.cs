@@ -232,7 +232,7 @@ namespace Game.Domain.Tests
                 + " over " + Seeds + " seeds, a tile "
                 + (ScreenFrame.PixelsPerMetre(widest) * IsoProjection.TileEdge).ToString("0")
                 + " px across at its widest against "
-                + (ScreenFrame.PixelsPerMetre(IsoProjection.OrthographicSize) * IsoProjection.TileEdge).ToString("0")
+                + (ScreenFrame.PixelsPerMetre(LevelFraming.PlaySize) * IsoProjection.TileEdge).ToString("0")
                 + " px in play");
         }
 
@@ -252,9 +252,109 @@ namespace Game.Domain.Tests
                 }
             }
 
+            Assert.That(
+                offAtPlay,
+                Is.EqualTo(Seeds),
+                "A level fitted the play frame whole, so there was nothing left to discover.");
+
             Console.WriteLine(
                 "  " + offAtPlay + " of " + Seeds
                 + " seeds run off a play-sized frame, which is why the camera follows rather than holds");
+        }
+
+        [Test]
+        public void ThePlayFramingShowsAWindowOnTheLevelAndNeverTheWholeOfIt()
+        {
+            var tightest = 1f;
+            var widest = 0f;
+            var nodesSeen = 0;
+            var nodesAll = 0;
+
+            foreach (var graph in Sweep())
+            {
+                var play = LevelFraming.Play(LevelFraming.StartPoint(graph));
+                var showing = 0;
+
+                foreach (var tile in graph.Tiles.Tiles)
+                {
+                    if (Inside(play, IsoProjection.Of(tile.Position)))
+                    {
+                        showing++;
+                    }
+                }
+
+                foreach (var node in graph.Decisions.Nodes)
+                {
+                    nodesAll++;
+                    if (Inside(play, IsoProjection.Of(node.Position)))
+                    {
+                        nodesSeen++;
+                    }
+                }
+
+                var share = showing / (float)graph.Tiles.Tiles.Count;
+
+                tightest = Math.Min(tightest, share);
+                widest = Math.Max(widest, share);
+
+                Assert.That(
+                    showing,
+                    Is.GreaterThan(0),
+                    "Seed " + graph.Seed + " opens play with the player on no tile the camera can see.");
+                Assert.That(
+                    share,
+                    Is.LessThan(0.55f),
+                    "Seed " + graph.Seed + " puts " + showing + " of its " + graph.Tiles.Tiles.Count
+                    + " tiles on one frame, which leaves nothing to discover.");
+            }
+
+            Console.WriteLine(
+                "  play framing at size " + LevelFraming.PlaySize.ToString("0.###")
+                + " puts the figure on " + (LevelFraming.FigureHeightFraction * 100f).ToString("0.#")
+                + "% of screen height and shows " + (tightest * 100f).ToString("0")
+                + "% to " + (widest * 100f).ToString("0") + "% of a level's tiles, "
+                + (nodesSeen / (float)nodesAll * 100f).ToString("0") + "% of its rooms");
+        }
+
+        [Test]
+        public void NoDragCanLoseTheLevelOffScreenOnAnySeed()
+        {
+            foreach (var graph in Sweep())
+            {
+                var staging = CameraStaging.Over(graph).Skipped();
+
+                for (var frame = 0; frame < FrameCap && !staging.IsSettled; frame++)
+                {
+                    staging = staging.Advanced(Frame);
+                }
+
+                foreach (var pull in Compass())
+                {
+                    var looking = staging.Looks(pull);
+                    var shows = false;
+
+                    foreach (var tile in graph.Tiles.Tiles)
+                    {
+                        shows |= Inside(looking.Framing, IsoProjection.Of(tile.Position));
+                    }
+
+                    Assert.That(
+                        shows,
+                        Is.True,
+                        "Seed " + graph.Seed + " dragged to " + pull + " left no tile on screen at "
+                        + looking.Framing + ".");
+                }
+            }
+        }
+
+        static bool Inside(CameraFraming framing, WorldPoint point)
+        {
+            var acrossHalf = framing.OrthographicSize * ScreenFrame.Width / ScreenFrame.Height;
+            var apart = new WorldPoint(
+                point.X - framing.Target.X, point.Y - framing.Target.Y, point.Z - framing.Target.Z);
+
+            return Math.Abs(WorldPoint.Dot(apart, IsoProjection.CameraRight)) <= acrossHalf
+                && Math.Abs(WorldPoint.Dot(apart, IsoProjection.CameraUp)) <= framing.OrthographicSize;
         }
 
         static IEnumerable<WorldPoint> Compass()

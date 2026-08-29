@@ -312,7 +312,7 @@ namespace Game.EditorTooling
 
             PreviewFilm.Sun();
 
-            var play = PreviewFilm.Rig(middle, ShotDistance, IsoProjection.OrthographicSize);
+            var play = PreviewFilm.Rig(middle, ShotDistance, LevelFraming.PlaySize);
             PreviewFilm.Warm(play);
             PreviewFilm.Shoot(play, PlayShot);
             WorldObjects.Destroy(play.gameObject);

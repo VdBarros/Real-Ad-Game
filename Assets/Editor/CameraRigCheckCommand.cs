@@ -237,25 +237,102 @@ namespace Game.EditorTooling
                     + ScreenFrame.PanCeiling + " px/s ceiling.");
             }
 
-            var subject = Multiplier(graph);
-            rig.CutTo(subject);
-            PreviewFilm.Shoot(lens, BeatPath);
-            report.AppendFormat(
-                CultureInfo.InvariantCulture,
-                "\n  beat cuts to {0} at size {1:0.###}, input {2}",
-                subject,
-                lens.orthographicSize,
-                rig.IsBusy ? "off" : "on");
+            ThePlayFramingStandsTheFigureAtItsShareOfTheScreen(lens, report);
 
-            rig.Release();
+            var subject = Multiplier(graph);
+            var resting = lens.orthographicSize;
+            rig.CutTo(subject);
+
+            if (!Mathf.Approximately(lens.orthographicSize, resting))
+            {
+                Debug.LogError(
+                    "The beat opened with a cut from size " + resting + " to " + lens.orthographicSize
+                    + " rather than easing in.");
+            }
+
+            var deepest = resting;
+            var biggestStep = 0f;
+            var previousSize = resting;
             frames = 0;
+
             while (rig.IsBusy && frames < Ceiling)
             {
                 rig.Advance(Frame);
                 frames++;
+
+                deepest = Mathf.Min(deepest, lens.orthographicSize);
+                biggestStep = Mathf.Max(biggestStep, Mathf.Abs(lens.orthographicSize - previousSize));
+                previousSize = lens.orthographicSize;
             }
 
-            report.Append(Landing("beat exit", lens, rig.Following, frames, 0f));
+            PreviewFilm.Shoot(lens, BeatPath);
+
+            var punch = resting / deepest;
+            var span = resting - resting / ZoomBeat.Punch;
+
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  beat punches in on {0} over {1} frames from size {2:0.###} to {3:0.###}, a {4:0.###}x"
+                + " punch, biggest single-frame step {5:0.####} m of {6:0.####} m",
+                subject,
+                frames,
+                resting,
+                deepest,
+                punch,
+                biggestStep,
+                span);
+
+            if (punch < 1.10f || punch > 1.25f)
+            {
+                Debug.LogError("The beat punched " + punch + "x, outside the 1.10x to 1.25x band.");
+            }
+
+            if (biggestStep >= span * 0.5f)
+            {
+                Debug.LogError(
+                    "One frame of the punch moved the lens " + biggestStep + " m of the " + span
+                    + " m it spans, which reads as a cut.");
+            }
+
+            if (frames <= 1)
+            {
+                Debug.LogError("The punch reached its peak in one frame, which is a cut and not an ease.");
+            }
+
+            rig.Release();
+
+            var freeAt = lens.orthographicSize;
+            var easedBack = 0;
+
+            while (!rig.Framing.Equals(rig.Following) && easedBack < Ceiling)
+            {
+                rig.Advance(Frame);
+                easedBack++;
+
+                if (rig.IsBusy)
+                {
+                    Debug.LogError(
+                        "The camera took input back at frame " + easedBack + " of its return from the beat.");
+                }
+            }
+
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  the release frees input at size {0:0.###} and the lens eases home over {1} more frames",
+                freeAt,
+                easedBack);
+
+            if (rig.IsBusy)
+            {
+                Debug.LogError("The release left the beat still holding input.");
+            }
+
+            if (easedBack <= 1)
+            {
+                Debug.LogError("The beat cut back to the player rather than easing back over its return.");
+            }
+
+            report.Append(Landing("beat exit", lens, rig.Following, easedBack, 0f));
 
             if (!rig.Framing.Target.Equals(walked))
             {
@@ -271,6 +348,40 @@ namespace Game.EditorTooling
 
             WorldObjects.Destroy(root);
             builder.Dispose();
+        }
+
+        static void ThePlayFramingStandsTheFigureAtItsShareOfTheScreen(Camera lens, StringBuilder report)
+        {
+            var standing = Vector3.zero;
+            var head = standing + Vector3.up * LevelFraming.FigureHeight;
+            var drawn = Mathf.Abs(
+                lens.WorldToViewportPoint(head).y - lens.WorldToViewportPoint(standing).y);
+            var share = LevelFraming.ShareOfScreen(LevelFraming.FigureHeight, lens.orthographicSize);
+
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  the play lens sits at {0:0.###} against the framing's {1:0.###}, standing a {2:0.###} m"
+                + " figure across {3:0.#}% of the frame's world height and {4:0.#}% of its pixels",
+                lens.orthographicSize,
+                LevelFraming.PlaySize,
+                LevelFraming.FigureHeight,
+                share * 100f,
+                drawn * 100f);
+
+            if (Mathf.Abs(share - LevelFraming.FigureHeightFraction) > 0.002f)
+            {
+                Debug.LogError(
+                    "The live lens stands the figure across " + (share * 100f)
+                    + "% of the frame where the framing asks for "
+                    + (LevelFraming.FigureHeightFraction * 100f) + "%.");
+            }
+
+            if (drawn <= 0.04f || drawn >= 0.09f)
+            {
+                Debug.LogError(
+                    "The figure draws across " + (drawn * 100f)
+                    + "% of the rendered frame, nowhere near the 7% the ad reads at.");
+            }
         }
 
         static float Peak(float peak, CameraFraming from, CameraFraming to)

@@ -71,21 +71,88 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void ThePlayFramingIsSetByTheShareOfScreenTheFigureFillsRatherThanASize()
+        {
+            Assert.That(LevelFraming.FigureHeightFraction, Is.EqualTo(0.07f));
+            Assert.That(
+                LevelFraming.ShareOfScreen(LevelFraming.FigureHeight, LevelFraming.PlaySize),
+                Is.EqualTo(LevelFraming.FigureHeightFraction).Within(1e-5f));
+        }
+
+        [Test]
+        public void TheFigureTheFramingIsBuiltRoundIsThePlayersOwn()
+        {
+            Assert.That(
+                LevelFraming.FigureHeight,
+                Is.EqualTo(
+                    FigureFit.StandingHeight(
+                        CharacterCast.MeshOf(PartStyle.Start), LevelBlueprintBuilder.FigureScale))
+                    .Within(1e-5f));
+            Assert.That(LevelFraming.FigureHeight, Is.GreaterThan(0f));
+        }
+
+        [Test]
+        public void TheFramingClosedInFromTheOneThatShowedEverythingAtOnce()
+        {
+            const float WasShowingTheWholeLevel = 9.5f;
+
+            Assert.That(
+                LevelFraming.ShareOfScreen(LevelFraming.FigureHeight, WasShowingTheWholeLevel),
+                Is.EqualTo(0.034f).Within(0.001f));
+            Assert.That(LevelFraming.PlaySize, Is.LessThan(WasShowingTheWholeLevel));
+            Assert.That(LevelFraming.PlaySize, Is.EqualTo(4.571f).Within(0.001f));
+        }
+
+        [Test]
+        public void ASizeAndTheShareItShowsAreEachOthersInverse()
+        {
+            Assert.That(
+                LevelFraming.SizeShowing(LevelFraming.FigureHeight, LevelFraming.FigureHeightFraction),
+                Is.EqualTo(LevelFraming.PlaySize).Within(1e-5f));
+            Assert.That(
+                () => LevelFraming.SizeShowing(0f, 0.07f),
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
+            Assert.That(
+                () => LevelFraming.SizeShowing(1f, 0f),
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
+            Assert.That(
+                () => LevelFraming.SizeShowing(1f, 1.5f),
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
+            Assert.That(
+                () => LevelFraming.ShareOfScreen(1f, 0f),
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
+        }
+
+        [Test]
+        public void TheCloseUpIsARatioOfThePlayFramingAndNotASizeOfItsOwn()
+        {
+            Assert.That(
+                LevelFraming.CloseUpSize,
+                Is.EqualTo(LevelFraming.PlaySize / ZoomBeat.Punch).Within(1e-5f));
+            Assert.That(
+                LevelFraming.PlaySize / LevelFraming.CloseUpSize,
+                Is.EqualTo(ZoomBeat.Punch).Within(1e-4f));
+            Assert.That(
+                LevelFraming.ShareOfScreen(LevelFraming.FigureHeight, LevelFraming.CloseUpSize),
+                Is.EqualTo(LevelFraming.FigureHeightFraction * ZoomBeat.Punch).Within(1e-5f));
+        }
+
+        [Test]
         public void ATighterFramingPutsMorePixelsOnAMetre()
         {
             Assert.That(
                 ScreenFrame.PixelsPerMetre(LevelFraming.OpeningSize),
-                Is.GreaterThan(ScreenFrame.PixelsPerMetre(IsoProjection.OrthographicSize)));
+                Is.GreaterThan(ScreenFrame.PixelsPerMetre(LevelFraming.PlaySize)));
             Assert.That(
-                ScreenFrame.PixelsPerMetre(IsoProjection.OrthographicSize) * IsoProjection.OrthographicSize * 2f,
+                ScreenFrame.PixelsPerMetre(LevelFraming.PlaySize) * LevelFraming.PlaySize * 2f,
                 Is.EqualTo((float)ScreenFrame.Height).Within(1e-3f));
         }
 
         [Test]
         public void ATileCoversLessScreenThanItsEdgeSquaredBecauseTheCameraLooksAcrossIt()
         {
-            var perMetre = ScreenFrame.PixelsPerMetre(IsoProjection.OrthographicSize);
-            var ground = ScreenFrame.TileGroundPixels(IsoProjection.OrthographicSize);
+            var perMetre = ScreenFrame.PixelsPerMetre(LevelFraming.PlaySize);
+            var ground = ScreenFrame.TileGroundPixels(LevelFraming.PlaySize);
 
             Assert.That(ground, Is.LessThan(perMetre * perMetre));
             Assert.That(
@@ -99,7 +166,7 @@ namespace Game.Domain.Tests
         {
             Assert.That(
                 ScreenFrame.TileGroundPixels(LevelFraming.OpeningSize),
-                Is.GreaterThan(ScreenFrame.TileGroundPixels(IsoProjection.OrthographicSize)));
+                Is.GreaterThan(ScreenFrame.TileGroundPixels(LevelFraming.PlaySize)));
             Assert.That(
                 () => ScreenFrame.TileGroundPixels(0f),
                 Throws.InstanceOf<ArgumentOutOfRangeException>());
