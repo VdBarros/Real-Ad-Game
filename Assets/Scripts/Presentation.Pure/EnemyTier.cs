@@ -5,7 +5,7 @@ namespace Game.Presentation.Pure
 {
     public static class EnemyTier
     {
-        static readonly int[] thresholds = { 8, 30, 100, 300 };
+        static readonly int[] thresholds = { 12, 50 };
 
         public static IReadOnlyList<int> Thresholds
         {

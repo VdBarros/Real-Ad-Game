@@ -211,6 +211,79 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void TheDeadTimeBudgetIsCountedInSecondsAndSpentAtTheOneWalkSpeed()
+        {
+            Assert.That(Pace.DeadWalkBudgetSeconds, Is.EqualTo(2.0));
+            Assert.That(
+                Game.Presentation.Pure.Walk.StepsPerSecond,
+                Is.EqualTo(Pace.StepsPerSecond),
+                "A walk and the budget it is spent against must read the same speed.");
+            Assert.That(
+                Pace.DeadWalkBudgetSteps,
+                Is.EqualTo((int)(Pace.DeadWalkBudgetSeconds * Game.Presentation.Pure.Walk.StepsPerSecond)),
+                "The tile count is derived from the seconds, so the two cannot drift apart.");
+        }
+
+        [Test]
+        public void AStretchOfEmptyCorridorLongerThanTheBudgetIsTurnedAwayRatherThanShipped()
+        {
+            var verdict = SolvabilityValidator.Validate(
+                LevelSketch.WalkingQuietOver(Pace.DeadWalkBudgetSteps).Build(), LevelSketch.Tuning);
+
+            Assert.That(verdict.IsSafe, Is.False);
+            Assert.That(verdict.Reason, Is.EqualTo(SolvabilityReason.DeadWalkBeyondBudget));
+        }
+
+        [Test]
+        public void AStretchOfEmptyCorridorInsideTheBudgetIsLeftAlone()
+        {
+            var verdict = SolvabilityValidator.Validate(
+                LevelSketch.WalkingQuietOver(1).Build(), LevelSketch.Tuning);
+
+            Assert.That(verdict.IsSafe, Is.True, verdict.ToString());
+        }
+
+        [Test]
+        public void AClimbIsABeatRatherThanAStretchOfSilence()
+        {
+            var quiet = LevelSketch.WalkingQuietOver(Pace.DeadWalkBudgetSteps).Build();
+            var climbed = LevelSketch.WalkingQuietOver(Pace.DeadWalkBudgetSteps, Terraces.Rise - 1).Build();
+
+            Assert.That(DeadWalk.LongestOf(quiet), Is.GreaterThan(Pace.DeadWalkBudgetSteps));
+            Assert.That(DeadWalk.LongestOf(climbed), Is.LessThanOrEqualTo(Pace.DeadWalkBudgetSteps));
+            Assert.That(
+                SolvabilityValidator.Validate(climbed, LevelSketch.Tuning).IsSafe,
+                Is.True,
+                "A flight of stairs is a traversal beat, not empty walking.");
+        }
+
+        [Test]
+        public void TheLongestDeadWalkAGeneratedLevelShipsFitsInsideTheBudget()
+        {
+            var level = Ship();
+
+            Assert.That(DeadWalk.LongestOf(level.Graph), Is.LessThanOrEqualTo(Pace.DeadWalkBudgetSteps));
+            Assert.That(DeadWalk.SecondsOf(level.Graph), Is.LessThanOrEqualTo(Pace.DeadWalkBudgetSeconds));
+        }
+
+        [Test]
+        public void AMazeTooBareToBreakUpItsOwnCorridorsIsTurnedAwayThroughTheRetryLoop()
+        {
+            var barren = new MazePreset("barren", 9, 7, 1, 2, 1.0, 0, 8, 6, 0);
+            var thin = new ContentRecipe(1, 5, 1);
+
+            var thrown = Assert.Throws<LevelGenerationException>(
+                () => LevelGenerator.Generate(Seed, barren, thin, PowerTuning.Ship, out _));
+
+            Assert.That(thrown.Attempts, Is.EqualTo(LevelGenerator.MaximumAttempts));
+            Assert.That(
+                thrown.CountOf(ContentRejection.DeadWalkBeyondBudget),
+                Is.GreaterThan(0),
+                "The histogram lost the reason the budget turned the attempts away with: " + thrown.Report);
+            Assert.That(thrown.Message, Does.Contain("DeadWalkBeyondBudget"));
+        }
+
+        [Test]
         public void APresetWithNoFiledRecipeIsAnArgumentErrorRatherThanAGuess()
         {
             var unknown = new MazePreset("unknown", 5, 3, 1, 2, 0.25, 0, 11, 1, 0);

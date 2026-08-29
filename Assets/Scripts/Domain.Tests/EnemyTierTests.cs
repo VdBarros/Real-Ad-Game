@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Game.Presentation.Pure;
 using NUnit.Framework;
 
@@ -6,13 +7,25 @@ namespace Game.Domain.Tests
 {
     public class EnemyTierTests
     {
-        static readonly int[] Boundaries = { 8, 30, 100, 300 };
+        const long OpeningSeed = 7919L;
+
+        const int RunLength = 16;
+
+        const double RarestShare = 0.10;
+
+        static readonly int[] Boundaries = { 12, 50 };
 
         [Test]
         public void TheMeasuredBoundariesAreTheOnesTheTierFunctionUses()
         {
             Assert.That(EnemyTier.Thresholds, Is.EqualTo(Boundaries));
             Assert.That(EnemyTier.Count, Is.EqualTo(Boundaries.Length + 1));
+        }
+
+        [Test]
+        public void ThreeBandsIsWhatThePackCanDressAndTheTableAsksForNoMore()
+        {
+            Assert.That(EnemyTier.Count, Is.EqualTo(3));
         }
 
         [Test]
@@ -28,8 +41,8 @@ namespace Game.Domain.Tests
         [Test]
         public void TheSmallestEnemySitsAtTheBottomTierAndTheLargestAtTheTop()
         {
-            Assert.That(EnemyTier.Of(2), Is.EqualTo(0));
-            Assert.That(EnemyTier.Of(7), Is.EqualTo(0));
+            Assert.That(EnemyTier.Of(1), Is.EqualTo(0));
+            Assert.That(EnemyTier.Of(11), Is.EqualTo(0));
             Assert.That(EnemyTier.Of(408), Is.EqualTo(EnemyTier.Count - 1));
             Assert.That(EnemyTier.Of(490), Is.EqualTo(EnemyTier.Count - 1));
         }
@@ -61,10 +74,10 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EveryTierIsReachedOnTheOnlyCurvePresentationEverBuilds()
+        public void EveryTierIsReachedWalkingTheNumbersOneByOne()
         {
             var reached = new HashSet<int>();
-            foreach (var number in Walk(PowerTuning.Ship.StartingPower))
+            for (var number = PowerTuning.Ship.StartingPower; number <= 490; number++)
             {
                 reached.Add(EnemyTier.Of(number));
             }
@@ -73,17 +86,73 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void EveryTierCarriesARealShareOfTheEnemiesATypicalRunMints()
+        {
+            var minted = RunEnemies();
+            var counts = new int[EnemyTier.Count];
+
+            foreach (var value in minted)
+            {
+                counts[EnemyTier.Of(value)]++;
+            }
+
+            Assert.That(minted.Count, Is.GreaterThan(0));
+
+            for (var tier = 0; tier < counts.Length; tier++)
+            {
+                Assert.That(
+                    counts[tier] / (double)minted.Count,
+                    Is.GreaterThan(RarestShare),
+                    "tier " + tier + " holds " + counts[tier] + " of " + minted.Count
+                    + " enemies over levels 1 to " + RunLength);
+            }
+        }
+
+        [Test]
+        public void NoTierEatsTheRunTheWayFiveBandsStretchedOverThreeMeshesDid()
+        {
+            var minted = RunEnemies();
+            var counts = new int[EnemyTier.Count];
+
+            foreach (var value in minted)
+            {
+                counts[EnemyTier.Of(value)]++;
+            }
+
+            Assert.That(counts.Max() / (double)minted.Count, Is.LessThan(0.6));
+        }
+
+        [Test]
         public void TheEnemyTableIsItsOwnAndOwesNothingToThePlayerOne()
         {
             Assert.That(EnemyTier.Thresholds, Is.Not.SameAs(PlayerTier.Thresholds));
         }
 
-        static IEnumerable<int> Walk(int startingPower)
+        static List<int> RunEnemies()
         {
-            for (var number = startingPower; number <= 490; number++)
+            var minted = new List<int>();
+
+            for (var levelNumber = 1; levelNumber <= RunLength; levelNumber++)
             {
-                yield return number;
+                var plan = LevelPlan.For(levelNumber);
+                LevelGenerationReport ignored;
+                var placed = LevelGenerator.Generate(
+                    LevelSupply.Scattered(OpeningSeed, levelNumber),
+                    plan.Preset,
+                    plan.Recipe,
+                    plan.Tuning,
+                    out ignored);
+
+                foreach (var node in placed.Graph.Decisions.Nodes)
+                {
+                    if (node.Type == NodeType.Enemy)
+                    {
+                        minted.Add(node.Value);
+                    }
+                }
             }
+
+            return minted;
         }
     }
 }

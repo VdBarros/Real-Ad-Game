@@ -81,13 +81,12 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EveryBandHasItsOwnLookAndTheOrderReadsAsRisingThreat()
+        public void EveryBandHasItsOwnSizeAndTheOrderReadsAsRisingThreat()
         {
             var bands = (EnemyBand[])Enum.GetValues(typeof(EnemyBand));
-            var tints = bands.Select(EnemyBands.TintOf).ToList();
             var scales = bands.Select(EnemyBands.ScaleOf).ToList();
 
-            Assert.That(tints.Distinct().Count(), Is.EqualTo(bands.Length));
+            Assert.That(scales.Distinct().Count(), Is.EqualTo(bands.Length));
 
             for (var index = 1; index < bands.Length; index++)
             {

@@ -14,6 +14,7 @@ namespace Game.Domain
         BossBeyondBound,
         BossWithinReach,
         AdversaryStalled,
-        MultiplierProductBeyondCap
+        MultiplierProductBeyondCap,
+        DeadWalkBeyondBudget
     }
 }

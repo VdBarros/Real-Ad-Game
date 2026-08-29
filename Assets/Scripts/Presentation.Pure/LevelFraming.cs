@@ -8,14 +8,61 @@ namespace Game.Presentation.Pure
     {
         public const float OpeningSize = 4.2f;
 
-        public const float CloseUpSize = 4f;
+        public const float FigureHeightFraction = 0.07f;
 
         public const float Headroom =
             LevelBlueprintBuilder.BossScale * 2f + BadgeMetrics.Clearance + BadgeMetrics.Height;
 
+        public static float FigureHeight
+        {
+            get
+            {
+                return FigureFit.StandingHeight(
+                    CharacterCast.MeshOf(PartStyle.Start), LevelBlueprintBuilder.FigureScale);
+            }
+        }
+
+        public static float PlaySize
+        {
+            get { return SizeShowing(FigureHeight, FigureHeightFraction); }
+        }
+
+        public static float CloseUpSize
+        {
+            get { return PlaySize / ZoomBeat.Punch; }
+        }
+
+        public static float SizeShowing(float height, float shareOfScreen)
+        {
+            if (height <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(height), height, "Nothing of no height fills a share of the screen.");
+            }
+
+            if (shareOfScreen <= 0f || shareOfScreen > 1f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(shareOfScreen), shareOfScreen, "A share of the screen runs above nothing and up to all of it.");
+            }
+
+            return height / (2f * shareOfScreen);
+        }
+
+        public static float ShareOfScreen(float height, float orthographicSize)
+        {
+            if (orthographicSize <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(orthographicSize), orthographicSize, "A framing always has a positive size.");
+            }
+
+            return height / (2f * orthographicSize);
+        }
+
         public static CameraFraming Play(WorldPoint subject)
         {
-            return new CameraFraming(subject, IsoProjection.OrthographicSize);
+            return new CameraFraming(subject, PlaySize);
         }
 
         public static CameraFraming Opening(LevelGraph graph)
@@ -67,7 +114,7 @@ namespace Game.Presentation.Pure
             var byWidth = halfAcross * ScreenFrame.Height / ScreenFrame.Width;
 
             return new CameraFraming(
-                target, Math.Max(IsoProjection.OrthographicSize, Math.Max(halfUp, byWidth)));
+                target, Math.Max(PlaySize, Math.Max(halfUp, byWidth)));
         }
 
         public static WorldPoint Centre(LevelGraph graph)

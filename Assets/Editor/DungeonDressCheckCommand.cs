@@ -17,6 +17,8 @@ namespace Game.EditorTooling
 
         const string BaseMap = "_BaseMap";
 
+        const string BaseColour = "_BaseColor";
+
         const float Epsilon = DungeonPack.BoundsEpsilon;
 
         const float AngleEpsilon = 0.01f;
@@ -738,10 +740,10 @@ namespace Game.EditorTooling
                     "the ship seed raised no pair to photograph");
             }
 
-            var tile = ScreenFrame.TileGroundPixels(IsoProjection.OrthographicSize);
+            var tile = ScreenFrame.TileGroundPixels(LevelFraming.PlaySize);
 
             report.Append("\n  at gameplay zoom ")
-                .Append(IsoProjection.OrthographicSize.ToString("0.#", CultureInfo.InvariantCulture))
+                .Append(LevelFraming.PlaySize.ToString("0.#", CultureInfo.InvariantCulture))
                 .Append(" one tile of ground covers ")
                 .Append(tile.ToString("0", CultureInfo.InvariantCulture))
                 .Append(" of the ")
@@ -812,7 +814,7 @@ namespace Game.EditorTooling
                 return reading;
             }
 
-            var camera = PreviewFilm.Rig(instance.position, ShotDistance, IsoProjection.OrthographicSize);
+            var camera = PreviewFilm.Rig(instance.position, ShotDistance, LevelFraming.PlaySize);
             PreviewFilm.Warm(camera);
 
             var silhouette = Silhouette(instance, camera);
@@ -1023,6 +1025,9 @@ namespace Game.EditorTooling
             var dressed = 0;
             var wrong = new List<string>();
             var missing = new List<string>();
+            var read = 0;
+            var flat = 0;
+            var mistinted = new List<string>();
 
             foreach (PartStyle style in Enum.GetValues(typeof(PartStyle)))
             {
@@ -1051,6 +1056,24 @@ namespace Game.EditorTooling
                 {
                     wrong.Add(style.ToString());
                 }
+
+                if (!material.HasProperty(BaseColour))
+                {
+                    continue;
+                }
+
+                read++;
+                var wanted = WorldMaterials.ColourFor(style, wears);
+
+                if (material.GetColor(BaseColour) == wanted)
+                {
+                    flat++;
+                }
+                else
+                {
+                    mistinted.Add(
+                        style + " reads " + material.GetColor(BaseColour) + " against " + wanted);
+                }
             }
 
             var ceiling = Enum.GetValues(typeof(PartStyle)).Length;
@@ -1071,6 +1094,15 @@ namespace Game.EditorTooling
                 atlassed + " of " + world.Count + " world materials do, drawn from the " + dressed
                 + " styles that want a mesh"
                 + (wrong.Count == 0 ? "" : "; wrong on " + string.Join(", ", wrong.ToArray())));
+
+            failures += Assert(
+                report,
+                read > 0 && flat == read,
+                "a style whose mesh carries the pack atlas multiplies it by white so the texture shows, "
+                + "and every other style still wears its palette colour, so a style whose atlas failed to "
+                + "load stays a visible flat colour rather than turning plain white",
+                flat + " of " + read + " do"
+                + (mistinted.Count == 0 ? "" : "; " + string.Join("; ", mistinted.ToArray())));
 
             var explained = new List<string> { PartStyle.Staircase.ToString() };
 
