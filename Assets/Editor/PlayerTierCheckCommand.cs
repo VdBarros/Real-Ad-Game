@@ -135,6 +135,7 @@ namespace Game.EditorTooling
             failures += ThePropsComeOffTheWayTheyWentOn(power, player, opening, report);
             failures += TheWeaponIsAPackMeshOnTheHand(power, player, report);
             failures += TheCloakIsThePacksOwnCloth(power, player, report);
+            failures += TheFinisherSwingsWhatTheHandHolds(power, player, report);
             failures += TheWeaponSitsWhereThePackHangsItsOwn(power, player, report);
             failures += TheMountedKitMeasuresWhatTheKitTablePins(power, player, report);
             failures += TheWeaponRidesTheHandThroughEveryClip(power, player, report);
@@ -1977,6 +1978,91 @@ namespace Game.EditorTooling
         static bool Drawn(Renderer renderer)
         {
             return renderer.enabled && renderer.gameObject.activeInHierarchy;
+        }
+
+        static int TheFinisherSwingsWhatTheHandHolds(
+            PowerBadge power, PlayerFigure player, StringBuilder report)
+        {
+            if (power == null || player == null)
+            {
+                return Assert(report, false, "there is a figure to arm and to swing", "there is none");
+            }
+
+            var worn = CharacterCast.MeshOf(PartStyle.Start);
+            var chosen = 0;
+            var loaded = 0;
+            var tiers = 0;
+            var strayed = new List<string>();
+
+            report.Append("\n  finishers:");
+
+            using (var clips = new WorldModels())
+            {
+                for (var tier = 0; tier < PlayerTier.Count; tier++)
+                {
+                    PowerPump.Settle(power, PowerAt(tier));
+                    tiers++;
+
+                    var gripped = player.Gripping;
+                    var wanted = PlayerKit.WeaponOf(tier);
+                    var act = FigureCues.FinisherOf(gripped);
+                    var named = AdventurerClips.NameOf(act);
+                    var clip = clips.ClipOf(worn, named);
+                    var held = player.Wielding;
+                    var mounted = gripped == PlayerWeapon.None
+                        ? held == null
+                        : held != null && held.name == PartNames.Held(gripped);
+
+                    if (gripped == wanted && mounted)
+                    {
+                        chosen++;
+                    }
+                    else
+                    {
+                        strayed.Add(string.Format(
+                            CultureInfo.InvariantCulture,
+                            "tier {0} grips {1} against the {2} the ramp dresses it in, holding {3}",
+                            tier,
+                            gripped,
+                            wanted,
+                            held == null ? "nothing" : held.name));
+                    }
+
+                    if (clip != null)
+                    {
+                        loaded++;
+                    }
+
+                    report.AppendFormat(
+                        CultureInfo.InvariantCulture,
+                        "\n    tier {0} grips {1} as {2} and finishes on {3}, which is {4}",
+                        tier,
+                        gripped,
+                        gripped == PlayerWeapon.None ? "an empty hand" : PlayerKit.ModelOf(gripped).ToString(),
+                        act,
+                        clip == null ? named + ", which loads nothing" : clip.name);
+                }
+            }
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                tiers == PlayerTier.Count && chosen == tiers,
+                "the weapon the fight reads off the figure to pick its finisher is the same one the hand "
+                + "is holding a mesh of, at every tier, so the mount and the swing are one notion of what "
+                + "the player grips and never two",
+                chosen + " of " + tiers + " tiers agree"
+                + (strayed.Count == 0 ? "" : "; " + string.Join("; ", strayed.ToArray())));
+
+            failures += Assert(
+                report,
+                tiers == PlayerTier.Count && loaded == tiers,
+                "and the finisher each of those weapons picks resolves to a clip the rig actually carries, "
+                + "so no tier reaches its execution with nothing to play",
+                loaded + " of " + tiers + " do");
+
+            return failures;
         }
 
         static int TheCloakIsThePacksOwnCloth(
