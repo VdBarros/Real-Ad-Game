@@ -667,6 +667,11 @@ namespace Game.EditorTooling
             loop.World.Floor.Advance(Frame);
             loop.World.Pickups.Advance(Frame);
 
+            if (loop.World.Orbs != null)
+            {
+                loop.World.Orbs.Advance(Frame);
+            }
+
             if (loop.World.PlayerBadge != null)
             {
                 loop.World.PlayerBadge.Advance(Frame);

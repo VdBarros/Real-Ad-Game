@@ -9,11 +9,33 @@ namespace Game.Presentation.Pure
 
         public const float DissolveSeconds = 0.30f;
 
-        static readonly VictoryStage[] order = { VictoryStage.Clash, VictoryStage.Dissolve };
+        public const float OrbFlightSeconds = 1.50f;
 
-        static readonly float[] seconds = { 0f, ClashSeconds, DissolveSeconds, 0f };
+        public const float BurstSeconds = 0.30f;
 
-        static readonly bool[] blocks = { false, true, true, false };
+        public const float CountSeconds = CountUp.Seconds;
+
+        static readonly VictoryStage[] order =
+        {
+            VictoryStage.Clash,
+            VictoryStage.Dissolve,
+            VictoryStage.OrbFlight,
+            VictoryStage.Burst,
+            VictoryStage.Count
+        };
+
+        static readonly float[] seconds =
+        {
+            0f,
+            ClashSeconds,
+            DissolveSeconds,
+            OrbFlightSeconds,
+            BurstSeconds,
+            CountSeconds,
+            0f
+        };
+
+        static readonly bool[] blocks = { false, true, true, false, false, false, false };
 
         static readonly float[] opensAt = Cumulative();
 

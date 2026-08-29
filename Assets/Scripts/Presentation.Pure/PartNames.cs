@@ -22,6 +22,24 @@ namespace Game.Presentation.Pure
 
         public const string Spark = "Spark";
 
+        public const string OrbGroup = "Orbs";
+
+        public const string OrbPrefix = "Orb_";
+
+        public const string OrbBurst = "OrbBurst";
+
+        public static string Orb(int index)
+        {
+            return OrbPrefix + index.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static bool IsOrb(string name)
+        {
+            return name != null
+                && (name.StartsWith(OrbPrefix, StringComparison.Ordinal)
+                    || string.Equals(name, OrbBurst, StringComparison.Ordinal));
+        }
+
         public const string GateLeftPost = "GatePost_Left";
 
         public const string GateRightPost = "GatePost_Right";
