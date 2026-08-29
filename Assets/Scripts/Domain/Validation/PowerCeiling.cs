@@ -20,7 +20,6 @@ namespace Game.Domain
             }
 
             long gains = startingPower;
-            long product = 1;
 
             foreach (var node in level.Decisions.Nodes)
             {
@@ -31,13 +30,10 @@ namespace Game.Domain
                     case NodeType.Boss:
                         gains += node.Value;
                         break;
-                    case NodeType.Multiplier:
-                        product = Saturate(product * node.Value);
-                        break;
                 }
             }
 
-            return Saturate(gains * product);
+            return Saturate(gains * MultiplierProduct.Of(level));
         }
 
         static long Saturate(long value)
