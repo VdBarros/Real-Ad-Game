@@ -269,6 +269,16 @@ namespace Game.Presentation
                     return "pillar";
                 case PartModel.Candle:
                     return "candle";
+                case PartModel.Column:
+                    return "column";
+                case PartModel.TorchLit:
+                    return "torch_lit";
+                case PartModel.BarrelLarge:
+                    return "barrel_large";
+                case PartModel.CratesStacked:
+                    return "crates_stacked";
+                case PartModel.SwordShield:
+                    return "sword_shield";
                 case PartModel.Knight:
                     return "Knight";
                 case PartModel.SkeletonMinion:

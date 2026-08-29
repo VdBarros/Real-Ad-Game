@@ -16,8 +16,12 @@ namespace Game.Presentation.Pure
                 case PartModel.Foundation:
                 case PartModel.Pillar:
                 case PartModel.Candle:
-                    return new WorldPoint(
-                        part.Position.X, part.Position.Y - part.Scale.Y * 0.5f, part.Position.Z);
+                case PartModel.Column:
+                case PartModel.TorchLit:
+                case PartModel.BarrelLarge:
+                case PartModel.CratesStacked:
+                case PartModel.SwordShield:
+                    return Footed(part);
                 case PartModel.Staircase:
                     return Crested(part);
                 case PartModel.Knight:
@@ -67,6 +71,11 @@ namespace Game.Presentation.Pure
                 case PartModel.Foundation:
                 case PartModel.Pillar:
                 case PartModel.Candle:
+                case PartModel.Column:
+                case PartModel.TorchLit:
+                case PartModel.BarrelLarge:
+                case PartModel.CratesStacked:
+                case PartModel.SwordShield:
                     return part.Rotation;
                 default:
                     throw new ArgumentOutOfRangeException(
@@ -89,6 +98,11 @@ namespace Game.Presentation.Pure
                 case PartModel.Foundation:
                 case PartModel.Pillar:
                 case PartModel.Candle:
+                case PartModel.Column:
+                case PartModel.TorchLit:
+                case PartModel.BarrelLarge:
+                case PartModel.CratesStacked:
+                case PartModel.SwordShield:
                     return Boxed(part);
                 case PartModel.Knight:
                 case PartModel.SkeletonMinion:
@@ -106,6 +120,14 @@ namespace Game.Presentation.Pure
                     throw new ArgumentOutOfRangeException(
                         nameof(part), part.Model, "No model scale for that part model.");
             }
+        }
+
+        static WorldPoint Footed(WorldPart part)
+        {
+            return new WorldPoint(
+                part.Position.X,
+                part.Position.Y - part.Scale.Y * (0.5f + DungeonPack.BaseShareOf(part.Model)),
+                part.Position.Z);
         }
 
         static WorldPoint Fitted(WorldPart part)
