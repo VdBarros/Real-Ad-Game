@@ -69,7 +69,7 @@ namespace Game.Presentation.Pure
 
         public static BadgePlan Plan
         {
-            get { return new BadgePlan(BadgeText.Digits(RivalNumber), RivalNumber); }
+            get { return new BadgePlan(BadgeText.Digits(RivalNumber)); }
         }
 
         public static float HeightOf(int number)
