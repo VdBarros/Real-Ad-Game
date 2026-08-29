@@ -30,6 +30,27 @@ namespace Game.Presentation
             get { return spark != null && spark.activeSelf; }
         }
 
+        public bool IsTurning
+        {
+            get
+            {
+                if (byNode == null)
+                {
+                    return false;
+                }
+
+                foreach (var enemy in byNode)
+                {
+                    if (enemy != null && enemy.IsTurning)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
         public void Dress(Material material)
         {
             if (material == null)
@@ -78,6 +99,44 @@ namespace Game.Presentation
             return new WorldPoint(ground.X, ground.Y + Spark.Lift, ground.Z);
         }
 
+        public void Turn(float deltaSeconds)
+        {
+            if (byNode == null)
+            {
+                return;
+            }
+
+            foreach (var enemy in byNode)
+            {
+                if (enemy != null)
+                {
+                    enemy.Turn(deltaSeconds);
+                }
+            }
+        }
+
+        public void Square(int nodeId, WorldPoint approach)
+        {
+            RequireABeginning();
+
+            var enemy = Of(nodeId);
+            if (player == null || enemy == null)
+            {
+                return;
+            }
+
+            var apart = FigureFacing.Between(player.Ground, enemy.Ground);
+            var toward = FigureFacing.IsAimed(apart) ? apart : approach;
+
+            if (!FigureFacing.IsAimed(toward))
+            {
+                return;
+            }
+
+            player.Face(toward);
+            enemy.Face(FigureFacing.Reversed(toward));
+        }
+
         public void Show(Journey journey)
         {
             if (journey == null)
@@ -109,6 +168,8 @@ namespace Game.Presentation
             axis = facing;
             playerPost = player != null ? player.Ground : default(WorldPoint);
             enemyPost = joined != null ? joined.Ground : playerPost;
+
+            Square(nodeId, axis);
 
             if (doomed && joined != null)
             {

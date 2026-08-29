@@ -6,8 +6,6 @@ namespace Game.Presentation.Pure
     {
         public const float GridUnits = DungeonPack.GridUnits;
 
-        public const float StandingScales = 1.3f;
-
         public const float Facing = 225f;
 
         public const string SlotNode = "handslot";
@@ -44,9 +42,21 @@ namespace Game.Presentation.Pure
 
         public const float MagePackBase = -0.17844f;
 
+        static readonly float shortestPackHeight = Shortest();
+
         public static float ImportScale
         {
             get { return IsoProjection.TileEdge / GridUnits; }
+        }
+
+        public static float ShortestPackHeight
+        {
+            get { return shortestPackHeight; }
+        }
+
+        public static float StandingScales
+        {
+            get { return AdventurerPack.StandingPerPackUnit * shortestPackHeight; }
         }
 
         public static bool Carries(PartModel model)
@@ -149,6 +159,28 @@ namespace Game.Presentation.Pure
         public static float BaseOf(PartModel model)
         {
             return PackBaseOf(model) * ImportScale;
+        }
+
+        static float Shortest()
+        {
+            var found = float.MaxValue;
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (!Carries(model))
+                {
+                    continue;
+                }
+
+                var height = PackHeightOf(model);
+
+                if (height < found)
+                {
+                    found = height;
+                }
+            }
+
+            return found;
         }
 
         static ArgumentOutOfRangeException Stranger(PartModel model)
