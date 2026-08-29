@@ -9,6 +9,8 @@ namespace Game.Presentation
 
         FigureAnimator acting;
 
+        Material[] ghosts;
+
         int value;
 
         public int NodeId { get; private set; }
@@ -16,6 +18,16 @@ namespace Game.Presentation
         public EnemyBand Band { get; private set; }
 
         public bool HasFallen { get; private set; }
+
+        public bool IsGhost
+        {
+            get { return ghosts != null; }
+        }
+
+        public float GhostAlpha
+        {
+            get { return ghosts == null ? 1f : Ghosting.AlphaOf(ghosts); }
+        }
 
         public FigureAct Act
         {
@@ -63,7 +75,22 @@ namespace Game.Presentation
                 return;
             }
 
-            Wear(BaseScale * EnemyBands.ScaleOf(Band) * fade);
+            if (fade >= 1f)
+            {
+                return;
+            }
+
+            Haunt(fade);
+        }
+
+        void Haunt(float fade)
+        {
+            if (ghosts == null)
+            {
+                ghosts = Ghosting.Raise(gameObject);
+            }
+
+            Ghosting.Fade(ghosts, fade);
         }
 
         void Fall()
@@ -75,12 +102,25 @@ namespace Game.Presentation
 
             HasFallen = true;
             Unhook();
+            Bury();
             Hide();
+        }
+
+        void Bury()
+        {
+            if (ghosts == null)
+            {
+                return;
+            }
+
+            Ghosting.Lay(ghosts);
+            ghosts = null;
         }
 
         void OnDestroy()
         {
             Unhook();
+            Bury();
         }
 
         void Unhook()

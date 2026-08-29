@@ -23,6 +23,8 @@ namespace Game.Presentation
 
         float crowd = 1f;
 
+        float topology = 1f;
+
         Vector3 home;
 
         Vector3 perched;
@@ -87,7 +89,7 @@ namespace Game.Presentation
 
         public Color Colour
         {
-            get { return washed; }
+            get { return background == null ? washed : background.color; }
         }
 
         public float Opacity
@@ -110,9 +112,15 @@ namespace Game.Presentation
             get { return background == null ? 0 : background.sortingOrder; }
         }
 
-        internal void Wash(Color colour)
+        public Color LabelColour
+        {
+            get { return label.color; }
+        }
+
+        internal void Wash(Color colour, float opacity)
         {
             washed = colour;
+            topology = opacity;
             Repaint();
         }
 
@@ -155,11 +163,11 @@ namespace Game.Presentation
         void Repaint()
         {
             var plate = washed;
-            plate.a *= crowd;
+            plate.a = topology * crowd;
             background.color = plate;
 
             var glyphs = BadgePalette.Text;
-            glyphs.a *= crowd;
+            glyphs.a = topology * crowd;
             label.color = glyphs;
         }
 

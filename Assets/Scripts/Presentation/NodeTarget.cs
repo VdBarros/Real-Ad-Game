@@ -10,7 +10,7 @@ namespace Game.Presentation
 
         GateProp gate;
 
-        Color plain;
+        Tint plain;
 
         int value;
 
@@ -42,7 +42,7 @@ namespace Game.Presentation
                     "A badge target wears its mark on a badge that is not there.");
             }
 
-            plain = BadgePalette.Of(part.Style);
+            plain = BadgeTints.Of(part.Style);
             NodeId = part.NodeId;
             value = part.Value;
             cells = part.Cells;
@@ -96,7 +96,7 @@ namespace Game.Presentation
                 return;
             }
 
-            badge.Wash(Color.Lerp(plain, Tints.Of(look.Tint), look.Weight));
+            badge.Wash(Tints.Of(BadgeTints.Washed(plain, look)), look.Opacity);
 
             if (!TargetMarks.IsAimed(mark) && !borrowed)
             {

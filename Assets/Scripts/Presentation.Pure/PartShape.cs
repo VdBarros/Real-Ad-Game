@@ -5,6 +5,9 @@ namespace Game.Presentation.Pure
         Quad,
         Cube,
         Capsule,
-        Gate
+        Sphere,
+        Cylinder,
+        Gate,
+        Landmark
     }
 }
