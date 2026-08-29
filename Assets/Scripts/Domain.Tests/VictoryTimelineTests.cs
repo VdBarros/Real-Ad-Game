@@ -28,17 +28,25 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheCeremonyIsTheSumOfTheStagesAndHoldsTheControlsForTheWholeOfIt()
+        public void TheCeremonyIsTheSumOfTheStagesAndHoldsTheControlsForOnlyTheFirstTwo()
         {
             var summed = 0f;
+            var held = 0f;
+
             foreach (var stage in VictoryStages.Order)
             {
                 summed += VictoryStages.SecondsOf(stage);
+
+                if (VictoryStages.BlocksInput(stage))
+                {
+                    held += VictoryStages.SecondsOf(stage);
+                }
             }
 
             Assert.That(VictoryStages.Seconds, Is.EqualTo(summed).Within(Tolerance));
-            Assert.That(VictoryStages.Seconds, Is.EqualTo(1.2f).Within(Tolerance));
+            Assert.That(VictoryStages.BlockingSeconds, Is.EqualTo(held).Within(Tolerance));
             Assert.That(VictoryStages.BlockingSeconds, Is.EqualTo(1.2f).Within(Tolerance));
+            Assert.That(VictoryStages.Seconds, Is.GreaterThan(VictoryStages.BlockingSeconds));
         }
 
         [Test]
@@ -67,7 +75,8 @@ namespace Game.Domain.Tests
         {
             Assert.That(VictoryStages.First, Is.EqualTo(VictoryStage.Clash));
             Assert.That(VictoryStages.After(VictoryStage.Clash), Is.EqualTo(VictoryStage.Dissolve));
-            Assert.That(VictoryStages.After(VictoryStage.Dissolve), Is.EqualTo(VictoryStage.Done));
+            Assert.That(VictoryStages.After(VictoryStage.Dissolve), Is.EqualTo(VictoryStage.OrbFlight));
+            Assert.That(VictoryStages.After(VictoryStage.Count), Is.EqualTo(VictoryStage.Done));
             Assert.That(VictoryStages.After(VictoryStage.Done), Is.EqualTo(VictoryStage.Done));
             Assert.That(VictoryStages.After(VictoryStage.None), Is.EqualTo(VictoryStage.None));
 
@@ -147,9 +156,13 @@ namespace Game.Domain.Tests
             Assert.That(held.BlocksInput, Is.True);
             Assert.That(held.Stage, Is.EqualTo(VictoryStage.Dissolve));
             Assert.That(freed.BlocksInput, Is.False);
-            Assert.That(freed.Stage, Is.EqualTo(VictoryStage.Done));
-            Assert.That(freed.IsOver, Is.True);
+            Assert.That(freed.Stage, Is.EqualTo(VictoryStage.OrbFlight));
+            Assert.That(freed.IsOver, Is.False);
             Assert.That(freed.BlockingSecondsLeft, Is.EqualTo(0f));
+            Assert.That(
+                VictoryTimeline.Begun.Advanced(VictoryStages.Seconds).Stage,
+                Is.EqualTo(VictoryStage.Done));
+            Assert.That(VictoryTimeline.Begun.Advanced(VictoryStages.Seconds).IsOver, Is.True);
         }
 
         [Test]
@@ -175,10 +188,23 @@ namespace Game.Domain.Tests
             walked.Add(timeline.Stage);
             opened.Add((float)clock);
 
-            Assert.That(walked, Is.EqualTo(new[] { VictoryStage.Clash, VictoryStage.Dissolve, VictoryStage.Done }));
+            Assert.That(
+                walked,
+                Is.EqualTo(new[]
+                {
+                    VictoryStage.Clash,
+                    VictoryStage.Dissolve,
+                    VictoryStage.OrbFlight,
+                    VictoryStage.Burst,
+                    VictoryStage.Count,
+                    VictoryStage.Done
+                }));
             Assert.That(opened[0], Is.EqualTo(0f).Within(Tolerance));
             Assert.That(opened[1], Is.EqualTo(VictoryStages.ClashSeconds).Within(Frame * 1.5f));
-            Assert.That(opened[2], Is.EqualTo(VictoryStages.Seconds).Within(Frame * 1.5f));
+            Assert.That(
+                opened[2], Is.EqualTo(VictoryStages.BlockingSeconds).Within(Frame * 1.5f));
+            Assert.That(
+                opened[5], Is.EqualTo(VictoryStages.Seconds).Within(Frame * 1.5f));
         }
 
         [Test]

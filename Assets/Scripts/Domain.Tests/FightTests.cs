@@ -148,7 +148,7 @@ namespace Game.Domain.Tests
             Assert.That(win.Seconds, Is.EqualTo(1.2f).Within(1e-4f));
             Assert.That(win.Stage, Is.EqualTo(VictoryStage.Clash));
             Assert.That(win.Advanced(VictoryStages.ClashSeconds).Stage, Is.EqualTo(VictoryStage.Dissolve));
-            Assert.That(win.Advanced(win.Seconds).Stage, Is.EqualTo(VictoryStage.Done));
+            Assert.That(win.Advanced(win.Seconds).Stage, Is.EqualTo(VictoryStage.OrbFlight));
             Assert.That(win.Advanced(win.Seconds - 0.001f).IsSettled, Is.False);
             Assert.That(win.Advanced(win.Seconds).IsSettled, Is.True);
             Assert.That(win.Timeline.HasBegun, Is.True);

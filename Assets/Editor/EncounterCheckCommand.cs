@@ -47,6 +47,16 @@ namespace Game.EditorTooling
 
         const int FrameCap = 4000;
 
+        const int SettleFrames = 300;
+
+        const float OrbReach = 0.4f;
+
+        const int Opener = 6;
+
+        const int First = 1;
+
+        const int Second = 2;
+
         sealed class Tally
         {
             public ActionOutcome Outcome;
@@ -76,6 +86,20 @@ namespace Game.EditorTooling
             public bool ShownRose;
             public bool EnemyNumbersMoved;
             public float DrainSeconds;
+            public WorldPoint Site;
+            public int OrbFrames;
+            public int OrbsAtOnce;
+            public int OrbsDrawn;
+            public int OrbLandings;
+            public int OrbDelivered;
+            public float NearestOrb = float.MaxValue;
+            public float PlayerAwayFromSite;
+            public int ShownAtLanding = -1;
+            public int LastShown = -1;
+            public int ClimbSteps;
+            public int WidestClimbStep;
+            public bool ClimbedBeforeTheOrbsLanded;
+            public int WalkedWhileFlying;
         }
 
         public static void Check()
@@ -126,6 +150,13 @@ namespace Game.EditorTooling
             NoGhostHaunts(tie);
             NoGhostHaunts(loss);
 
+            TheWinCarriedItsValueHomeInOrbs(win, Power, Power - 1);
+            NoOrbsForAFightNobodyWon(tie);
+            NoOrbsForAFightNobodyWon(loss);
+
+            report.Append(Orbs(win));
+            report.Append(ASecondFightDoesNotOrphanTheOrbsOfTheFirst());
+            report.Append(OrbsInFlightAreTornDownWithTheLevel());
             report.Append(TheBrushCostsLessThanTheLean());
 
             Debug.Log(report.ToString());
@@ -173,7 +204,12 @@ namespace Game.EditorTooling
             var input = TapInput.Raise(rig, builder.Targets, opening);
             var walker = Walker.Raise(rig, builder, input, opening);
 
-            var reel = new Tally { Outcome = ActionOutcome.Rejected, ClearedBefore = builder.Floor.ClearedCount };
+            var reel = new Tally
+            {
+                Outcome = ActionOutcome.Rejected,
+                ClearedBefore = builder.Floor.ClearedCount,
+                Site = builder.Fights.SiteOf(Doorstep)
+            };
             walker.Arrived += result => reel.Outcome = result.Outcome;
 
             var figure = builder.Fights.Of(Doorstep);
@@ -214,6 +250,7 @@ namespace Game.EditorTooling
 
                 Step(rig, builder, walker, acting);
                 Answer(reel, striking, answering, close, leg);
+                Reap(reel, builder, walker);
 
                 if (draining)
                 {
@@ -276,11 +313,19 @@ namespace Game.EditorTooling
                 Debug.LogError("The " + leg + " was still playing after " + FrameCap + " frames.");
             }
 
-            for (var frame = 0; frame < 120; frame++)
+            for (var frame = 0; frame < SettleFrames; frame++)
             {
                 Step(rig, builder, walker, acting);
+                Reap(reel, builder, walker);
                 reel.WeaponFlew |= builder.Player.IsFlying;
                 reel.EnemyFell |= figure != null && figure.HasFallen;
+            }
+
+            if (!builder.Orbs.IsSettled)
+            {
+                Debug.LogError(
+                    "The " + leg + " left orbs in the air " + (SettleFrames * Frame)
+                    + "s after the walk ended.");
             }
 
             if (builder.Fights.IsSparkLit)
@@ -891,6 +936,7 @@ namespace Game.EditorTooling
             rig.Advance(Frame);
             builder.Floor.Advance(Frame);
             builder.Pickups.Advance(Frame);
+            builder.Orbs.Advance(Frame);
 
             if (builder.PlayerBadge != null)
             {
@@ -1071,6 +1117,425 @@ namespace Game.EditorTooling
                 Acts(reel.EnemyActs),
                 reel.Shot,
                 SidesPath);
+        }
+
+        static void Reap(Tally reel, WorldBuilder builder, Walker walker)
+        {
+            var orbs = builder.Orbs;
+            var shown = builder.PlayerBadge == null ? 0 : builder.PlayerBadge.Shown;
+
+            if (reel.LastShown < 0)
+            {
+                reel.LastShown = shown;
+            }
+
+            if (orbs.InFlight > 0)
+            {
+                reel.OrbFrames++;
+                reel.OrbsAtOnce = orbs.InFlight > reel.OrbsAtOnce ? orbs.InFlight : reel.OrbsAtOnce;
+                reel.OrbsDrawn = orbs.Showing > reel.OrbsDrawn ? orbs.Showing : reel.OrbsDrawn;
+                reel.ClimbedBeforeTheOrbsLanded |= orbs.Landings == 0 && shown != reel.LastShown;
+
+                if (walker != null && walker.IsWalking && !walker.Walk.IsWaiting)
+                {
+                    reel.WalkedWhileFlying++;
+                }
+
+                Closest(reel, builder);
+            }
+
+            if (orbs.Landings > 0)
+            {
+                if (reel.ShownAtLanding < 0)
+                {
+                    reel.ShownAtLanding = reel.LastShown;
+                }
+
+                if (shown != reel.LastShown)
+                {
+                    reel.ClimbSteps++;
+                    var step = Math.Abs(shown - reel.LastShown);
+                    reel.WidestClimbStep = step > reel.WidestClimbStep ? step : reel.WidestClimbStep;
+                }
+            }
+
+            reel.OrbLandings = orbs.Landings;
+            reel.OrbDelivered = orbs.Delivered;
+            reel.LastShown = shown;
+        }
+
+        static void Closest(Tally reel, WorldBuilder builder)
+        {
+            var ground = builder.Player.Ground;
+            var carrier = new Vector3(ground.X, ground.Y + Spark.Lift, ground.Z);
+            var site = new Vector3(reel.Site.X, reel.Site.Y, reel.Site.Z);
+
+            foreach (Transform bead in builder.Orbs.transform)
+            {
+                if (!bead.gameObject.activeSelf || !PartNames.IsOrb(bead.name))
+                {
+                    continue;
+                }
+
+                var away = Vector3.Distance(bead.position, carrier);
+                if (away >= reel.NearestOrb)
+                {
+                    continue;
+                }
+
+                reel.NearestOrb = away;
+                reel.PlayerAwayFromSite = Vector3.Distance(carrier, site);
+            }
+        }
+
+        static void TheWinCarriedItsValueHomeInOrbs(Tally win, int startingPower, int enemyValue)
+        {
+            if (win.OrbFrames == 0 || win.OrbsDrawn == 0)
+            {
+                Debug.LogError(
+                    "A win drew " + win.OrbsDrawn + " orbs over " + win.OrbFrames
+                    + " frames, so the enemy's value walked home invisibly.");
+            }
+
+            if (win.OrbsDrawn < OrbStream.Fewest)
+            {
+                Debug.LogError(
+                    "A win drew only " + win.OrbsDrawn + " orb parts where a stream is at least "
+                    + OrbStream.Fewest + " orbs, each with a trail behind it.");
+            }
+
+            if (win.OrbLandings != 1)
+            {
+                Debug.LogError(
+                    "A win over one enemy landed " + win.OrbLandings
+                    + " orb streams, where one kill is one stream and one value.");
+            }
+
+            if (win.OrbDelivered != enemyValue)
+            {
+                Debug.LogError(
+                    "A win's orbs handed over " + win.OrbDelivered + " where the enemy was worth "
+                    + enemyValue + ".");
+            }
+
+            if (win.ClimbedBeforeTheOrbsLanded)
+            {
+                Debug.LogError(
+                    "The number climbed while the orbs were still in the air, so the flight paid for "
+                    + "nothing.");
+            }
+
+            if (win.ShownAtLanding != startingPower)
+            {
+                Debug.LogError(
+                    "The badge read " + win.ShownAtLanding + " on the frame the orbs landed, where the "
+                    + "run walked in at " + startingPower + ".");
+            }
+
+            if (win.ClimbSteps < 1 || win.WidestClimbStep > enemyValue)
+            {
+                Debug.LogError(
+                    "The badge moved " + win.ClimbSteps + " times in steps of at most "
+                    + win.WidestClimbStep + " after the orbs landed, where a climb from " + startingPower
+                    + " to " + (startingPower + enemyValue)
+                    + " reads as a run of steps rather than a jump.");
+            }
+
+            if (win.LastShown != startingPower + enemyValue)
+            {
+                Debug.LogError(
+                    "The badge settled on " + win.LastShown + " where the orbs owed it "
+                    + (startingPower + enemyValue) + ".");
+            }
+
+            if (win.NearestOrb > OrbReach)
+            {
+                Debug.LogError(
+                    "No orb ever came within " + OrbReach + " of the player: the closest got to "
+                    + win.NearestOrb + ", so the stream missed the fighter it was aimed at.");
+            }
+
+            var flown = win.OrbFrames * Frame;
+
+            if (Math.Abs(flown - VictoryStages.Seconds) > Frame * 4f)
+            {
+                Debug.LogError(
+                    "A win's orbs lived " + flown.ToString("0.###", CultureInfo.InvariantCulture)
+                    + "s where the whole ceremony is "
+                    + VictoryStages.Seconds.ToString("0.###", CultureInfo.InvariantCulture) + "s.");
+            }
+
+            if (flown <= VictoryStages.BlockingSeconds)
+            {
+                Debug.LogError(
+                    "A win's orbs were gone by the time the controls came back, so nothing outlived the "
+                    + "journey that threw them.");
+            }
+        }
+
+        static void NoOrbsForAFightNobodyWon(Tally reel)
+        {
+            if (reel.OrbFrames > 0 || reel.OrbLandings > 0)
+            {
+                Debug.LogError(
+                    "A " + reel.Outcome + " sent " + reel.OrbLandings + " orb streams over "
+                    + reel.OrbFrames + " frames, where only a kill pays.");
+            }
+        }
+
+        static LevelGraph Gauntlet(int firstValue, int secondValue)
+        {
+            var builder = new LevelGraphBuilder(Seed, Preset);
+
+            for (var x = 0; x < 7; x++)
+            {
+                builder.AddTile(At(x), regionId: 0);
+            }
+
+            builder.AddNode(At(0), NodeType.Start);
+            builder.AddNode(At(2), NodeType.Enemy, firstValue);
+            builder.AddNode(At(4), NodeType.Enemy, secondValue);
+            builder.AddNode(At(6), NodeType.Additive, Prize);
+
+            builder.Connect(At(0), At(2), new[] { At(1) });
+            builder.Connect(At(2), At(4), new[] { At(3) });
+            builder.Connect(At(4), At(6), new[] { At(5) });
+
+            return builder.Build();
+        }
+
+        static string ASecondFightDoesNotOrphanTheOrbsOfTheFirst()
+        {
+            var graph = Gauntlet(First, Second);
+            var rig = CameraRig.Raise();
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph, Opener);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var opening = RunState.Begin(graph, Opener);
+            var input = TapInput.Raise(rig, builder.Targets, opening);
+            var walker = Walker.Raise(rig, builder, input, opening);
+            var acting = root.GetComponentsInChildren<FigureAnimator>(true);
+
+            var reel = new Tally { Site = builder.Fights.SiteOf(1) };
+            var flyingIntoTheSecondFight = 0;
+
+            walker.WalkTo(1);
+
+            for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
+            {
+                Step(rig, builder, walker, acting);
+                Reap(reel, builder, walker);
+            }
+
+            if (builder.Orbs.InFlight != 1)
+            {
+                Debug.LogError(
+                    "The first kill left " + builder.Orbs.InFlight
+                    + " orb streams in the air once its journey was over, where it owes exactly one.");
+            }
+
+            var landingsBeforeTheSecondFight = builder.Orbs.Landings;
+
+            walker.WalkTo(2);
+
+            for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
+            {
+                Step(rig, builder, walker, acting);
+                Reap(reel, builder, walker);
+
+                if (walker.Walk.IsWaiting && walker.Walk.ArrivedNodeId == 2)
+                {
+                    flyingIntoTheSecondFight = builder.Orbs.InFlight > flyingIntoTheSecondFight
+                        ? builder.Orbs.InFlight
+                        : flyingIntoTheSecondFight;
+                }
+            }
+
+            for (var frame = 0; frame < FrameCap && !builder.Orbs.IsSettled; frame++)
+            {
+                Step(rig, builder, walker, acting);
+                Reap(reel, builder, walker);
+            }
+
+            var orbs = builder.Orbs;
+            var settled = walker.Run;
+
+            if (landingsBeforeTheSecondFight != 0)
+            {
+                Debug.LogError(
+                    "The first stream had already paid out " + landingsBeforeTheSecondFight
+                    + " times before the second fight started, so nothing was in the air to protect.");
+            }
+
+            if (reel.OrbsAtOnce < 2 || flyingIntoTheSecondFight < 1)
+            {
+                Debug.LogError(
+                    "The board never carried two streams at once (" + reel.OrbsAtOnce + " at most, "
+                    + flyingIntoTheSecondFight
+                    + " alive as the second fight was joined), so a second fight cancelled the first "
+                    + "kill's orbs.");
+            }
+
+            if (orbs.Landings != 2 || orbs.Delivered != First + Second)
+            {
+                Debug.LogError(
+                    "Two kills landed " + orbs.Landings + " streams worth " + orbs.Delivered
+                    + " where they owe 2 streams worth " + (First + Second) + ".");
+            }
+
+            if (!orbs.IsSettled)
+            {
+                Debug.LogError("Two kills left orbs hanging in the air after both had been paid.");
+            }
+
+            if (settled.Power != Opener + First + Second)
+            {
+                Debug.LogError(
+                    "Two kills took the run to power " + settled.Power + " rather than "
+                    + (Opener + First + Second) + ".");
+            }
+
+            if (reel.LastShown != settled.Power)
+            {
+                Debug.LogError(
+                    "The badge settled on " + reel.LastShown + " where the run stands at "
+                    + settled.Power + ", so an orb stream was orphaned.");
+            }
+
+            if (reel.WalkedWhileFlying == 0)
+            {
+                Debug.LogError(
+                    "The player never took a step while an orb was in the air, so nothing shows the "
+                    + "controls were free.");
+            }
+
+            if (reel.NearestOrb > OrbReach || reel.PlayerAwayFromSite < 1f)
+            {
+                Debug.LogError(
+                    "The closest an orb came to the player was " + reel.NearestOrb + " while they stood "
+                    + reel.PlayerAwayFromSite + " from the death site, so the stream flew at a corpse "
+                    + "rather than at a moving fighter.");
+            }
+
+            var report = string.Format(
+                CultureInfo.InvariantCulture,
+                "\n  two kills back to back at power {0}: {1} streams worth {2} landed on a player who "
+                + "walked {3} frames while orbs were in the air, {4} streams aloft at once, the badge "
+                + "ending on {5} against a run of {6}, the nearest orb {7:0.###} from a player {8:0.###} "
+                + "from the death site",
+                Opener,
+                orbs.Landings,
+                orbs.Delivered,
+                reel.WalkedWhileFlying,
+                reel.OrbsAtOnce,
+                reel.LastShown,
+                settled.Power,
+                reel.NearestOrb,
+                reel.PlayerAwayFromSite);
+
+            WorldObjects.Destroy(root);
+            WorldObjects.Destroy(rig.gameObject);
+            builder.Dispose();
+
+            return report;
+        }
+
+        static string OrbsInFlightAreTornDownWithTheLevel()
+        {
+            var graph = Gauntlet(First, Second);
+            var rig = CameraRig.Raise();
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph, Opener);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var opening = RunState.Begin(graph, Opener);
+            var input = TapInput.Raise(rig, builder.Targets, opening);
+            var walker = Walker.Raise(rig, builder, input, opening);
+            var acting = root.GetComponentsInChildren<FigureAnimator>(true);
+
+            walker.WalkTo(1);
+
+            for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
+            {
+                Step(rig, builder, walker, acting);
+            }
+
+            for (var frame = 0; frame < 20; frame++)
+            {
+                Step(rig, builder, walker, acting);
+            }
+
+            var aloft = builder.Orbs.InFlight;
+            var drawn = builder.Orbs.Showing;
+            var standing = OrbsInTheScene();
+
+            if (aloft == 0 || drawn == 0 || standing == 0)
+            {
+                Debug.LogError(
+                    "The level was torn down with " + aloft + " streams, " + drawn + " orbs drawn and "
+                    + standing + " orb objects standing, so it proves nothing about a leak.");
+            }
+
+            WorldObjects.Destroy(root);
+            WorldObjects.Destroy(rig.gameObject);
+            builder.Dispose();
+
+            var left = OrbsInTheScene();
+            var boards = Resources.FindObjectsOfTypeAll<OrbBoard>().Length;
+
+            if (left != 0 || boards != 0)
+            {
+                Debug.LogError(
+                    "Tearing the level down mid-flight left " + left + " orb objects and " + boards
+                    + " orb boards behind, where it owes nothing at all.");
+            }
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "\n  a level torn down with {0} stream and {1} orb objects in the air left {2} objects "
+                + "and {3} boards behind",
+                aloft,
+                standing,
+                left,
+                boards);
+        }
+
+        static int OrbsInTheScene()
+        {
+            var counted = 0;
+
+            foreach (var raised in Resources.FindObjectsOfTypeAll<GameObject>())
+            {
+                if (PartNames.IsOrb(raised.name))
+                {
+                    counted++;
+                }
+            }
+
+            return counted;
+        }
+
+        static string Orbs(Tally win)
+        {
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "\n  the win threw {0} orb parts over {1:0.###}s of flight, landing {2} stream worth {3} "
+                + "on a player {4:0.###} away from the death site, the badge holding {5} until they "
+                + "arrived and then climbing to {6} in {7} steps of at most {8}",
+                win.OrbsDrawn,
+                win.OrbFrames * Frame,
+                win.OrbLandings,
+                win.OrbDelivered,
+                win.PlayerAwayFromSite,
+                win.ShownAtLanding,
+                win.LastShown,
+                win.ClimbSteps,
+                win.WidestClimbStep);
         }
 
         static string Row(Tally reel, int startingPower, int enemyValue)

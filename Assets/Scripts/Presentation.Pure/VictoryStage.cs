@@ -5,6 +5,9 @@ namespace Game.Presentation.Pure
         None,
         Clash,
         Dissolve,
+        OrbFlight,
+        Burst,
+        Count,
         Done
     }
 }

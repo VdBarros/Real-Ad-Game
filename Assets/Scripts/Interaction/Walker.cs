@@ -26,6 +26,8 @@ namespace Game.Interaction
 
         PickupBoard pickups;
 
+        OrbBoard orbs;
+
         Journey journey = Journey.Nowhere;
 
         bool landed;
@@ -115,6 +117,12 @@ namespace Game.Interaction
             trail = world.Trail;
             fights = world.Fights;
             pickups = world.Pickups;
+            orbs = world.Orbs;
+
+            if (orbs != null)
+            {
+                orbs.Landed += Deliver;
+            }
 
             if (pickups != null)
             {
@@ -246,6 +254,8 @@ namespace Game.Interaction
 
         void Land()
         {
+            var carried = Run.Power;
+
             landed = true;
             Run = journey.State;
 
@@ -256,7 +266,14 @@ namespace Game.Interaction
                     power.DropWeaponFrom(fights.SiteOf(journey.Walk.ArrivedNodeId));
                 }
 
-                power.Show(Run.Power);
+                if (Reaped(carried))
+                {
+                    orbs.Launch(fights.SiteOf(journey.Walk.ArrivedNodeId), Run.Power - carried);
+                }
+                else
+                {
+                    power.Show(Run.Power);
+                }
             }
 
             floor.Show(Run);
@@ -281,6 +298,22 @@ namespace Game.Interaction
 
             holding = true;
             rig.CutTo(Run.Level.Decisions.Node(journey.Walk.ArrivedNodeId).Position);
+        }
+
+        bool Reaped(int carried)
+        {
+            return journey.Arrival.Outcome == ActionOutcome.Win
+                && orbs != null
+                && fights != null
+                && Run.Power > carried;
+        }
+
+        void Deliver(int gain)
+        {
+            if (power != null && Run != null)
+            {
+                power.Show(Run.Power);
+            }
         }
 
         void Bleed()
@@ -409,6 +442,11 @@ namespace Game.Interaction
 
         void Unhook()
         {
+            if (orbs != null)
+            {
+                orbs.Landed -= Deliver;
+            }
+
             if (input == null)
             {
                 return;
