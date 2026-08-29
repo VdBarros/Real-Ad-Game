@@ -111,22 +111,32 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void OnlyThePlayerBadgeIsSizedForTheLargestValueTheLevelCanHold()
+        public void EveryBadgeIncludingThePlayersIsSizedForTheNumberItShows()
         {
             var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = BadgeBlueprintBuilder.Build(graph, StartingPower);
 
             foreach (var badge in blueprint.Badges)
             {
-                if (badge.Style == BadgeStyle.Player)
-                {
-                    Assert.That(badge.Cells, Is.EqualTo(blueprint.Plan.Capacity), badge.ToString());
-                    Assert.That(badge.Width, Is.EqualTo(blueprint.Plan.PlayerWidth), badge.ToString());
-                    continue;
-                }
-
                 Assert.That(badge.Cells, Is.EqualTo(badge.Text.Length), badge.ToString());
                 Assert.That(badge.Cells, Is.LessThanOrEqualTo(blueprint.Plan.Capacity), badge.ToString());
+                Assert.That(badge.Size.Cells, Is.EqualTo(badge.Cells), badge.ToString());
+            }
+        }
+
+        [Test]
+        public void EveryBadgeIsMeasuredAgainstTheWidthOfThePropItHangsOver()
+        {
+            var graph = LevelGraphFixture.TwoTerraces();
+            var blueprint = BadgeBlueprintBuilder.Build(graph, StartingPower);
+
+            foreach (var badge in blueprint.Badges)
+            {
+                WorldPart prop;
+                Assert.That(LevelBlueprintBuilder.TryProp(graph.Decisions.Node(badge.NodeId), out prop), Is.True);
+
+                Assert.That(badge.SubjectWidth, Is.EqualTo(WorldParts.WidthOf(prop)), badge.ToString());
+                Assert.That(badge.Width, Is.LessThanOrEqualTo(badge.SubjectWidth + Tolerance), badge.ToString());
             }
         }
 

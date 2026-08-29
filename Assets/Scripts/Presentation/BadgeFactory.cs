@@ -5,7 +5,7 @@ namespace Game.Presentation
 {
     public static class BadgeFactory
     {
-        public static NumberBadge Raise(BadgePart part, BadgePlan plan, BadgeAssets assets, Transform parent)
+        public static NumberBadge Raise(BadgePart part, BadgeAssets assets, Transform parent)
         {
             var instance = new GameObject(part.Name);
             instance.transform.SetParent(parent, worldPositionStays: false);
@@ -13,7 +13,7 @@ namespace Game.Presentation
             instance.transform.localEulerAngles = new Vector3(part.Rotation.X, part.Rotation.Y, part.Rotation.Z);
 
             var badge = instance.AddComponent<NumberBadge>();
-            badge.Compose(part, plan, assets);
+            badge.Compose(part, assets);
             return badge;
         }
     }

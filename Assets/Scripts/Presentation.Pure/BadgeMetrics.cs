@@ -22,17 +22,21 @@ namespace Game.Presentation.Pure
 
         public const float TextLift = 0.01f;
 
-        public static float WidthFor(int capacity)
-        {
-            RequireCapacity(capacity);
-            return capacity * CellWidth + 2f * SidePadding;
-        }
+        public const float MinimumCells = 1f;
+
+        public const float MinimumWidth = MinimumCells * CellWidth + 2f * SidePadding;
 
         public const float FontSizeByWidth = CellWidth / (MonospaceEm * UnitsPerFontPoint);
 
         public const float FontSizeByHeight = (Height - 2f * VerticalPadding) / (CapHeightEm * UnitsPerFontPoint);
 
         public const float FontSize = FontSizeByWidth < FontSizeByHeight ? FontSizeByWidth : FontSizeByHeight;
+
+        public static float WidthFor(float cells)
+        {
+            RequireCells(cells);
+            return cells * CellWidth + 2f * SidePadding;
+        }
 
         public static float AnchorHeight(WorldPart prop)
         {
@@ -44,12 +48,12 @@ namespace Game.Presentation.Pure
             return top + Clearance + Height * 0.5f;
         }
 
-        static void RequireCapacity(int capacity)
+        static void RequireCells(float cells)
         {
-            if (capacity < 1)
+            if (!(cells >= MinimumCells) || float.IsInfinity(cells))
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(capacity), capacity, "A badge holds at least one glyph.");
+                    nameof(cells), cells, "A badge holds at least one glyph.");
             }
         }
     }

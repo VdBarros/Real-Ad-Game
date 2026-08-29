@@ -9,17 +9,19 @@ namespace Game.Presentation.Pure
         readonly int from;
         readonly int to;
         readonly float elapsed;
+        readonly float fromDigits;
 
-        CountUp(int from, int to, float elapsed)
+        CountUp(int from, int to, float elapsed, float fromDigits)
         {
             this.from = from;
             this.to = to;
             this.elapsed = elapsed;
+            this.fromDigits = fromDigits;
         }
 
         public static CountUp Settled(int value)
         {
-            return new CountUp(value, value, Seconds);
+            return new CountUp(value, value, Seconds, BadgeText.Digits(value));
         }
 
         public int From
@@ -56,6 +58,20 @@ namespace Game.Presentation.Pure
             }
         }
 
+        public float Digits
+        {
+            get
+            {
+                var landing = BadgeText.Digits(to);
+                if (IsSettled)
+                {
+                    return landing;
+                }
+
+                return fromDigits + (landing - fromDigits) * EaseOut(elapsed / Seconds);
+            }
+        }
+
         public CountUp Toward(int target)
         {
             if (target == to)
@@ -63,7 +79,7 @@ namespace Game.Presentation.Pure
                 return this;
             }
 
-            return new CountUp(Display, target, 0f);
+            return new CountUp(Display, target, 0f, Digits);
         }
 
         public CountUp Advanced(float deltaSeconds)
@@ -79,7 +95,7 @@ namespace Game.Presentation.Pure
                 return this;
             }
 
-            return new CountUp(from, to, elapsed + deltaSeconds);
+            return new CountUp(from, to, elapsed + deltaSeconds, fromDigits);
         }
 
         static float EaseOut(float t)
@@ -90,7 +106,10 @@ namespace Game.Presentation.Pure
 
         public bool Equals(CountUp other)
         {
-            return from == other.from && to == other.to && elapsed.Equals(other.elapsed);
+            return from == other.from
+                && to == other.to
+                && elapsed.Equals(other.elapsed)
+                && fromDigits.Equals(other.fromDigits);
         }
 
         public override bool Equals(object obj)
@@ -105,6 +124,7 @@ namespace Game.Presentation.Pure
                 var hash = from;
                 hash = (hash * 397) ^ to;
                 hash = (hash * 397) ^ elapsed.GetHashCode();
+                hash = (hash * 397) ^ fromDigits.GetHashCode();
                 return hash;
             }
         }
