@@ -7,8 +7,6 @@ namespace Game.Presentation
     {
         Transform badge;
 
-        Renderer[] skins;
-
         WorldPoint ground;
 
         PartModel worn;
@@ -42,7 +40,6 @@ namespace Game.Presentation
         internal void Stand(Transform hangingBadge, PartModel mesh)
         {
             badge = hangingBadge;
-            skins = GetComponentsInChildren<Renderer>(true);
             worn = mesh;
             BaseScale = transform.localScale.x / FigureFit.ScaleOf(worn);
             Scale = BaseScale;
@@ -69,21 +66,11 @@ namespace Game.Presentation
             gameObject.SetActive(false);
         }
 
-        protected void Wear(float scale, Tint tint)
+        protected void Wear(float scale)
         {
             Scale = scale;
             transform.localScale = Vector3.one * (scale * FigureFit.ScaleOf(worn));
             Replant();
-
-            if (skins == null)
-            {
-                return;
-            }
-
-            foreach (var skin in skins)
-            {
-                Tints.Wash(skin, tint);
-            }
         }
 
         void Replant()

@@ -9,20 +9,18 @@ namespace Game.Presentation.Pure
         public const float Tension = 2.2f;
 
         readonly float fromScale;
-        readonly Tint fromTint;
         readonly float elapsed;
 
-        Promotion(float fromScale, Tint fromTint, PlayerLook target, float elapsed)
+        Promotion(float fromScale, PlayerLook target, float elapsed)
         {
             this.fromScale = fromScale;
-            this.fromTint = fromTint;
             this.elapsed = elapsed;
             Target = target;
         }
 
         public static Promotion Settled(PlayerLook look)
         {
-            return new Promotion(look.Scale, look.Tint, look, Seconds);
+            return new Promotion(look.Scale, look, Seconds);
         }
 
         public PlayerLook Target { get; }
@@ -45,19 +43,6 @@ namespace Game.Presentation.Pure
             }
         }
 
-        public Tint Tint
-        {
-            get
-            {
-                if (IsSettled)
-                {
-                    return Target.Tint;
-                }
-
-                return Tint.Lerp(fromTint, Target.Tint, Overshoot(elapsed / Seconds));
-            }
-        }
-
         public Promotion Toward(PlayerLook look)
         {
             if (look.Equals(Target))
@@ -65,7 +50,7 @@ namespace Game.Presentation.Pure
                 return this;
             }
 
-            return new Promotion(Scale, Tint, look, 0f);
+            return new Promotion(Scale, look, 0f);
         }
 
         public Promotion Advanced(float deltaSeconds)
@@ -81,7 +66,7 @@ namespace Game.Presentation.Pure
                 return this;
             }
 
-            return new Promotion(fromScale, fromTint, Target, elapsed + deltaSeconds);
+            return new Promotion(fromScale, Target, elapsed + deltaSeconds);
         }
 
         static float Overshoot(float t)
@@ -93,7 +78,6 @@ namespace Game.Presentation.Pure
         public bool Equals(Promotion other)
         {
             return fromScale.Equals(other.fromScale)
-                && fromTint.Equals(other.fromTint)
                 && elapsed.Equals(other.elapsed)
                 && Target.Equals(other.Target);
         }
@@ -108,7 +92,6 @@ namespace Game.Presentation.Pure
             unchecked
             {
                 var hash = fromScale.GetHashCode();
-                hash = (hash * 397) ^ fromTint.GetHashCode();
                 hash = (hash * 397) ^ elapsed.GetHashCode();
                 hash = (hash * 397) ^ Target.GetHashCode();
                 return hash;

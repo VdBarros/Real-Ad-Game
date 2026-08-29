@@ -67,14 +67,36 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ANodeBehindAnEnemyTooStrongToPassIsNotEvenAimedAt()
+        public void ANodeBehindAnEnemyIsAimedAtAndPreviewsTheFightStandingInTheWay()
         {
             var state = RunFixture.Begin(1);
+            var preview = TargetPreview.Of(state, RunFixture.Boss);
 
             Assert.That(state.IsReachable(RunFixture.Boss), Is.False);
-            Assert.That(TapAim.Aimable(state), Has.No.Member(RunFixture.Boss));
-            Assert.That(TargetPreview.Of(state, RunFixture.Boss).IsLegal, Is.False);
-            Assert.That(TargetPreview.Of(state, RunFixture.Boss).Outcome, Is.EqualTo(ActionOutcome.Rejected));
+            Assert.That(TapAim.Aimable(state), Has.Member(RunFixture.Boss));
+            Assert.That(preview.IsLegal, Is.True);
+            Assert.That(
+                preview.Route,
+                Is.EqualTo(new[]
+                {
+                    RunFixture.Start, RunFixture.Additive, RunFixture.GateEnemy, RunFixture.Boss
+                }));
+            Assert.That(preview.Outcome, Is.EqualTo(ActionOutcome.Tie));
+            Assert.That(preview.Power, Is.EqualTo(1 + RunFixture.AdditiveValue));
+        }
+
+        [Test]
+        public void APreviewThroughAWinnableEnemyReadsTheOutcomeAtTheFarEndOfTheRoute()
+        {
+            var state = RunFixture.Begin(2);
+            var preview = TargetPreview.Of(state, RunFixture.Boss);
+
+            Assert.That(state.IsReachable(RunFixture.Boss), Is.False);
+            Assert.That(preview.Outcome, Is.EqualTo(ActionOutcome.Loss));
+            Assert.That(
+                preview.Power,
+                Is.EqualTo(2 + RunFixture.AdditiveValue + RunFixture.GateEnemyValue),
+                "The preview stops on the boss it cannot beat, holding what the walk in earned.");
         }
 
         [Test]
@@ -196,7 +218,7 @@ namespace Game.Domain.Tests
 
             Assert.That(
                 source,
-                Does.Contain("ActionResolver.Resolve"),
+                Does.Contain("ActionResolver.Along"),
                 "The preview has to be the resolver, or it is a second reading of the rules waiting to drift.");
 
             foreach (var restatement in new[]

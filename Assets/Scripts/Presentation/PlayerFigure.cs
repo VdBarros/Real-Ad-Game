@@ -37,7 +37,7 @@ namespace Game.Presentation
         internal void Begin(PowerBeat beat)
         {
             landed = beat.HasLanded;
-            Wear(beat.Scale, beat.Tint);
+            Wear(beat.Scale);
             Wield(beat.Look.Trophies);
         }
 
@@ -50,7 +50,7 @@ namespace Game.Presentation
 
             landed = beat.HasLanded;
             Fly(deltaSeconds);
-            Wear(beat.Scale, beat.Tint);
+            Wear(beat.Scale);
 
             if (beat.IsSettled)
             {

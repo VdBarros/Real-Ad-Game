@@ -8,14 +8,6 @@ namespace Game.Presentation.Pure
 
         public const int CloseReach = 2;
 
-        static readonly Tint[] tints =
-        {
-            new Tint(0.76f, 0.62f, 0.60f),
-            new Tint(0.86f, 0.36f, 0.30f),
-            new Tint(0.86f, 0.14f, 0.14f),
-            new Tint(0.32f, 0.05f, 0.10f)
-        };
-
         static readonly float[] scales = { 0.78f, 0.92f, 1.06f, 1.22f };
 
         public static EnemyBand Of(int enemyValue, int playerPower)
@@ -53,11 +45,6 @@ namespace Game.Presentation.Pure
             return band == EnemyBand.Trivial || band == EnemyBand.Edible;
         }
 
-        public static Tint TintOf(EnemyBand band)
-        {
-            return tints[Slot(band)];
-        }
-
         public static float ScaleOf(EnemyBand band)
         {
             return scales[Slot(band)];
@@ -66,7 +53,7 @@ namespace Game.Presentation.Pure
         static int Slot(EnemyBand band)
         {
             var slot = (int)band;
-            if (slot < 0 || slot >= tints.Length)
+            if (slot < 0 || slot >= scales.Length)
             {
                 throw new ArgumentOutOfRangeException(nameof(band), band, "No look for that band.");
             }

@@ -16,6 +16,7 @@ namespace Game.Domain
         PanelStalled,
         RegionSpreadTooThin,
         OpeningWithoutAChoice,
-        MultiplierProductBeyondCap
+        MultiplierProductBeyondCap,
+        DeadWalkBeyondBudget
     }
 }
