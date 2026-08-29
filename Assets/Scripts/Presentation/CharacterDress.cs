@@ -43,18 +43,28 @@ namespace Game.Presentation
             return carried.Count;
         }
 
+        public static Transform Cloak(GameObject instance)
+        {
+            return Under(instance, AdventurerPack.CloakNode);
+        }
+
         public static Transform Hand(GameObject instance)
+        {
+            return Under(instance, ArtPacks.CastSlotNode);
+        }
+
+        static Transform Under(GameObject instance, string node)
         {
             if (instance == null)
             {
                 return null;
             }
 
-            foreach (var node in instance.GetComponentsInChildren<Transform>(true))
+            foreach (var found in instance.GetComponentsInChildren<Transform>(true))
             {
-                if (node.name.StartsWith(ArtPacks.CastSlotNode, StringComparison.Ordinal))
+                if (found.name.StartsWith(node, StringComparison.Ordinal))
                 {
-                    return node;
+                    return found;
                 }
             }
 

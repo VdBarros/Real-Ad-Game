@@ -20,6 +20,10 @@ namespace Game.Presentation.Pure
         SkeletonMinion,
         SkeletonRogue,
         SkeletonWarrior,
-        SkeletonMage
+        SkeletonMage,
+        Sword1Handed,
+        Axe2Handed,
+        Staff,
+        Sword2Handed
     }
 }

@@ -8,11 +8,13 @@ namespace Game.Presentation
     {
         readonly List<GameObject> trophies = new List<GameObject>();
 
+        WorldModels library;
+
+        Material skin;
+
         GameObject weapon;
 
         GameObject held;
-
-        GameObject cloak;
 
         PlayerWeapon gripped = PlayerWeapon.None;
 
@@ -45,7 +47,23 @@ namespace Game.Presentation
 
         public bool IsCloaked
         {
-            get { return cloak != null; }
+            get
+            {
+                var cape = CharacterDress.Cloak(gameObject);
+
+                return cape != null && cape.gameObject.activeSelf;
+            }
+        }
+
+        public Transform Wielding
+        {
+            get { return held == null ? null : held.transform; }
+        }
+
+        internal void Kit(WorldModels models, Material dressing)
+        {
+            library = models;
+            skin = dressing;
         }
 
         public void AwaitWeaponFrom(WorldPoint deathSite)
@@ -110,21 +128,14 @@ namespace Game.Presentation
 
                 if (gripped != PlayerWeapon.None)
                 {
-                    held = Hang(
-                        PartNames.Held(gripped), Grip(), PlayerKit.LimbsOf(gripped), PlayerKit.Steel);
+                    held = Mount(PartNames.Held(gripped), Grip(), PlayerKit.ModelOf(gripped));
                 }
             }
 
             if (!armed || cloaked != look.Cloak)
             {
-                WorldObjects.Destroy(cloak);
-                cloak = null;
                 cloaked = look.Cloak;
-
-                if (cloaked)
-                {
-                    cloak = Hang(PartNames.Cloak, transform, PlayerKit.CloakLimbs, PlayerKit.Cloth);
-                }
+                Drape(cloaked);
             }
 
             armed = true;
@@ -137,41 +148,44 @@ namespace Game.Presentation
             return slot == null ? transform : slot;
         }
 
-        GameObject Hang(
-            string name, Transform anchor, IReadOnlyList<PropLimb> limbs, Tint tint)
+        GameObject Mount(string name, Transform anchor, PartModel model)
         {
-            var holder = new GameObject(name);
-            holder.transform.SetParent(anchor, worldPositionStays: false);
-            holder.transform.localPosition = Vector3.zero;
-            holder.transform.localScale = Vector3.one * UnitUnder(anchor);
-            holder.transform.rotation = transform.rotation;
+            var prefab = library == null ? null : library.Of(model);
 
-            for (var limb = 0; limb < limbs.Count; limb++)
+            if (prefab == null)
             {
-                Slab(PartNames.Limb(name, limb), holder.transform, limbs[limb], tint);
+                return null;
             }
 
-            return holder;
+            var instance = Instantiate(prefab);
+            instance.name = name;
+            instance.transform.SetParent(anchor, worldPositionStays: false);
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+            WorldObjects.Destroy(instance.GetComponent<Animator>());
+
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                renderer.sharedMaterial = skin;
+            }
+
+            foreach (var solid in instance.GetComponentsInChildren<Collider>(true))
+            {
+                WorldObjects.Destroy(solid);
+            }
+
+            return instance;
         }
 
-        float UnitUnder(Transform anchor)
+        void Drape(bool worn)
         {
-            var mine = transform.lossyScale.x;
-            var theirs = anchor.lossyScale.x;
+            var cape = CharacterDress.Cloak(gameObject);
 
-            return theirs <= 1e-6f || mine <= 1e-6f ? CapsuleUnit : mine * CapsuleUnit / theirs;
-        }
-
-        static void Slab(string name, Transform parent, PropLimb limb, Tint tint)
-        {
-            var slab = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            slab.name = name;
-            slab.transform.SetParent(parent, worldPositionStays: false);
-            slab.transform.localPosition = Vector(limb.Offset);
-            slab.transform.localEulerAngles = Vector(limb.Rotation);
-            slab.transform.localScale = Vector(limb.Size);
-            WorldObjects.Destroy(slab.GetComponent<Collider>());
-            Tints.Wash(slab.GetComponent<Renderer>(), tint);
+            if (cape != null)
+            {
+                cape.gameObject.SetActive(worn);
+            }
         }
 
         void Launch(PlayerLook look)
@@ -215,7 +229,8 @@ namespace Game.Presentation
             WorldObjects.Destroy(weapon);
             weapon = null;
             held = null;
-            cloak = null;
+            library = null;
+            skin = null;
             gripped = PlayerWeapon.None;
             cloaked = false;
             armed = false;

@@ -165,6 +165,7 @@ namespace Game.Presentation
                         playerNumber = badge;
                         playerFigure = prop.gameObject.AddComponent<PlayerFigure>();
                         playerFigure.Stand(badge.transform, worn);
+                        playerFigure.Kit(models, materials.Of(PartStyle.Start));
                         FigureAnimator.Raise(playerFigure.gameObject, worn, models);
                     }
                     else if (part.Style == BadgeStyle.Enemy || part.Style == BadgeStyle.Boss)

@@ -30,6 +30,10 @@ namespace Game.Presentation.Pure
                 case PartModel.SkeletonWarrior:
                 case PartModel.SkeletonMage:
                     return Standing(part);
+                case PartModel.Sword1Handed:
+                case PartModel.Axe2Handed:
+                case PartModel.Staff:
+                case PartModel.Sword2Handed:
                 case PartModel.None:
                 case PartModel.FloorTile:
                     return part.Position;
@@ -56,6 +60,10 @@ namespace Game.Presentation.Pure
                         part.Rotation.X,
                         part.Rotation.Y + ArtPacks.FacingOf(part.Model),
                         part.Rotation.Z);
+                case PartModel.Sword1Handed:
+                case PartModel.Axe2Handed:
+                case PartModel.Staff:
+                case PartModel.Sword2Handed:
                 case PartModel.None:
                 case PartModel.WallPanel:
                 case PartModel.CoinStack:
@@ -102,6 +110,10 @@ namespace Game.Presentation.Pure
                 case PartModel.SkeletonWarrior:
                 case PartModel.SkeletonMage:
                     return Sized(part);
+                case PartModel.Sword1Handed:
+                case PartModel.Axe2Handed:
+                case PartModel.Staff:
+                case PartModel.Sword2Handed:
                 case PartModel.None:
                     return part.Scale;
                 default:
