@@ -37,6 +37,8 @@ namespace Game.EditorTooling
 
         const int ChannelTolerance = 8;
 
+        const float ColourTolerance = 1e-3f;
+
         const int AloneLayer = 31;
 
         const int Cursed = 0;
@@ -352,6 +354,8 @@ namespace Game.EditorTooling
             failures += TheLandmarksReadApartAtThePlayFraming(graph, byName, report);
             failures += TheCastReadsAgainstTheDungeon(root, graph, byName, report);
             failures += TheMaterialsStayFlat(root, report);
+            failures += TheGatesAreCutFromPackMeshes(models, graph, byName, report);
+            failures += TheGateWalkwayStaysClear(builder, graph, byName, report);
 
             WorldObjects.Destroy(root);
             builder.Dispose();
@@ -464,6 +468,276 @@ namespace Game.EditorTooling
                 (total - bare) + " of " + total + " renderers do");
 
             return failures;
+        }
+
+        static int TheGatesAreCutFromPackMeshes(
+            WorldModels models,
+            LevelGraph graph,
+            IDictionary<string, Transform> byName,
+            StringBuilder report)
+        {
+            var pack = new List<Mesh>();
+
+            foreach (var mesh in PackMesh.Of(models.Of(GateArch.Masonry)))
+            {
+                pack.Add(mesh);
+            }
+
+            foreach (var mesh in PackMesh.Of(models.Of(GateArch.Pipwork)))
+            {
+                pack.Add(mesh);
+            }
+
+            var gates = 0;
+            var meshed = 0;
+            var counted = 0;
+            var lit = 0;
+            var dimmed = 0;
+            var complaint = new List<string>();
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                if (node.Type != NodeType.Multiplier)
+                {
+                    continue;
+                }
+
+                Transform instance;
+                if (!byName.TryGetValue(PartNames.Node(node.Id), out instance))
+                {
+                    complaint.Add(PartNames.Node(node.Id) + " is not in the world");
+                    continue;
+                }
+
+                gates++;
+                var pieces = GateArch.Pieces(node.Value);
+                var renderers = instance.GetComponentsInChildren<Renderer>(true);
+                var wearing = renderers.Length == pieces.Count;
+                var strays = new List<string>();
+
+                foreach (var renderer in renderers)
+                {
+                    var mesh = PackMesh.On(renderer);
+
+                    if (mesh == null || !pack.Contains(mesh))
+                    {
+                        wearing = false;
+                        strays.Add(renderer.name + " wears " + (mesh == null ? "nothing" : mesh.name));
+                    }
+                }
+
+                var raised = 0;
+
+                foreach (var piece in pieces)
+                {
+                    var child = instance.Find(piece.Name);
+
+                    if (child != null && PackMesh.Around(child.gameObject).size.sqrMagnitude > 0f)
+                    {
+                        raised++;
+                    }
+                }
+
+                if (wearing && raised == pieces.Count)
+                {
+                    meshed++;
+                }
+                else if (complaint.Count < Complaints)
+                {
+                    complaint.Add(instance.name + ": " + raised + " of " + pieces.Count
+                        + " pieces carry a mesh, " + renderers.Length + " renderers"
+                        + (strays.Count == 0 ? "" : "; " + string.Join(", ", strays.ToArray())));
+                }
+
+                var glow = instance.GetComponent<GateProp>();
+                var target = instance.GetComponent<NodeTarget>();
+
+                if (glow == null || target == null)
+                {
+                    continue;
+                }
+
+                if (glow.Pips == node.Value && PipsUnder(instance) == node.Value)
+                {
+                    counted++;
+                }
+
+                target.Wear(TargetMark.Idle, 0);
+
+                if (Alike(glow.Colour, Tints.Of(GateLook.Of(node.Value))))
+                {
+                    lit++;
+                }
+
+                target.Wear(TargetMark.Unreachable, 0);
+
+                if (Alike(
+                    glow.Colour,
+                    Tints.Of(GateLook.Washed(node.Value, TargetMarks.Look(TargetMark.Unreachable)))))
+                {
+                    dimmed++;
+                }
+
+                target.Wear(TargetMark.Idle, 0);
+            }
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                gates > 0 && meshed == gates,
+                "every gate is cut from the " + GateArch.Masonry + " and " + GateArch.Pipwork
+                + " meshes of the dungeon pack, with no primitive box left in the arch",
+                meshed + " of " + gates + " are, from " + pack.Count + " pack meshes"
+                + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+
+            failures += Assert(
+                report,
+                gates > 0 && counted == gates,
+                "every gate still counts its factor in a row of pips standing on its lintel, so the "
+                + "factor is readable from the geometry without a badge",
+                counted + " of " + gates + " do");
+
+            failures += Assert(
+                report,
+                gates > 0 && lit == gates,
+                "every gate still glows in the colour its factor was given",
+                lit + " of " + gates + " do");
+
+            return failures + Assert(
+                report,
+                gates > 0 && dimmed == gates,
+                "every gate still washes and dims to the unreachable mark rather than holding its plain "
+                + "colour",
+                dimmed + " of " + gates + " do");
+        }
+
+        static int PipsUnder(Transform instance)
+        {
+            var pips = 0;
+
+            foreach (var node in instance.GetComponentsInChildren<Transform>(true))
+            {
+                if (PartNames.IsGatePip(node.name))
+                {
+                    pips++;
+                }
+            }
+
+            return pips;
+        }
+
+        static bool Alike(Color one, Color other)
+        {
+            return Math.Abs(one.r - other.r) <= ColourTolerance
+                && Math.Abs(one.g - other.g) <= ColourTolerance
+                && Math.Abs(one.b - other.b) <= ColourTolerance;
+        }
+
+        static int TheGateWalkwayStaysClear(
+            WorldBuilder builder,
+            LevelGraph graph,
+            IDictionary<string, Transform> byName,
+            StringBuilder report)
+        {
+            var gate = GateUnder(graph, byName);
+            var power = builder.PlayerBadge;
+            var player = builder.Player;
+
+            if (gate == null || power == null || player == null)
+            {
+                return Assert(
+                    report,
+                    false,
+                    "the ship level raises a gate and a player to walk it through",
+                    (gate == null ? "no gate" : "a gate") + " and "
+                    + (player == null ? "no player" : "a player"));
+            }
+
+            var triangles = new List<Vector3[]>();
+            GateClearance.Gather(gate, gate, triangles);
+
+            var pack = PackMesh.Of(
+                Resources.Load<GameObject>(WorldModels.AssetPathOf(GateArch.Passer)));
+            var opening = power.Power;
+            var clear = 0;
+            var tiers = 0;
+            var narrowest = float.MaxValue;
+            var readings = new List<string>();
+            var clipping = new List<string>();
+
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                PowerPump.Settle(power, PowerAt(tier));
+                tiers++;
+
+                var body = PackMesh.Wearing(player.transform, pack);
+                var kit = World(player.transform);
+                var across = Math.Max(body.size.x, body.size.z);
+                var half = new Vector3(across * 0.5f, body.size.y * 0.5f, GateArch.Depth);
+                var centre = new Vector3(0f, -GateArch.Height * 0.5f + body.size.y * 0.5f, 0f);
+
+                readings.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "tier {0} stands {1:0.###} across and {2:0.###} tall, kit and all {3:0.###} by {4:0.###}",
+                    tier,
+                    across,
+                    body.size.y,
+                    Math.Max(kit.size.x, kit.size.z),
+                    kit.size.y));
+
+                narrowest = Math.Min(narrowest, GateArch.Walkway - across);
+
+                if (!GateClearance.Blocked(triangles, centre, half))
+                {
+                    clear++;
+                }
+                else
+                {
+                    clipping.Add("tier " + tier + " clips the arch");
+                }
+            }
+
+            PowerPump.Settle(power, opening);
+
+            return Assert(
+                report,
+                tiers > 0 && clear == tiers,
+                "the body of a player of every tier sweeps through the gate's walkway without touching a "
+                + "single triangle of its posts or its lintel, the raised weapon it carries above its own "
+                + "head excepted",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} of {1} tiers pass through the arch's {2} triangles; the widest leaves {3:0.###} "
+                    + "of the {4:0.###} walkway spare; {5}{6}",
+                    clear,
+                    tiers,
+                    triangles.Count,
+                    narrowest,
+                    GateArch.Walkway,
+                    string.Join(", ", readings.ToArray()),
+                    clipping.Count == 0 ? "" : "; " + string.Join(", ", clipping.ToArray())));
+        }
+
+        static int PowerAt(int tier)
+        {
+            return tier == 0 ? 1 : PlayerTier.Thresholds[tier - 1];
+        }
+
+        static Transform GateUnder(LevelGraph graph, IDictionary<string, Transform> byName)
+        {
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                Transform instance;
+
+                if (node.Type == NodeType.Multiplier
+                    && byName.TryGetValue(PartNames.Node(node.Id), out instance))
+                {
+                    return instance;
+                }
+            }
+
+            return null;
         }
 
         static int EveryWallLandsOnItsTileEdge(

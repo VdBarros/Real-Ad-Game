@@ -39,8 +39,82 @@ namespace Game.Domain.Tests
             Assert.That(names, Contains.Item(PartNames.GateRightPost));
             Assert.That(names, Contains.Item(PartNames.GateLintel));
             Assert.That(names.Distinct().Count(), Is.EqualTo(names.Count));
-            Assert.That(pieces.All(piece => piece.Shape == PartShape.Cube), Is.True);
+            Assert.That(pieces.All(piece => piece.Shape == PartShape.Gate), Is.True);
             Assert.That(pieces.All(piece => piece.Style == PartStyle.Multiplier), Is.True);
+        }
+
+        [Test]
+        public void NoPieceOfAnArchIsAPrimitiveBox()
+        {
+            for (var factor = GateArch.SmallestFactor; factor <= GateArch.MostPips; factor++)
+            {
+                foreach (var piece in GateArch.Pieces(factor))
+                {
+                    Assert.That(piece.Shape, Is.Not.EqualTo(PartShape.Cube), piece.Name);
+                    Assert.That(piece.Model, Is.Not.EqualTo(PartModel.None), piece.Name);
+                }
+            }
+        }
+
+        [Test]
+        public void EveryPieceIsADungeonPackMeshWhoseBoxTheMeasurementsCanFill()
+        {
+            foreach (var piece in GateArch.Pieces(GateArch.MostPips))
+            {
+                Assert.That(ArtPacks.Of(piece.Model), Is.EqualTo(ArtPack.Dungeon), piece.Name);
+                Assert.That(ArtPacks.IsRigged(piece.Model), Is.False, piece.Name);
+
+                var fit = DungeonPack.FitOf(piece.Model, piece.Scale);
+
+                Assert.That(fit.X, Is.GreaterThan(0f), piece.Name);
+                Assert.That(fit.Y, Is.GreaterThan(0f), piece.Name);
+                Assert.That(fit.Z, Is.GreaterThan(0f), piece.Name);
+                Assert.That(
+                    DungeonPack.WidthOf(piece.Model) * fit.X,
+                    Is.EqualTo(piece.Scale.X).Within(Tolerance),
+                    piece.Name);
+                Assert.That(
+                    DungeonPack.HeightOf(piece.Model) * fit.Y,
+                    Is.EqualTo(piece.Scale.Y).Within(Tolerance),
+                    piece.Name);
+                Assert.That(
+                    DungeonPack.DepthOf(piece.Model) * fit.Z,
+                    Is.EqualTo(piece.Scale.Z).Within(Tolerance),
+                    piece.Name);
+            }
+        }
+
+        [Test]
+        public void ThePostsAndLintelAreOneStoneAndThePipsAnother()
+        {
+            var pieces = GateArch.Pieces(3);
+
+            foreach (var piece in pieces)
+            {
+                Assert.That(
+                    piece.Model,
+                    Is.EqualTo(PartNames.IsGatePip(piece.Name) ? GateArch.Pipwork : GateArch.Masonry),
+                    piece.Name);
+            }
+
+            Assert.That(GateArch.Masonry, Is.Not.EqualTo(GateArch.Pipwork));
+        }
+
+        [Test]
+        public void EveryPieceStandsOnItsOwnBaseSoTheMeshPivotLandsWhereTheBoxDoes()
+        {
+            foreach (var piece in GateArch.Pieces(GateArch.MostPips))
+            {
+                Assert.That(
+                    ModelPose.PositionOf(piece).Y,
+                    Is.EqualTo(piece.Position.Y - piece.Scale.Y * 0.5f).Within(Tolerance),
+                    piece.Name);
+                Assert.That(ModelPose.RotationOf(piece), Is.EqualTo(piece.Rotation), piece.Name);
+                Assert.That(
+                    ModelPose.ScaleOf(piece),
+                    Is.EqualTo(DungeonPack.FitOf(piece.Model, piece.Scale)),
+                    piece.Name);
+            }
         }
 
         [Test]
@@ -48,15 +122,53 @@ namespace Game.Domain.Tests
         {
             Assert.That(GateArch.Walkway, Is.GreaterThan(LevelBlueprintBuilder.FigureScale));
             Assert.That(GateArch.Walkway, Is.GreaterThan(LevelBlueprintBuilder.BossScale));
-            Assert.That(GateArch.Span, Is.LessThanOrEqualTo(IsoProjection.TileEdge));
+            Assert.That(GateArch.Walkway, Is.GreaterThan(GateArch.WidestPasser));
+            Assert.That(GateArch.Span, Is.GreaterThan(GateArch.Walkway));
         }
 
         [Test]
-        public void TheLintelClearsTheHeadOfThePlayerWalkingUnderIt()
+        public void TheWholeArchKeepsItsFootprintOnTheTileItStandsOn()
+        {
+            Assert.That(GateArch.TileFootprint, Is.LessThan(IsoProjection.TileEdge));
+            Assert.That(GateArch.Span, Is.GreaterThan(IsoProjection.TileEdge));
+
+            foreach (var piece in GateArch.Pieces(GateArch.MostPips))
+            {
+                Assert.That(
+                    Math.Abs(piece.Position.X) + piece.Scale.X * 0.5f,
+                    Is.LessThanOrEqualTo(GateArch.Span * 0.5f + Tolerance),
+                    piece.Name);
+                Assert.That(
+                    Math.Abs(piece.Position.Z) + piece.Scale.Z * 0.5f,
+                    Is.LessThanOrEqualTo(GateArch.Depth * 0.5f + Tolerance),
+                    piece.Name);
+            }
+        }
+
+        [Test]
+        public void TheLintelClearsTheHeadOfThePlayerAtEveryTierItCanClimbTo()
         {
             Assert.That(GateArch.PostHeight, Is.GreaterThan(LevelBlueprintBuilder.FigureScale * 2f));
             Assert.That(GateArch.Height, Is.GreaterThan(LevelBlueprintBuilder.PickupScale));
+            Assert.That(GateArch.Headroom, Is.GreaterThan(1f));
+
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                var power = tier == 0 ? 1 : PlayerTier.Thresholds[tier - 1];
+                var look = PlayerLook.Of(power);
+                var mesh = CharacterCast.MeshOf(PartStyle.Start);
+
+                Assert.That(
+                    FigureFit.StandingHeight(mesh, look.Scale),
+                    Is.LessThan(GateArch.PostHeight),
+                    "tier " + tier);
+                Assert.That(
+                    FigureFit.SpreadOf(mesh, look.Scale),
+                    Is.LessThan(GateArch.Walkway),
+                    "tier " + tier);
+            }
         }
+
 
         [Test]
         public void AnArchCountsItsFactorInPips()

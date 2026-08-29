@@ -265,6 +265,10 @@ namespace Game.Presentation
                     return "stairs_narrow";
                 case PartModel.Foundation:
                     return "floor_foundation_allsides";
+                case PartModel.Pillar:
+                    return "pillar";
+                case PartModel.Candle:
+                    return "candle";
                 case PartModel.Knight:
                     return "Knight";
                 case PartModel.SkeletonMinion:
