@@ -108,6 +108,9 @@ namespace Game.Domain
                 case SolvabilityReason.AdversaryStalled:
                     return ContentRejection.PanelStalled;
 
+                case SolvabilityReason.MultiplierProductBeyondCap:
+                    return ContentRejection.MultiplierProductBeyondCap;
+
                 default:
                     throw new InvalidOperationException(
                         "Placement built a level no seed can excuse: " + verdict + ".");
@@ -399,6 +402,11 @@ namespace Game.Domain
                 var value = ladder[index % ladder.Count];
                 board.SetValue(multipliers[index], value);
                 product *= value;
+            }
+
+            if (MultiplierProduct.Of(board) > tuning.MultiplierProductCap)
+            {
+                return ContentRejection.MultiplierProductBeyondCap;
             }
 
             var steps = Math.Max(1, content.Count - multipliers.Count);
