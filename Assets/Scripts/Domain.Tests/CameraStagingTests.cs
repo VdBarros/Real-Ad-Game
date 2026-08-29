@@ -156,7 +156,7 @@ namespace Game.Domain.Tests
             staging = Rested(staging.Follows(walked));
 
             Assert.That(staging.Framing.Target, Is.EqualTo(walked));
-            Assert.That(staging.Framing.OrthographicSize, Is.EqualTo(IsoProjection.OrthographicSize));
+            Assert.That(staging.Framing.OrthographicSize, Is.EqualTo(LevelFraming.PlaySize));
         }
 
         [Test]
@@ -174,13 +174,20 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void ABeatCutsAwayFromTheFollowAndTakesInputWithIt()
+        public void ABeatPunchesInOnWhatItFiredOnAndTakesInputWithIt()
         {
             var graph = Graph();
-            var staging = Playing(graph).CutTo(Multiplier);
+            var resting = Playing(graph);
+            var staging = resting.CutTo(Multiplier);
 
             Assert.That(staging.IsBusy, Is.True);
-            Assert.That(staging.Framing, Is.EqualTo(LevelFraming.CloseUp(Multiplier)));
+            Assert.That(
+                staging.Framing,
+                Is.EqualTo(resting.Framing),
+                "The punch landed as a cut on the frame it fired.");
+            Assert.That(
+                staging.Advanced(ZoomBeat.InSeconds).Framing,
+                Is.EqualTo(LevelFraming.CloseUp(Multiplier)));
         }
 
         [Test]
@@ -188,7 +195,9 @@ namespace Game.Domain.Tests
         {
             var graph = Graph();
             var standing = IsoProjection.Of(Multiplier);
-            var staging = Rested(Playing(graph).Follows(standing)).CutTo(Multiplier);
+            var staging = Rested(Playing(graph).Follows(standing))
+                .CutTo(Multiplier)
+                .Advanced(ZoomBeat.InSeconds);
 
             for (var step = 0; step < 30; step++)
             {
@@ -196,9 +205,12 @@ namespace Game.Domain.Tests
                 Assert.That(staging.Framing, Is.EqualTo(LevelFraming.CloseUp(Multiplier)));
             }
 
-            staging = staging.Advanced(ZoomBeat.FloorSeconds).Released();
+            staging = staging.Released();
 
-            Assert.That(staging.IsBusy, Is.False);
+            Assert.That(staging.IsBusy, Is.False, "The return kept input locked out.");
+
+            staging = Rested(staging);
+
             Assert.That(staging.Framing, Is.EqualTo(LevelFraming.Play(standing)));
             Assert.That(staging.Framing, Is.EqualTo(staging.Following));
         }
@@ -226,9 +238,11 @@ namespace Game.Domain.Tests
                 var standing = IsoProjection.Of(node.Position);
                 var beating = Rested(staging.Follows(standing)).CutTo(node.Position);
 
-                Assert.That(beating.Framing, Is.EqualTo(LevelFraming.CloseUp(node.Position)));
                 Assert.That(
-                    beating.Advanced(ZoomBeat.CapSeconds).Framing,
+                    beating.Advanced(ZoomBeat.InSeconds).Framing,
+                    Is.EqualTo(LevelFraming.CloseUp(node.Position)));
+                Assert.That(
+                    beating.Advanced(ZoomBeat.CapSeconds + ZoomBeat.OutSeconds).Framing,
                     Is.EqualTo(LevelFraming.Play(standing)));
             }
         }
@@ -335,7 +349,10 @@ namespace Game.Domain.Tests
         {
             var graph = Graph();
             var standing = IsoProjection.Of(Multiplier);
-            var staging = Rested(Playing(graph).Follows(standing)).Looks(Up(4f)).CutTo(Multiplier);
+            var staging = Rested(Playing(graph).Follows(standing))
+                .Looks(Up(4f))
+                .CutTo(Multiplier)
+                .Advanced(ZoomBeat.InSeconds);
 
             Assert.That(staging.Framing, Is.EqualTo(LevelFraming.CloseUp(Multiplier)));
 

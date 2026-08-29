@@ -18,6 +18,8 @@ namespace Game.Presentation.Pure
                 case PartShape.Cube:
                 case PartShape.Quad:
                     return part.Scale.X;
+                case PartShape.Gate:
+                    return GateArch.Span * part.Scale.X;
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(part), part.Shape, "No width for that part shape.");
@@ -34,6 +36,8 @@ namespace Game.Presentation.Pure
                     return part.Scale.Y * 0.5f;
                 case PartShape.Quad:
                     return 0f;
+                case PartShape.Gate:
+                    return GateArch.Height * part.Scale.Y * 0.5f;
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(part), part.Shape, "No height for that part shape.");

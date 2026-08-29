@@ -7,8 +7,6 @@ namespace Game.Presentation.Pure
     {
         public const string AdditivePrefix = "+";
 
-        public const string MultiplierPrefix = "x";
-
         public const string NoPrefix = "";
 
         public static bool TryOf(NodeType type, out BadgeStyle style)
@@ -20,9 +18,6 @@ namespace Game.Presentation.Pure
                     return true;
                 case NodeType.Additive:
                     style = BadgeStyle.Additive;
-                    return true;
-                case NodeType.Multiplier:
-                    style = BadgeStyle.Multiplier;
                     return true;
                 case NodeType.Enemy:
                     style = BadgeStyle.Enemy;
@@ -41,9 +36,9 @@ namespace Game.Presentation.Pure
             switch (style)
             {
                 case BadgeStyle.Player:
-                case BadgeStyle.Additive:
-                case BadgeStyle.Multiplier:
                     return BadgeShape.RoundedRect;
+                case BadgeStyle.Additive:
+                    return BadgeShape.Tag;
                 case BadgeStyle.Enemy:
                 case BadgeStyle.Boss:
                     return BadgeShape.Pill;
@@ -58,8 +53,6 @@ namespace Game.Presentation.Pure
             {
                 case BadgeStyle.Additive:
                     return AdditivePrefix;
-                case BadgeStyle.Multiplier:
-                    return MultiplierPrefix;
                 case BadgeStyle.Player:
                 case BadgeStyle.Enemy:
                 case BadgeStyle.Boss:

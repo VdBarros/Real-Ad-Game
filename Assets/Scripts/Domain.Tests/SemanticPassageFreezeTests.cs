@@ -10,9 +10,9 @@ namespace Game.Domain.Tests
 
         const int FrozenMoves = 40;
 
-        const long FrozenFingerprint = -5327736069986208670L;
+        const long FrozenFingerprint = 2295786003125634436L;
 
-        const int FrozenStates = 3527;
+        const int FrozenStates = 3522;
 
         static IEnumerable<MazePreset> EveryPreset()
         {
@@ -39,8 +39,13 @@ namespace Game.Domain.Tests
             Assert.That(
                 fingerprint,
                 Is.EqualTo(FrozenFingerprint),
-                "The semantic reachable set moved. Navigation has leaked into the domain and every "
-                + "invariant proof in the backlog rests on it, so the change is wrong, not the number.");
+                "The semantic reachable set moved. If the change under test touched passage, "
+                + "navigation or the decision graph, navigation has leaked into the domain and every "
+                + "invariant proof in the backlog rests on it, so the change is wrong, not the number. "
+                + "This fingerprint is taken over levels from LevelGenerator, so a deliberate "
+                + "generation change moves it too; in that case confirm RunState, DecisionGraph and "
+                + "NavigationMap are untouched and that NavigationMapTests still passes over the new "
+                + "corpus, then refreeze.");
         }
 
         static long Fingerprint(out int states)

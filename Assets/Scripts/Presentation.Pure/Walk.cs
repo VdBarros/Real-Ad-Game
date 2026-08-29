@@ -6,7 +6,7 @@ namespace Game.Presentation.Pure
 {
     public readonly struct Walk : IEquatable<Walk>
     {
-        public const float StepsPerSecond = 4f;
+        public const float StepsPerSecond = Pace.StepsPerSecond;
 
         readonly TileRoute route;
         readonly int stage;

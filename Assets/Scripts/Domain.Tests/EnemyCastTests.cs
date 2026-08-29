@@ -10,7 +10,7 @@ namespace Game.Domain.Tests
     {
         const float Tolerance = 1e-4f;
 
-        static readonly int[] EnemyNumbers = { 1, 7, 8, 29, 30, 99, 100, 299, 300, 6303 };
+        static readonly int[] EnemyNumbers = { 1, 11, 12, 49, 50, 51, 300, 6303 };
 
         static readonly int[] PlayerPowers = { 1, 5, 40, 400, 4000 };
 
@@ -100,6 +100,45 @@ namespace Game.Domain.Tests
             Assert.That(seen[0], Is.EqualTo(PartModel.SkeletonMinion));
             Assert.That(seen[1], Is.EqualTo(PartModel.SkeletonRogue));
             Assert.That(seen[2], Is.EqualTo(PartModel.SkeletonWarrior));
+        }
+
+        [Test]
+        public void NoTwoEnemyTiersShareASilhouetteSoTheMeshAloneSeparatesThem()
+        {
+            var byTier = new List<PartModel>();
+
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
+            {
+                byTier.Add(CharacterCast.TierMeshOf(tier));
+            }
+
+            Assert.That(byTier.Distinct().Count(), Is.EqualTo(EnemyTier.Count), string.Join(", ", byTier));
+            Assert.That(CharacterCast.MeshesOf(PartStyle.Enemy).Count, Is.EqualTo(EnemyTier.Count));
+            Assert.That(EnemyTier.Count, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void TheSkeletonPackDressesEveryEnemyTierAndStillKeepsOneMeshBackForTheBoss()
+        {
+            var carried = 0;
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (SkeletonPack.Carries(model))
+                {
+                    carried++;
+                }
+            }
+
+            Assert.That(CharacterCast.MeshesOf(PartStyle.Enemy).Count, Is.EqualTo(carried - 1));
+            Assert.That(
+                CharacterCast.MeshesOf(PartStyle.Enemy),
+                Has.No.Member(CharacterCast.MeshOf(PartStyle.Boss)));
+
+            foreach (var mesh in CharacterCast.MeshesOf(PartStyle.Enemy))
+            {
+                Assert.That(SkeletonPack.Carries(mesh), Is.True, mesh.ToString());
+            }
         }
 
         [Test]
@@ -349,7 +388,7 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void MoreThanOneSilhouetteReachesAShippedLevelSoTheRampIsVisibleInPlay()
+        public void EverySilhouetteReachesATypicalRunSoTheWholeRampIsVisibleInPlay()
         {
             var worn = new List<PartModel>();
 
@@ -374,6 +413,7 @@ namespace Game.Domain.Tests
             }
 
             Assert.That(worn.Count, Is.EqualTo(CharacterCast.MeshesOf(PartStyle.Enemy).Count));
+            Assert.That(worn.Count, Is.EqualTo(EnemyTier.Count));
         }
 
         [Test]

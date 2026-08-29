@@ -4,6 +4,7 @@ namespace Game.Presentation.Pure
     {
         Quad,
         Cube,
-        Capsule
+        Capsule,
+        Gate
     }
 }

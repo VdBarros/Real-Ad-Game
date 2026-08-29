@@ -13,7 +13,7 @@ namespace Game.Domain.Tests
 
         static CameraFraming Framing()
         {
-            return new CameraFraming(new WorldPoint(3f, 2f, 5f), IsoProjection.OrthographicSize);
+            return new CameraFraming(new WorldPoint(3f, 2f, 5f), LevelFraming.PlaySize);
         }
 
         [Test]
@@ -80,8 +80,8 @@ namespace Game.Domain.Tests
         [Test]
         public void ZoomingInDoublesThePixelsAMetreBuys()
         {
-            var wide = ScreenProjection.PixelsPerMetre(IsoProjection.OrthographicSize, Height);
-            var close = ScreenProjection.PixelsPerMetre(IsoProjection.OrthographicSize * 0.5f, Height);
+            var wide = ScreenProjection.PixelsPerMetre(LevelFraming.PlaySize, Height);
+            var close = ScreenProjection.PixelsPerMetre(LevelFraming.PlaySize * 0.5f, Height);
 
             Assert.That(close, Is.EqualTo(wide * 2f).Within(Tolerance));
         }
@@ -89,8 +89,8 @@ namespace Game.Domain.Tests
         [Test]
         public void AShorterScreenBuysFewerPixelsAMetre()
         {
-            var tall = ScreenProjection.PixelsPerMetre(IsoProjection.OrthographicSize, Height);
-            var half = ScreenProjection.PixelsPerMetre(IsoProjection.OrthographicSize, Height / 2);
+            var tall = ScreenProjection.PixelsPerMetre(LevelFraming.PlaySize, Height);
+            var half = ScreenProjection.PixelsPerMetre(LevelFraming.PlaySize, Height / 2);
 
             Assert.That(half, Is.EqualTo(tall * 0.5f).Within(Tolerance));
         }
@@ -99,8 +99,8 @@ namespace Game.Domain.Tests
         public void TheSweptFramingAgreesWithTheConstantOneTheRigNeverLeaves()
         {
             Assert.That(
-                ScreenProjection.PixelsPerMetre(IsoProjection.OrthographicSize, Height),
-                Is.EqualTo(ScreenFrame.PixelsPerMetre(IsoProjection.OrthographicSize)).Within(Tolerance));
+                ScreenProjection.PixelsPerMetre(LevelFraming.PlaySize, Height),
+                Is.EqualTo(ScreenFrame.PixelsPerMetre(LevelFraming.PlaySize)).Within(Tolerance));
         }
     }
 }

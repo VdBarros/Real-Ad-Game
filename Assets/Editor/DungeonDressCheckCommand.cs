@@ -650,22 +650,20 @@ namespace Game.EditorTooling
 
             var chestGround = chest.size.x * chest.size.z;
             var hoardGround = hoard.size.x * hoard.size.z;
-            var tall = Math.Abs(chest.size.y - hoard.size.y) <= Epsilon;
-            var apart = Math.Min(chestGround, hoardGround) > 0f
-                && Math.Max(chestGround, hoardGround)
-                >= Math.Min(chestGround, hoardGround) * SilhouetteRatio;
+            var taller = hoard.size.y >= chest.size.y * SilhouetteRatio;
+            var standing = chestGround > 0f && hoardGround > 0f;
             var failures = 0;
 
             failures += Assert(
                 report,
-                tall && apart,
-                "the two reward kinds stand the same height and cover different ground, so a scan tells "
-                + "an additive from a multiplier by shape",
+                taller && standing,
+                "the two reward kinds are different physical things, so a scan tells an additive from a "
+                + "multiplier by shape: the gain is a low box on the tile, the gate an arch over it",
                 string.Format(
                     CultureInfo.InvariantCulture,
                     "the chest is {0:0.###} by {1:0.###} on the ground and {2:0.###} tall against the "
-                    + "multiplier prop's {3:0.###} by {4:0.###} by {5:0.###}, a ground ratio of {6:0.##} "
-                    + "against the {7:0.##} asked for",
+                    + "gate arch's {3:0.###} by {4:0.###} by {5:0.###}, a ground ratio of {6:0.##} and a "
+                    + "height ratio of {7:0.##} against the {8:0.##} asked for",
                     chest.size.x,
                     chest.size.z,
                     chest.size.y,
@@ -675,6 +673,7 @@ namespace Game.EditorTooling
                     Math.Min(chestGround, hoardGround) <= 0f
                         ? 0f
                         : Math.Max(chestGround, hoardGround) / Math.Min(chestGround, hoardGround),
+                    chest.size.y <= 0f ? 0f : hoard.size.y / chest.size.y,
                     SilhouetteRatio));
 
             var edge = IsoProjection.TileEdge;
@@ -700,6 +699,7 @@ namespace Game.EditorTooling
         {
             PreviewFilm.Sun();
             var badges = Unbadge(root);
+            Unmark(root);
 
             var multiplier = new Reading[Rounds];
             var additive = new Reading[Rounds];
@@ -740,10 +740,10 @@ namespace Game.EditorTooling
                     "the ship seed raised no pair to photograph");
             }
 
-            var tile = ScreenFrame.TileGroundPixels(IsoProjection.OrthographicSize);
+            var tile = ScreenFrame.TileGroundPixels(LevelFraming.PlaySize);
 
             report.Append("\n  at gameplay zoom ")
-                .Append(IsoProjection.OrthographicSize.ToString("0.#", CultureInfo.InvariantCulture))
+                .Append(LevelFraming.PlaySize.ToString("0.#", CultureInfo.InvariantCulture))
                 .Append(" one tile of ground covers ")
                 .Append(tile.ToString("0", CultureInfo.InvariantCulture))
                 .Append(" of the ")
@@ -798,6 +798,14 @@ namespace Game.EditorTooling
             return failures;
         }
 
+        static void Unmark(GameObject root)
+        {
+            foreach (var target in root.GetComponentsInChildren<NodeTarget>(true))
+            {
+                target.Wear(TargetMark.Idle, 0);
+            }
+        }
+
         static Reading Photograph(
             LevelGraph graph,
             IDictionary<string, Transform> byName,
@@ -814,7 +822,7 @@ namespace Game.EditorTooling
                 return reading;
             }
 
-            var camera = PreviewFilm.Rig(instance.position, ShotDistance, IsoProjection.OrthographicSize);
+            var camera = PreviewFilm.Rig(instance.position, ShotDistance, LevelFraming.PlaySize);
             PreviewFilm.Warm(camera);
 
             var silhouette = Silhouette(instance, camera);

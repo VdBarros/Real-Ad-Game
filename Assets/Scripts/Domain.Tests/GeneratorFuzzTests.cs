@@ -100,6 +100,18 @@ namespace Game.Domain.Tests
             NoGateProductPassesTheCap(PlanSweep(levelNumber));
         }
 
+        [TestCaseSource(nameof(EveryPreset))]
+        public void NoLevelAnyPresetShipsLeavesARouteQuietForLongerThanTheBudget(MazePreset preset)
+        {
+            NoDeadWalkPassesTheBudget(Sweep(preset));
+        }
+
+        [TestCaseSource(nameof(EveryPlanOnTheCurve))]
+        public void NoLevelAnyPlanShipsLeavesARouteQuietForLongerThanTheBudget(int levelNumber)
+        {
+            NoDeadWalkPassesTheBudget(PlanSweep(levelNumber));
+        }
+
         [TestCaseSource(nameof(EveryPlanOnTheCurve))]
         public void TheRejectionRateOfEveryPlanStaysUnderTheBar(int levelNumber)
         {
@@ -522,6 +534,21 @@ namespace Game.Domain.Tests
                 Console.WriteLine("  boosts " + sweep.Pickups());
                 Console.WriteLine("  par " + sweep.Rating());
                 Console.WriteLine("  gates " + sweep.Multipliers());
+                Console.WriteLine("  quiet " + sweep.Silence());
+            }
+        }
+
+        static void NoDeadWalkPassesTheBudget(FuzzSweep sweep)
+        {
+            foreach (var accepted in sweep.Accepted)
+            {
+                Assert.That(
+                    DeadWalk.LongestOf(accepted.Level.Graph),
+                    Is.LessThanOrEqualTo(Pace.DeadWalkBudgetSteps),
+                    "Seed " + accepted.Level.AttemptSeed + " shipped a route walking "
+                        + SweepStatistics.Round(DeadWalk.SecondsOf(accepted.Level.Graph))
+                        + "s with nothing happening, over a budget of "
+                        + SweepStatistics.Round(Pace.DeadWalkBudgetSeconds) + "s.");
             }
         }
 
@@ -692,6 +719,7 @@ namespace Game.Domain.Tests
                 Console.WriteLine(sweep.ToString());
                 Console.WriteLine("  spread P_max/P_min " + sweep.Spread());
                 Console.WriteLine("  gates " + sweep.Multipliers());
+                Console.WriteLine("  quiet " + sweep.Silence());
             }
 
             Console.WriteLine(Mutants() + ", one enemy at a time inflated "

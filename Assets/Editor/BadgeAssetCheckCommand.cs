@@ -27,16 +27,21 @@ namespace Game.EditorTooling
 
             var builder = new WorldBuilder();
 
-            var first = builder.Build(LevelGenerator.Generate(FirstSeed, MazePreset.Ship).Graph);
+            var firstGraph = LevelGenerator.Generate(FirstSeed, MazePreset.Ship).Graph;
+            var first = builder.Build(firstGraph);
             var firstSprites = SpritesOn(first);
             var firstMaterials = MaterialsOn(first);
             ReportBadgeWidths(FirstSeed, first);
+            NoMultiplierGateWearsABadge(FirstSeed, firstGraph, first);
             WorldObjects.Destroy(first);
 
-            var second = builder.Build(LevelGenerator.Generate(SecondSeed, MazePreset.Ship).Graph);
+            var secondGraph = LevelGenerator.Generate(SecondSeed, MazePreset.Ship).Graph;
+            var second = builder.Build(secondGraph);
             var secondSprites = SpritesOn(second);
             var secondMaterials = MaterialsOn(second);
             ReportBadgeWidths(SecondSeed, second);
+            NoMultiplierGateWearsABadge(SecondSeed, secondGraph, second);
+            ReportBadgeShapes(second);
             ReportPlayerGrowth(builder.PlayerBadge);
 
             firstSprites.AddRange(secondSprites);
@@ -110,6 +115,159 @@ namespace Game.EditorTooling
                 narrowest,
                 widest,
                 BadgeMetrics.WidthFor(5)));
+        }
+
+        static void NoMultiplierGateWearsABadge(long seed, LevelGraph graph, GameObject root)
+        {
+            var gates = 0;
+            var wearing = 0;
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                if (node.Type != NodeType.Multiplier)
+                {
+                    continue;
+                }
+
+                gates++;
+                var named = PartNames.Badge(node.Id);
+
+                foreach (var badge in root.GetComponentsInChildren<NumberBadge>(true))
+                {
+                    if (badge.name == named)
+                    {
+                        wearing++;
+                    }
+                }
+
+                var prop = Named(root, PartNames.Node(node.Id));
+
+                if (prop == null)
+                {
+                    Debug.LogError(
+                        "FAIL: seed " + seed + " raised no arch over multiplier node " + node.Id + ".");
+                    continue;
+                }
+
+                if (prop.GetComponent<GateProp>() == null)
+                {
+                    Debug.LogError(
+                        "FAIL: seed " + seed + " node " + node.Id
+                        + " is not a gate arch, so a multiplier is not a world object.");
+                }
+
+                foreach (var badge in prop.GetComponentsInChildren<NumberBadge>(true))
+                {
+                    Debug.LogError(
+                        "FAIL: seed " + seed + " hangs " + badge.name + " on multiplier node "
+                        + node.Id + ", which is meant to carry no badge of any kind.");
+                }
+
+                foreach (var plate in prop.GetComponentsInChildren<SpriteRenderer>(true))
+                {
+                    Debug.LogError(
+                        "FAIL: seed " + seed + " hangs the sprite " + plate.name
+                        + " on multiplier node " + node.Id + ".");
+                }
+            }
+
+            if (gates == 0)
+            {
+                Debug.LogError(
+                    "FAIL: seed " + seed + " placed no multiplier at all, so it proves nothing "
+                    + "about a gate wearing no badge.");
+            }
+
+            if (wearing > 0)
+            {
+                Debug.LogError(
+                    "FAIL: seed " + seed + " built " + wearing + " badges named for a multiplier node.");
+            }
+
+            Debug.Log(
+                "seed " + seed + ": " + gates + " multiplier gates, each an arch, none of them badged");
+        }
+
+        static void ReportBadgeShapes(GameObject root)
+        {
+            var byStyle = new Dictionary<BadgeStyle, string>();
+            var sprites = new Dictionary<BadgeShape, Sprite>();
+
+            foreach (var badge in root.GetComponentsInChildren<NumberBadge>(true))
+            {
+                var plate = badge.GetComponent<SpriteRenderer>();
+                var shape = BadgeStyles.ShapeOf(badge.Style);
+
+                if (plate == null)
+                {
+                    Debug.LogError("FAIL: badge " + badge.name + " draws no plate behind its number.");
+                    continue;
+                }
+
+                byStyle[badge.Style] = shape + " in #" + ColorUtility.ToHtmlStringRGB(BadgePalette.Of(badge.Style));
+
+                Sprite cut;
+                if (sprites.TryGetValue(shape, out cut))
+                {
+                    if (cut != plate.sprite)
+                    {
+                        Debug.LogError(
+                            "FAIL: two " + shape + " badges were cut from different sprites.");
+                    }
+                }
+                else
+                {
+                    sprites[shape] = plate.sprite;
+                }
+            }
+
+            foreach (var style in byStyle)
+            {
+                foreach (var other in byStyle)
+                {
+                    if (!SameFamily(style.Key, other.Key) && style.Value == other.Value)
+                    {
+                        Debug.LogError(
+                            "FAIL: a " + style.Key + " badge and a " + other.Key
+                            + " badge are both " + style.Value
+                            + ", so only their numbers tell the two meanings apart.");
+                    }
+                }
+            }
+
+            var report = new StringBuilder("badge meanings, one look each:");
+
+            foreach (var style in byStyle)
+            {
+                report.Append("\n  ").Append(style.Key).Append(": ").Append(style.Value);
+            }
+
+            report.Append("\n  Multiplier: no badge at all, a lit arch on the ground");
+            Debug.Log(report.ToString());
+        }
+
+        static bool SameFamily(BadgeStyle left, BadgeStyle right)
+        {
+            if (left == right)
+            {
+                return true;
+            }
+
+            return (left == BadgeStyle.Enemy || left == BadgeStyle.Boss)
+                && (right == BadgeStyle.Enemy || right == BadgeStyle.Boss);
+        }
+
+        static Transform Named(GameObject root, string name)
+        {
+            foreach (var part in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (part.name == name)
+                {
+                    return part;
+                }
+            }
+
+            return null;
         }
 
         static void ReportPlayerGrowth(PowerBadge power)

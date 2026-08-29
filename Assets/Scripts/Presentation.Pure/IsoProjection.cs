@@ -17,8 +17,6 @@ namespace Game.Presentation.Pure
 
         public const float CameraRoll = 0f;
 
-        public const float OrthographicSize = 9.5f;
-
         public const float CameraBack = 20f;
 
         public const float OcclusionBound = 0.5f;

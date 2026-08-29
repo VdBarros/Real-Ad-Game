@@ -4,21 +4,29 @@ namespace Game.Presentation.Pure
 {
     public readonly struct ZoomBeat : IEquatable<ZoomBeat>
     {
+        public const float Punch = 1.18f;
+
+        public const float InSeconds = 0.15f;
+
+        public const float OutSeconds = 0.4f;
+
         public const float FloorSeconds = 0.35f;
 
         public const float CapSeconds = 1.2f;
 
-        readonly CameraFraming subject;
-        readonly float elapsed;
-        readonly bool live;
-        readonly bool released;
+        const float Loose = -1f;
 
-        ZoomBeat(CameraFraming subject, float elapsed, bool live, bool released)
+        readonly WorldPoint anchor;
+        readonly float elapsed;
+        readonly float releasedAt;
+        readonly bool live;
+
+        ZoomBeat(WorldPoint anchor, float elapsed, float releasedAt, bool live)
         {
-            this.subject = subject;
+            this.anchor = anchor;
             this.elapsed = elapsed;
+            this.releasedAt = releasedAt;
             this.live = live;
-            this.released = released;
         }
 
         public static ZoomBeat None
@@ -26,37 +34,81 @@ namespace Game.Presentation.Pure
             get { return default(ZoomBeat); }
         }
 
-        public static ZoomBeat On(CameraFraming subject)
+        public static ZoomBeat On(WorldPoint anchor)
         {
-            return new ZoomBeat(subject, 0f, true, false);
+            return new ZoomBeat(anchor, 0f, Loose, true);
         }
 
-        public CameraFraming Framing
+        public WorldPoint Anchor
         {
-            get { return subject; }
+            get { return anchor; }
         }
 
-        public bool IsSettled
+        public float ReturnsAt
+        {
+            get
+            {
+                var held = releasedAt < 0f ? CapSeconds : Math.Max(FloorSeconds, releasedAt);
+                return Math.Min(CapSeconds, held);
+            }
+        }
+
+        public float Amount
         {
             get
             {
                 if (!live)
                 {
-                    return true;
+                    return 0f;
                 }
 
-                return elapsed >= CapSeconds || (released && elapsed >= FloorSeconds);
+                if (elapsed < InSeconds)
+                {
+                    return EasedOut(elapsed / InSeconds);
+                }
+
+                var returns = ReturnsAt;
+                if (elapsed < returns)
+                {
+                    return 1f;
+                }
+
+                var back = (elapsed - returns) / OutSeconds;
+
+                return back >= 1f ? 0f : 1f - EasedOut(back);
             }
+        }
+
+        public bool IsGripping
+        {
+            get { return live && elapsed < ReturnsAt; }
+        }
+
+        public bool IsSettled
+        {
+            get { return !live || elapsed >= ReturnsAt + OutSeconds; }
+        }
+
+        public CameraFraming Over(CameraFraming basis)
+        {
+            if (!live)
+            {
+                return basis;
+            }
+
+            var punched = new CameraFraming(anchor, basis.OrthographicSize / Punch);
+
+            return CameraFraming.Between(basis, punched, Amount);
         }
 
         public ZoomBeat Released()
         {
-            if (released || !live)
+            if (!live || releasedAt >= 0f)
             {
                 return this;
             }
 
-            return new ZoomBeat(subject, elapsed, true, true);
+            return new ZoomBeat(anchor, elapsed, elapsed, true);
         }
 
         public ZoomBeat Advanced(float deltaSeconds)
@@ -72,15 +124,15 @@ namespace Game.Presentation.Pure
                 return this;
             }
 
-            return new ZoomBeat(subject, elapsed + deltaSeconds, true, released);
+            return new ZoomBeat(anchor, elapsed + deltaSeconds, releasedAt, true);
         }
 
         public bool Equals(ZoomBeat other)
         {
-            return subject.Equals(other.subject)
+            return anchor.Equals(other.anchor)
                 && elapsed.Equals(other.elapsed)
-                && live == other.live
-                && released == other.released;
+                && releasedAt.Equals(other.releasedAt)
+                && live == other.live;
         }
 
         public override bool Equals(object obj)
@@ -92,10 +144,10 @@ namespace Game.Presentation.Pure
         {
             unchecked
             {
-                var hash = subject.GetHashCode();
+                var hash = anchor.GetHashCode();
                 hash = (hash * 397) ^ elapsed.GetHashCode();
+                hash = (hash * 397) ^ releasedAt.GetHashCode();
                 hash = (hash * 397) ^ live.GetHashCode();
-                hash = (hash * 397) ^ released.GetHashCode();
                 return hash;
             }
         }
@@ -107,7 +159,33 @@ namespace Game.Presentation.Pure
                 return "no beat";
             }
 
-            return string.Concat(IsSettled ? "cut back from " : "held on ", subject.ToString());
+            if (IsSettled)
+            {
+                return "eased back off " + anchor;
+            }
+
+            return string.Concat(
+                IsGripping ? "punching in on " : "easing back off ",
+                anchor.ToString(),
+                " at ",
+                Amount.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        static float EasedOut(float t)
+        {
+            if (t <= 0f)
+            {
+                return 0f;
+            }
+
+            if (t >= 1f)
+            {
+                return 1f;
+            }
+
+            var left = 1f - t;
+
+            return 1f - left * left;
         }
     }
 }

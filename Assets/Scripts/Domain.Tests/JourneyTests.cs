@@ -454,5 +454,205 @@ namespace Game.Domain.Tests
         {
             Assert.That(() => Journey.Toward(null, 0), Throws.ArgumentNullException);
         }
+
+        [Test]
+        public void AJourneyNobodyHasTappedThroughCarriesNoDiversion()
+        {
+            Assert.That(Journey.Nowhere.Diversion, Is.EqualTo(TapAim.Nothing));
+            Assert.That(Journey.Nowhere.Onward(), Is.SameAs(Journey.Nowhere));
+
+            var setOut = Journey.Toward(RunFixture.Begin(2), RunFixture.Multiplier);
+
+            Assert.That(setOut.Diversion, Is.EqualTo(TapAim.Nothing));
+            Assert.That(Ran(setOut, null).Onward(), Is.SameAs(Journey.Nowhere));
+        }
+
+        [Test]
+        public void ATapMidWalkBreaksOffAndSetsOutForWhatWasTappedInstead()
+        {
+            var journey = Walked(
+                Journey.Toward(RunFixture.Begin(2), RunFixture.AdditiveBeyondTheMultiplier), 5);
+
+            Assert.That(journey.IsWaiting, Is.False);
+
+            journey = journey.DivertedTo(RunFixture.Additive);
+
+            Assert.That(journey.Diversion, Is.EqualTo(RunFixture.Additive));
+            Assert.That(journey.Walk.IsRetreating, Is.True);
+
+            var settled = Ran(journey, null);
+
+            Assert.That(settled.IsOver, Is.True);
+            Assert.That(settled.State.PositionNodeId, Is.EqualTo(RunFixture.Start));
+            Assert.That(settled.State.ConsumedNodes.Count, Is.EqualTo(0));
+
+            var onward = settled.Onward();
+
+            Assert.That(onward.IsOver, Is.False);
+            Assert.That(onward.State, Is.SameAs(settled.State));
+            Assert.That(
+                onward.Walk.Route.Nodes, Is.EqualTo(new[] { RunFixture.Start, RunFixture.Additive }));
+            Assert.That(onward.Diversion, Is.EqualTo(TapAim.Nothing));
+        }
+
+        [Test]
+        public void ATapMidFightBreaksOffHoldingThePowerItHadAndLeavesTheEnemyStanding()
+        {
+            var opening = RunFixture.Begin(RunFixture.DoorstepEnemyValue - 1);
+            var journey = Reached(Journey.Toward(opening, RunFixture.DoorstepEnemy));
+
+            Assert.That(journey.HoldsForAFight, Is.True);
+            Assert.That(journey.Fight.Outcome, Is.EqualTo(ActionOutcome.Loss));
+
+            var settled = Ran(journey.DivertedTo(RunFixture.Multiplier), null);
+
+            Assert.That(settled.IsOver, Is.True);
+            Assert.That(settled.State.Power, Is.EqualTo(opening.Power));
+            Assert.That(settled.State.PositionNodeId, Is.EqualTo(RunFixture.Start));
+            Assert.That(settled.State.IsConsumed(RunFixture.DoorstepEnemy), Is.False);
+            Assert.That(
+                settled.State.Level.Decisions.Node(RunFixture.DoorstepEnemy).Value,
+                Is.EqualTo(RunFixture.DoorstepEnemyValue));
+            Assert.That(
+                TapAim.Aimable(settled.State),
+                Has.Member(RunFixture.DoorstepEnemy),
+                "An enemy broken off from is still there to be tapped on again.");
+
+            var onward = settled.Onward();
+
+            Assert.That(
+                onward.Walk.Route.Nodes, Is.EqualTo(new[] { RunFixture.Start, RunFixture.Multiplier }));
+        }
+
+        [Test]
+        public void ATapMidFightOnTheWayToSomewhereElseKeepsAFightAlreadyWon()
+        {
+            var journey = Reached(Journey.Toward(RunFixture.Begin(3), RunFixture.DoorstepEnemy));
+
+            Assert.That(journey.Fight.Outcome, Is.EqualTo(ActionOutcome.Win));
+
+            var settled = Ran(journey.DivertedTo(RunFixture.Multiplier), null);
+
+            Assert.That(settled.State.Power, Is.EqualTo(3 + RunFixture.DoorstepEnemyValue));
+            Assert.That(settled.State.PositionNodeId, Is.EqualTo(RunFixture.DoorstepEnemy));
+            Assert.That(settled.State.IsConsumed(RunFixture.DoorstepEnemy), Is.True);
+            Assert.That(
+                settled.Walk.Position,
+                Is.EqualTo(IsoProjection.Of(new TilePosition(0, 5, 2))),
+                "Breaking off a fight already won leaves the figure on the tile it won on.");
+            Assert.That(
+                settled.Onward().Walk.Route.Nodes,
+                Is.EqualTo(new[] { RunFixture.DoorstepEnemy, RunFixture.Start, RunFixture.Multiplier }));
+        }
+
+        [Test]
+        public void ADiversionOutlivesTheWalkBackAndLettingGoOfTheScreenClearsIt()
+        {
+            var journey = Walked(
+                Journey.Toward(RunFixture.Begin(2), RunFixture.AdditiveBeyondTheMultiplier), 5)
+                .DivertedTo(RunFixture.Additive);
+
+            Assert.That(Walked(journey, 1).Diversion, Is.EqualTo(RunFixture.Additive));
+            Assert.That(journey.Cancelled().Diversion, Is.EqualTo(TapAim.Nothing));
+            Assert.That(
+                journey.DivertedTo(RunFixture.Multiplier).Diversion, Is.EqualTo(RunFixture.Multiplier));
+        }
+
+        [Test]
+        public void TapAfterTapNeverStrandsTheWalkerBetweenTilesOrOffTheNodeTheRunStandsOn()
+        {
+            var targets = new[]
+            {
+                RunFixture.Boss,
+                RunFixture.AdditiveBeyondTheMultiplier,
+                RunFixture.DoorstepEnemy,
+                RunFixture.Additive,
+                RunFixture.Multiplier,
+                RunFixture.Start
+            };
+
+            var run = RunFixture.Begin(2);
+            var journey = Journey.Nowhere;
+            var dice = 1;
+            var waiting = 0;
+            var diversions = 0;
+            var midFight = 0;
+            var settlings = 0;
+
+            for (var frame = 0; frame < 40000; frame++)
+            {
+                if (waiting-- <= 0)
+                {
+                    dice = dice * 1103515245 + 12345;
+                    waiting = 1 + ((dice >> 8) & 63);
+                    var target = targets[((dice >> 20) & 1023) % targets.Length];
+
+                    if (journey.IsOver)
+                    {
+                        journey = Journey.Toward(run, target);
+                    }
+                    else
+                    {
+                        if (journey.HoldsForAFight)
+                        {
+                            midFight++;
+                        }
+
+                        journey = journey.DivertedTo(target);
+                        diversions++;
+                    }
+                }
+
+                if (journey.IsOver)
+                {
+                    continue;
+                }
+
+                journey = Stepped(journey);
+
+                if (!journey.IsOver)
+                {
+                    continue;
+                }
+
+                settlings++;
+                run = journey.State;
+                AssertItStandsOnTheNodeTheRunStandsOn(journey, run);
+
+                journey = journey.Onward();
+
+                if (!journey.IsOver)
+                {
+                    run = journey.State;
+                }
+            }
+
+            Assert.That(diversions, Is.GreaterThan(200));
+            Assert.That(midFight, Is.GreaterThan(5), "The sweep never broke off a fight.");
+            Assert.That(settlings, Is.GreaterThan(200));
+        }
+
+        static void AssertItStandsOnTheNodeTheRunStandsOn(Journey journey, RunState run)
+        {
+            var standing = IsoProjection.Of(run.Level.Decisions.Node(run.PositionNodeId).Position);
+
+            Assert.That(
+                journey.Walk.Position,
+                Is.EqualTo(standing),
+                "A walk that stopped left the figure off the node " + run.PositionNodeId
+                + " the run stands on.");
+        }
+
+        static Journey Stepped(Journey journey)
+        {
+            journey = journey.Advanced(Frame);
+
+            if (journey.IsOver || !journey.IsWaiting || journey.HoldsForAFight)
+            {
+                return journey;
+            }
+
+            return journey.Resumed();
+        }
     }
 }
