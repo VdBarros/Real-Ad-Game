@@ -29,6 +29,44 @@ namespace Game.Domain.Tests
             return journey;
         }
 
+        static Journey UntilAFight(Journey journey)
+        {
+            for (var frame = 0; frame < 4000 && !journey.IsOver && !journey.HoldsForAFight; frame++)
+            {
+                journey = journey.Advanced(Frame);
+
+                if (journey.IsWaiting && !journey.HoldsForAFight)
+                {
+                    journey = journey.Resumed();
+                }
+            }
+
+            return journey;
+        }
+
+        static Journey Landed(Journey journey, List<int> landings)
+        {
+            for (var frame = 0; frame < 4000 && !journey.IsOver; frame++)
+            {
+                journey = journey.Advanced(Frame);
+
+                if (!journey.IsWaiting)
+                {
+                    continue;
+                }
+
+                var arrived = journey.Walk.ArrivedNodeId;
+                if (landings.Count == 0 || landings[landings.Count - 1] != arrived)
+                {
+                    landings.Add(arrived);
+                }
+
+                journey = journey.Resumed();
+            }
+
+            return journey;
+        }
+
         static Journey Ran(Journey journey, List<int> arrivals)
         {
             for (var frame = 0; frame < 2000 && !journey.IsOver; frame++)
@@ -54,9 +92,60 @@ namespace Game.Domain.Tests
         [Test]
         public void ATapThatResolvesToNothingStartsNoJourney()
         {
-            Assert.That(Journey.Toward(RunFixture.Begin(2), RunFixture.Boss), Is.SameAs(Journey.Nowhere));
+            var finished = Ran(Journey.Toward(RunFixture.Begin(40), RunFixture.Boss), null).State;
+
+            Assert.That(finished.IsLevelComplete, Is.True);
+            Assert.That(Journey.Toward(finished, RunFixture.Multiplier), Is.SameAs(Journey.Nowhere));
             Assert.That(Journey.Nowhere.IsOver, Is.True);
             Assert.That(Journey.Nowhere.Arrival, Is.Null);
+        }
+
+        [Test]
+        public void ATapBehindAnUnbeatenEnemyWalksTheRouteAndFightsOnContact()
+        {
+            var opening = RunFixture.Begin(2);
+            var setOut = Journey.Toward(opening, RunFixture.Boss);
+
+            Assert.That(opening.IsReachable(RunFixture.Boss), Is.False);
+            Assert.That(setOut, Is.Not.SameAs(Journey.Nowhere));
+            Assert.That(
+                setOut.Walk.Route.Nodes,
+                Is.EqualTo(new[]
+                {
+                    RunFixture.Start, RunFixture.Additive, RunFixture.GateEnemy, RunFixture.Boss
+                }),
+                "The tap has to lay a route straight through the enemy standing in the way.");
+
+            var fought = UntilAFight(setOut);
+
+            Assert.That(fought.Walk.ArrivedNodeId, Is.EqualTo(RunFixture.GateEnemy));
+            Assert.That(fought.HoldsForAFight, Is.True, "Contact with the enemy has to interrupt the walk.");
+            Assert.That(fought.Fight.Outcome, Is.EqualTo(ActionOutcome.Win));
+        }
+
+        [Test]
+        public void WinningTheFightOnTheWayCarriesTheWalkOnToWhatWasTappedFor()
+        {
+            var arrivals = new List<int>();
+            var journey = Landed(Journey.Toward(RunFixture.Begin(40), RunFixture.Boss), arrivals);
+
+            Assert.That(
+                arrivals,
+                Is.EqualTo(new[] { RunFixture.Additive, RunFixture.GateEnemy, RunFixture.Boss }));
+            Assert.That(journey.State.PositionNodeId, Is.EqualTo(RunFixture.Boss));
+            Assert.That(journey.State.IsLevelComplete, Is.True);
+        }
+
+        [Test]
+        public void LosingTheFightOnTheWayBouncesBackAndNeverReachesTheFarSide()
+        {
+            var opening = RunFixture.Begin(1);
+            var journey = Ran(Journey.Toward(opening, RunFixture.Boss), null);
+
+            Assert.That(journey.State.PositionNodeId, Is.EqualTo(RunFixture.Additive));
+            Assert.That(journey.State.IsConsumed(RunFixture.GateEnemy), Is.False);
+            Assert.That(journey.State.IsConsumed(RunFixture.Boss), Is.False);
+            Assert.That(journey.Walk.Position, Is.EqualTo(IsoProjection.Of(new TilePosition(0, 3, 0))));
         }
 
         [Test]

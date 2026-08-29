@@ -70,6 +70,7 @@ namespace Game.EditorTooling
 
             var beats = 0;
             var hops = 0;
+            var behindAnEnemy = 0;
             var shotTrail = false;
 
             for (var move = 0; move < Moves && !walker.Run.IsLevelComplete; move++)
@@ -81,11 +82,22 @@ namespace Game.EditorTooling
                 }
 
                 var before = walker.Run;
-                var predicted = ActionResolver.Resolve(before, target);
+                var predicted = ActionResolver.Along(before, NavigationMap.Of(before).RouteTo(target));
+                var halted = Halted(predicted);
                 var expected = new List<int>();
                 for (var step = 1; step < predicted.Route.Count; step++)
                 {
                     expected.Add(predicted.Route[step]);
+
+                    if (predicted.Route[step] == halted)
+                    {
+                        break;
+                    }
+                }
+
+                if (!before.IsReachable(target))
+                {
+                    behindAnEnemy++;
                 }
 
                 arrivals.Clear();
@@ -138,11 +150,19 @@ namespace Game.EditorTooling
                 .Append(Moves.ToString(CultureInfo.InvariantCulture))
                 .Append(" moves, ")
                 .Append(beats.ToString(CultureInfo.InvariantCulture))
-                .Append(" zoom beats held and released");
+                .Append(" zoom beats held and released, ")
+                .Append(behindAnEnemy.ToString(CultureInfo.InvariantCulture))
+                .Append(" of the moves aimed past an unbeaten enemy");
 
             if (hops == 0)
             {
                 Debug.LogError("The check needs at least one walk, and made none.");
+            }
+
+            if (behindAnEnemy == 0)
+            {
+                Debug.LogWarning(
+                    "The greedy line never chose a target behind an unbeaten enemy on this seed.");
             }
 
             if (!shotTrail)
@@ -337,16 +357,35 @@ namespace Game.EditorTooling
             }
         }
 
+        static int Halted(ActionResult predicted)
+        {
+            if (predicted.Outcome != ActionOutcome.Tie && predicted.Outcome != ActionOutcome.Loss)
+            {
+                return TapAim.Nothing;
+            }
+
+            for (var step = 0; step < predicted.Route.Count - 1; step++)
+            {
+                if (predicted.Route[step] == predicted.State.PositionNodeId)
+                {
+                    return predicted.Route[step + 1];
+                }
+            }
+
+            return TapAim.Nothing;
+        }
+
         static int Furthest(RunState state)
         {
+            var navigation = NavigationMap.Of(state);
             var furthest = TapAim.Nothing;
             var doomed = TapAim.Nothing;
             var steps = 0;
             var doomedSteps = 0;
 
-            foreach (var nodeId in TapAim.Aimable(state))
+            foreach (var nodeId in TapAim.Aimable(navigation))
             {
-                var resolved = ActionResolver.Resolve(state, nodeId);
+                var resolved = ActionResolver.Along(state, navigation.RouteTo(nodeId));
                 if (resolved.Outcome == ActionOutcome.Rejected)
                 {
                     continue;
