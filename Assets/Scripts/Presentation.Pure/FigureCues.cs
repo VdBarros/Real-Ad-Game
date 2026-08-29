@@ -40,14 +40,25 @@ namespace Game.Presentation.Pure
             switch (fight.Outcome)
             {
                 case ActionOutcome.Win:
-                    return FigureCue.Within(FigureAct.Strike, fight.Seconds);
+                    return Trading(fight);
                 case ActionOutcome.Tie:
-                    return FigureCue.Within(FigureAct.Clash, fight.Seconds);
+                    return FigureCue.Within(FigureAct.Clash, fight.Beat);
                 case ActionOutcome.Loss:
-                    return FigureCue.Within(FigureAct.Recoil, fight.Seconds);
+                    return FigureCue.Within(FigureAct.Recoil, fight.Beat);
                 default:
                     return FigureCue.Still;
             }
+        }
+
+        static FigureCue Trading(Fight fight)
+        {
+            if (!fight.IsTrading)
+            {
+                return FigureCue.Still;
+            }
+
+            return FigureCue.Within(
+                fight.ThePlayerThrewIt ? FigureAct.Strike : FigureAct.Recoil, fight.Beat);
         }
 
         public static FigureCue Answering(Fight fight)
