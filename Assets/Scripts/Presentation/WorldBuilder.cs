@@ -32,6 +32,8 @@ namespace Game.Presentation
 
         public TargetBoard Targets { get; private set; }
 
+        public CrowdBoard Crowd { get; private set; }
+
         public TrailBoard Trail { get; private set; }
 
         public FightBoard Fights { get; private set; }
@@ -65,6 +67,8 @@ namespace Game.Presentation
             Floor.Dress(materials.Of(PartStyle.Floor), materials.Of(PartStyle.Cleared));
             Targets = root.AddComponent<TargetBoard>();
             Targets.Begin(graph.Decisions.Nodes.Count);
+            Crowd = root.AddComponent<CrowdBoard>();
+            Crowd.Begin();
             Fights = root.AddComponent<FightBoard>();
             Fights.Dress(materials.Of(PartStyle.Spark));
             Pickups = root.AddComponent<PickupBoard>();
@@ -149,6 +153,7 @@ namespace Game.Presentation
                     var target = badge.gameObject.AddComponent<NodeTarget>();
                     target.Begin(part);
                     Targets.Adopt(target);
+                    Crowd.Adopt(badge, part);
 
                     if (part.Style == BadgeStyle.Player)
                     {
@@ -185,6 +190,7 @@ namespace Game.Presentation
             Pickups.Begin(graph.Decisions.Nodes.Count, pickups, opening);
             Floor.Begin(opening);
             Targets.Show(opening, TargetPreview.None);
+            Crowd.Settle();
 
             if (playerNumber != null)
             {

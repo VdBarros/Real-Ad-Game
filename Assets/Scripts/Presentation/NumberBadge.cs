@@ -19,6 +19,18 @@ namespace Game.Presentation
 
         BadgeSize size;
 
+        Color washed;
+
+        float crowd = 1f;
+
+        float topology = 1f;
+
+        Vector3 home;
+
+        Vector3 perched;
+
+        float lift;
+
         public BadgeStyle Style { get; private set; }
 
         public int Value { get; private set; }
@@ -53,7 +65,7 @@ namespace Game.Presentation
             background.sprite = assets.Of(part.Shape);
             background.sharedMaterial = assets.Material;
             background.drawMode = SpriteDrawMode.Sliced;
-            background.color = BadgePalette.Of(part.Style);
+            washed = BadgePalette.Of(part.Style);
 
             var labelObject = new GameObject(LabelName, typeof(RectTransform));
             labelObject.transform.SetParent(transform, worldPositionStays: false);
@@ -66,7 +78,10 @@ namespace Game.Presentation
             label.alignment = TextAlignmentOptions.Center;
             label.textWrappingMode = TextWrappingModes.NoWrap;
             label.overflowMode = TextOverflowModes.Overflow;
-            label.color = BadgePalette.Text;
+
+            home = transform.localPosition;
+            perched = home;
+            Repaint();
 
             Fit(part.Cells);
             Show(part.Value);
@@ -74,7 +89,27 @@ namespace Game.Presentation
 
         public Color Colour
         {
-            get { return background.color; }
+            get { return background == null ? washed : background.color; }
+        }
+
+        public float Opacity
+        {
+            get { return crowd; }
+        }
+
+        public float Lift
+        {
+            get { return lift; }
+        }
+
+        public Vector3 Home
+        {
+            get { return home; }
+        }
+
+        public int Order
+        {
+            get { return background == null ? 0 : background.sortingOrder; }
         }
 
         public Color LabelColour
@@ -84,8 +119,56 @@ namespace Game.Presentation
 
         internal void Wash(Color colour, float opacity)
         {
-            background.color = new Color(colour.r, colour.g, colour.b, opacity);
-            label.color = new Color(BadgePalette.Text.r, BadgePalette.Text.g, BadgePalette.Text.b, opacity);
+            washed = colour;
+            topology = opacity;
+            Repaint();
+        }
+
+        internal void Fade(float opacity)
+        {
+            crowd = opacity;
+            Repaint();
+        }
+
+        internal void Reseat()
+        {
+            var here = transform.localPosition;
+            if (here != perched)
+            {
+                home = here;
+            }
+        }
+
+        internal void Raise(float metres)
+        {
+            var up = IsoProjection.CameraUp;
+
+            lift = metres;
+            perched = new Vector3(
+                home.x + up.X * metres, home.y + up.Y * metres, home.z + up.Z * metres);
+            transform.localPosition = perched;
+        }
+
+        internal void Draw(int order)
+        {
+            background.sortingOrder = order;
+
+            var glyphs = label.GetComponent<Renderer>();
+            if (glyphs != null)
+            {
+                glyphs.sortingOrder = order + 1;
+            }
+        }
+
+        void Repaint()
+        {
+            var plate = washed;
+            plate.a = topology * crowd;
+            background.color = plate;
+
+            var glyphs = BadgePalette.Text;
+            glyphs.a = topology * crowd;
+            label.color = glyphs;
         }
 
         internal void Fit(float cells)
