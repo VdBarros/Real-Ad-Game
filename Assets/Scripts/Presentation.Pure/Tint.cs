@@ -18,6 +18,98 @@ namespace Game.Presentation.Pure
 
         public float Blue { get; }
 
+        public float Luminance
+        {
+            get
+            {
+                return (float)(0.2126 * Linear(Red) + 0.7152 * Linear(Green) + 0.0722 * Linear(Blue));
+            }
+        }
+
+        public float Chroma
+        {
+            get { return Highest - Lowest; }
+        }
+
+        public float Hue
+        {
+            get
+            {
+                var span = Chroma;
+
+                if (span <= 0f)
+                {
+                    return 0f;
+                }
+
+                float sixth;
+
+                if (Highest == Red)
+                {
+                    sixth = (Green - Blue) / span;
+                }
+                else if (Highest == Green)
+                {
+                    sixth = (Blue - Red) / span + 2f;
+                }
+                else
+                {
+                    sixth = (Red - Green) / span + 4f;
+                }
+
+                var degrees = sixth * 60f;
+
+                return degrees < 0f ? degrees + 360f : degrees;
+            }
+        }
+
+        public static float Contrast(Tint one, Tint other)
+        {
+            var here = one.Luminance;
+            var there = other.Luminance;
+            var high = here > there ? here : there;
+            var low = here > there ? there : here;
+
+            return (high + 0.05f) / (low + 0.05f);
+        }
+
+        public static float HueApart(Tint one, Tint other)
+        {
+            var apart = one.Hue - other.Hue;
+
+            if (apart < 0f)
+            {
+                apart = -apart;
+            }
+
+            return apart > 180f ? 360f - apart : apart;
+        }
+
+        float Highest
+        {
+            get
+            {
+                var high = Red > Green ? Red : Green;
+
+                return high > Blue ? high : Blue;
+            }
+        }
+
+        float Lowest
+        {
+            get
+            {
+                var low = Red < Green ? Red : Green;
+
+                return low < Blue ? low : Blue;
+            }
+        }
+
+        static double Linear(float channel)
+        {
+            return channel <= 0.04045f ? channel / 12.92 : Math.Pow((channel + 0.055) / 1.055, 2.4);
+        }
+
         public static Tint Lerp(Tint from, Tint to, float amount)
         {
             return new Tint(
