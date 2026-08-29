@@ -77,6 +77,16 @@ namespace Game.Domain
             get { return regionIds; }
         }
 
+        public TileGrid Tiles
+        {
+            get { return source.Tiles; }
+        }
+
+        public TilePosition PositionOf(int nodeId)
+        {
+            return source.Decisions.Node(nodeId).Position;
+        }
+
         public NodeType TypeOf(int nodeId)
         {
             return types[nodeId];

@@ -177,6 +177,30 @@ namespace Game.Domain.Tests
                 + " attempts turned away for passing it";
         }
 
+        public string Silence()
+        {
+            var walks = new List<double>();
+            var longest = 0.0;
+
+            foreach (var level in accepted)
+            {
+                var steps = (double)DeadWalk.LongestOf(level.Level.Graph);
+                walks.Add(steps);
+                longest = Math.Max(longest, steps);
+            }
+
+            walks.Sort();
+            return "longest dead walk p10 " + SweepStatistics.Round(SweepStatistics.Percentile(walks, 0.1))
+                + " p50 " + SweepStatistics.Round(SweepStatistics.Percentile(walks, 0.5))
+                + " p90 " + SweepStatistics.Round(SweepStatistics.Percentile(walks, 0.9))
+                + " worst " + SweepStatistics.Round(longest) + " steps ("
+                + SweepStatistics.Round(Pace.SecondsOf((int)longest)) + "s), budgeted at "
+                + Pace.DeadWalkBudgetSteps + " steps ("
+                + SweepStatistics.Round(Pace.DeadWalkBudgetSeconds) + "s), "
+                + CountOf(ContentRejection.DeadWalkBeyondBudget)
+                + " attempts turned away for passing it";
+        }
+
         public string Spread()
         {
             var everywhere = SpreadsEverywhere();
