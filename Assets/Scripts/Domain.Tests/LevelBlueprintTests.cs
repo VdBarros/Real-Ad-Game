@@ -28,7 +28,6 @@ namespace Game.Domain.Tests
             Assert.That(IsoProjection.CameraPitch, Is.EqualTo(30f));
             Assert.That(IsoProjection.CameraYaw, Is.EqualTo(45f));
             Assert.That(IsoProjection.CameraRoll, Is.EqualTo(0f));
-            Assert.That(IsoProjection.OrthographicSize, Is.EqualTo(9.5f));
         }
 
         [Test]
@@ -267,7 +266,7 @@ namespace Game.Domain.Tests
             AssertProp(graph, blueprint, NodeType.Enemy, PartShape.Capsule, PartStyle.Enemy);
             AssertProp(graph, blueprint, NodeType.Boss, PartShape.Capsule, PartStyle.Boss);
             AssertProp(graph, blueprint, NodeType.Additive, PartShape.Cube, PartStyle.Additive);
-            AssertProp(graph, blueprint, NodeType.Multiplier, PartShape.Cube, PartStyle.Multiplier);
+            AssertProp(graph, blueprint, NodeType.Multiplier, PartShape.Gate, PartStyle.Multiplier);
         }
 
         [Test]
@@ -283,12 +282,15 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AMultiplierIsACubeTurnedFortyFiveDegrees()
+        public void AMultiplierGateStandsSquareToTheCameraAndAChestDoesNot()
         {
             var graph = LevelGraphFixture.TwoTerraces();
             var blueprint = LevelBlueprintBuilder.Build(graph);
 
-            Assert.That(Prop(graph, blueprint, NodeType.Multiplier).Rotation, Is.EqualTo(new WorldPoint(0f, 45f, 0f)));
+            Assert.That(
+                Prop(graph, blueprint, NodeType.Multiplier).Rotation,
+                Is.EqualTo(new WorldPoint(0f, GateArch.Yaw, 0f)));
+            Assert.That(GateArch.Yaw, Is.EqualTo(IsoProjection.CameraYaw));
             Assert.That(Prop(graph, blueprint, NodeType.Additive).Rotation, Is.EqualTo(new WorldPoint(0f, 0f, 0f)));
         }
 

@@ -8,7 +8,9 @@ namespace Game.Presentation.Pure
 
         public const int GutterPixels = 2;
 
-        public const int TextureWidth = CellPixels * 2 + GutterPixels;
+        public const int Cells = 3;
+
+        public const int TextureWidth = CellPixels * Cells + GutterPixels * (Cells - 1);
 
         public const int TextureHeight = CellPixels;
 
@@ -18,6 +20,10 @@ namespace Game.Presentation.Pure
 
         public const float PillRadius = 31f;
 
+        public const float TagChamfer = 28f;
+
+        static readonly float DiagonalFall = (float)(1.0 / Math.Sqrt(2.0));
+
         public static int OriginX(BadgeShape shape)
         {
             switch (shape)
@@ -26,6 +32,8 @@ namespace Game.Presentation.Pure
                     return 0;
                 case BadgeShape.Pill:
                     return CellPixels + GutterPixels;
+                case BadgeShape.Tag:
+                    return 2 * (CellPixels + GutterPixels);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(shape), shape, "No texture cell for that shape.");
             }
@@ -39,6 +47,8 @@ namespace Game.Presentation.Pure
                     return RoundedRectRadius;
                 case BadgeShape.Pill:
                     return PillRadius;
+                case BadgeShape.Tag:
+                    return TagChamfer;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(shape), shape, "No corner radius for that shape.");
             }
@@ -59,19 +69,34 @@ namespace Game.Presentation.Pure
                     "A badge shape is sampled inside its own cell.");
             }
 
-            var radius = RadiusOf(shape);
+            var coverage = 0.5f - DistanceOutside(shape, x, y);
+            return coverage < 0f ? 0f : coverage > 1f ? 1f : coverage;
+        }
+
+        static float DistanceOutside(BadgeShape shape, int x, int y)
+        {
             var half = CellPixels * 0.5f;
-            var offsetX = Math.Abs(x + 0.5f - half) - (half - radius);
-            var offsetY = Math.Abs(y + 0.5f - half) - (half - radius);
+            var fromMiddleX = Math.Abs(x + 0.5f - half);
+            var fromMiddleY = Math.Abs(y + 0.5f - half);
+
+            if (shape == BadgeShape.Tag)
+            {
+                var straight = Math.Max(fromMiddleX - half, fromMiddleY - half);
+                var cut = (fromMiddleX + fromMiddleY - (2f * half - TagChamfer)) * DiagonalFall;
+
+                return Math.Max(straight, cut);
+            }
+
+            var radius = RadiusOf(shape);
+            var offsetX = fromMiddleX - (half - radius);
+            var offsetY = fromMiddleY - (half - radius);
             var outsideX = offsetX > 0f ? offsetX : 0f;
             var outsideY = offsetY > 0f ? offsetY : 0f;
             var inside = Math.Max(offsetX, offsetY);
-            var distance = (float)Math.Sqrt(outsideX * outsideX + outsideY * outsideY)
+
+            return (float)Math.Sqrt(outsideX * outsideX + outsideY * outsideY)
                 + (inside < 0f ? inside : 0f)
                 - radius;
-
-            var coverage = 0.5f - distance;
-            return coverage < 0f ? 0f : coverage > 1f ? 1f : coverage;
         }
     }
 }

@@ -6,18 +6,26 @@ namespace Game.Presentation.Pure
     public sealed class Journey : IEquatable<Journey>
     {
         public static readonly Journey Nowhere =
-            new Journey(null, Walk.Nowhere, null, false, Fight.None);
+            new Journey(null, Walk.Nowhere, null, false, Fight.None, TapAim.Nothing);
 
         readonly bool owesABeat;
         readonly Fight fight;
+        readonly int diversion;
 
-        Journey(RunState state, Walk walk, ActionResult arrival, bool owesABeat, Fight fight)
+        Journey(
+            RunState state,
+            Walk walk,
+            ActionResult arrival,
+            bool owesABeat,
+            Fight fight,
+            int diversion)
         {
             State = state;
             Walk = walk;
             Arrival = arrival;
             this.owesABeat = owesABeat;
             this.fight = fight;
+            this.diversion = diversion;
         }
 
         public static Journey Toward(RunState state, int nodeId)
@@ -34,7 +42,12 @@ namespace Game.Presentation.Pure
             }
 
             return new Journey(
-                state, Walk.Along(TileRoute.Of(state.Level, resolved.Route)), null, false, Fight.None);
+                state,
+                Walk.Along(TileRoute.Of(state.Level, resolved.Route)),
+                null,
+                false,
+                Fight.None,
+                TapAim.Nothing);
         }
 
         public RunState State { get; }
@@ -68,6 +81,11 @@ namespace Game.Presentation.Pure
             get { return IsWaiting && !fight.IsSettled; }
         }
 
+        public int Diversion
+        {
+            get { return diversion; }
+        }
+
         public Journey Advanced(float deltaSeconds)
         {
             if (IsOver)
@@ -80,13 +98,13 @@ namespace Game.Presentation.Pure
                 var fought = fight.Advanced(deltaSeconds);
                 return fought.Equals(fight)
                     ? this
-                    : new Journey(State, Walk, Arrival, owesABeat, fought);
+                    : new Journey(State, Walk, Arrival, owesABeat, fought, diversion);
             }
 
             var walked = Walk.Advanced(deltaSeconds);
             if (!walked.IsWaiting)
             {
-                return new Journey(State, walked, null, false, Fight.None);
+                return new Journey(State, walked, null, false, Fight.None, diversion);
             }
 
             var reached = walked.ArrivedNodeId;
@@ -95,7 +113,12 @@ namespace Game.Presentation.Pure
             var resolved = ActionResolver.Along(State, new[] { State.PositionNodeId, reached });
 
             return new Journey(
-                resolved.State, walked, resolved, spendsAMultiplier, Fight.Of(resolved.Outcome));
+                resolved.State,
+                walked,
+                resolved,
+                spendsAMultiplier,
+                Fight.Of(resolved.Outcome),
+                diversion);
         }
 
         public Journey Resumed()
@@ -110,22 +133,44 @@ namespace Game.Presentation.Pure
                 StandsWhereItArrived ? Walk.Resumed() : Walk.Backtracked(),
                 null,
                 false,
-                Fight.None);
+                Fight.None,
+                diversion);
         }
 
         public Journey Cancelled()
+        {
+            return BrokenOff(TapAim.Nothing);
+        }
+
+        public Journey DivertedTo(int nodeId)
+        {
+            return BrokenOff(nodeId);
+        }
+
+        public Journey Onward()
+        {
+            if (!IsOver || State == null || diversion == TapAim.Nothing)
+            {
+                return Nowhere;
+            }
+
+            return Toward(State, diversion);
+        }
+
+        Journey BrokenOff(int nextNodeId)
         {
             if (IsOver)
             {
                 return this;
             }
 
-            if (IsWaiting)
-            {
-                return new Journey(State, Walk.Stopped(), Arrival, owesABeat, fight);
-            }
-
-            return new Journey(State, Walk.Backtracked(), Arrival, owesABeat, fight);
+            return new Journey(
+                State,
+                IsWaiting ? Walk.Stopped() : Walk.Backtracked(),
+                Arrival,
+                owesABeat,
+                fight,
+                nextNodeId);
         }
 
         bool StandsWhereItArrived
@@ -142,6 +187,7 @@ namespace Game.Presentation.Pure
 
             return Walk.Equals(other.Walk)
                 && owesABeat == other.owesABeat
+                && diversion == other.diversion
                 && fight.Equals(other.fight)
                 && ReferenceEquals(Arrival, other.Arrival)
                 && (State == null ? other.State == null : State.Equals(other.State));
@@ -159,6 +205,7 @@ namespace Game.Presentation.Pure
                 var hash = Walk.GetHashCode();
                 hash = (hash * 397) ^ (owesABeat ? 1 : 0);
                 hash = (hash * 397) ^ fight.GetHashCode();
+                hash = (hash * 397) ^ diversion;
                 hash = (hash * 397) ^ (State == null ? 0 : State.GetHashCode());
                 return hash;
             }

@@ -84,7 +84,7 @@ namespace Game.EditorTooling
 
         public static void Capture()
         {
-            Shoot(CapturePath, CameraDistance, IsoProjection.OrthographicSize, false, PowerTuning.Ship.StartingPower);
+            Shoot(CapturePath, CameraDistance, LevelFraming.PlaySize, false, PowerTuning.Ship.StartingPower);
         }
 
         public static void CaptureBadges()

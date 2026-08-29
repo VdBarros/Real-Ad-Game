@@ -266,7 +266,9 @@ namespace Game.Domain.Tests
 
             var beating = staging.CutTo(Multiplier);
 
-            Assert.That(beating.Framing, Is.EqualTo(LevelFraming.CloseUp(Multiplier)));
+            Assert.That(
+                beating.Advanced(ZoomBeat.InSeconds).Framing,
+                Is.EqualTo(LevelFraming.CloseUp(Multiplier)));
             Assert.That(beating.IsAway, Is.False, "A beat took the camera and the pan still claims it.");
             Assert.That(beating.Looks(Up(4f)), Is.EqualTo(beating), "A drag fought the beat for the camera.");
 
