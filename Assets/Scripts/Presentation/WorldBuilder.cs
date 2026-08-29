@@ -40,6 +40,8 @@ namespace Game.Presentation
 
         public PickupBoard Pickups { get; private set; }
 
+        public OrbBoard Orbs { get; private set; }
+
         public GameObject Build(LevelGraph graph)
         {
             if (graph == null)
@@ -74,6 +76,8 @@ namespace Game.Presentation
             Pickups = root.AddComponent<PickupBoard>();
             Trail = Group(root.transform, PartNames.TrailGroup).gameObject.AddComponent<TrailBoard>();
             Trail.Dress(materials.Of(PartStyle.Trail));
+            Orbs = Group(root.transform, PartNames.OrbGroup).gameObject.AddComponent<OrbBoard>();
+            Orbs.Dress(materials.Of(PartStyle.Spark));
             NumberBadge playerNumber = null;
             PlayerFigure playerFigure = null;
             var playerWorn = PartModel.None;
@@ -187,6 +191,7 @@ namespace Game.Presentation
 
             var opening = RunState.Begin(graph, startingPower);
             Fights.Begin(graph.Decisions.Nodes.Count, playerFigure, enemies);
+            Orbs.Begin(playerFigure);
             Pickups.Begin(graph.Decisions.Nodes.Count, pickups, opening);
             Floor.Begin(opening);
             Targets.Show(opening, TargetPreview.None);

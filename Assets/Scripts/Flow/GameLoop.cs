@@ -336,6 +336,11 @@ namespace Game.Flow
 
         bool PowerHasSettled()
         {
+            if (world.Orbs != null && !world.Orbs.IsSettled)
+            {
+                return false;
+            }
+
             return world.PlayerBadge == null || world.PlayerBadge.IsSettled;
         }
 
