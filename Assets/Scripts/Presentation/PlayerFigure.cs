@@ -10,6 +10,16 @@ namespace Game.Presentation
 
         GameObject weapon;
 
+        GameObject held;
+
+        GameObject cloak;
+
+        PlayerWeapon gripped = PlayerWeapon.None;
+
+        bool cloaked;
+
+        bool armed;
+
         WeaponFlight flight;
 
         WorldPoint dropSite;
@@ -28,6 +38,16 @@ namespace Game.Presentation
             get { return trophies.Count; }
         }
 
+        public PlayerWeapon Gripping
+        {
+            get { return gripped; }
+        }
+
+        public bool IsCloaked
+        {
+            get { return cloak != null; }
+        }
+
         public void AwaitWeaponFrom(WorldPoint deathSite)
         {
             dropSite = deathSite;
@@ -39,6 +59,7 @@ namespace Game.Presentation
             landed = beat.HasLanded;
             Wear(beat.Scale);
             Wield(beat.Look.Trophies);
+            Arm(beat.Look);
         }
 
         internal void Follow(PowerBeat beat, float deltaSeconds)
@@ -55,6 +76,7 @@ namespace Game.Presentation
             if (beat.IsSettled)
             {
                 Wield(beat.Look.Trophies);
+                Arm(beat.Look);
             }
         }
 
@@ -71,6 +93,85 @@ namespace Game.Presentation
             {
                 trophies.Add(Plant(trophies.Count));
             }
+        }
+
+        void Arm(PlayerLook look)
+        {
+            if (armed && gripped == look.Weapon && cloaked == look.Cloak)
+            {
+                return;
+            }
+
+            if (!armed || gripped != look.Weapon)
+            {
+                WorldObjects.Destroy(held);
+                held = null;
+                gripped = look.Weapon;
+
+                if (gripped != PlayerWeapon.None)
+                {
+                    held = Hang(
+                        PartNames.Held(gripped), Grip(), PlayerKit.LimbsOf(gripped), PlayerKit.Steel);
+                }
+            }
+
+            if (!armed || cloaked != look.Cloak)
+            {
+                WorldObjects.Destroy(cloak);
+                cloak = null;
+                cloaked = look.Cloak;
+
+                if (cloaked)
+                {
+                    cloak = Hang(PartNames.Cloak, transform, PlayerKit.CloakLimbs, PlayerKit.Cloth);
+                }
+            }
+
+            armed = true;
+        }
+
+        Transform Grip()
+        {
+            var slot = CharacterDress.Hand(gameObject);
+
+            return slot == null ? transform : slot;
+        }
+
+        GameObject Hang(
+            string name, Transform anchor, IReadOnlyList<PropLimb> limbs, Tint tint)
+        {
+            var holder = new GameObject(name);
+            holder.transform.SetParent(anchor, worldPositionStays: false);
+            holder.transform.localPosition = Vector3.zero;
+            holder.transform.localScale = Vector3.one * UnitUnder(anchor);
+            holder.transform.rotation = transform.rotation;
+
+            for (var limb = 0; limb < limbs.Count; limb++)
+            {
+                Slab(PartNames.Limb(name, limb), holder.transform, limbs[limb], tint);
+            }
+
+            return holder;
+        }
+
+        float UnitUnder(Transform anchor)
+        {
+            var mine = transform.lossyScale.x;
+            var theirs = anchor.lossyScale.x;
+
+            return theirs <= 1e-6f || mine <= 1e-6f ? CapsuleUnit : mine * CapsuleUnit / theirs;
+        }
+
+        static void Slab(string name, Transform parent, PropLimb limb, Tint tint)
+        {
+            var slab = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            slab.name = name;
+            slab.transform.SetParent(parent, worldPositionStays: false);
+            slab.transform.localPosition = Vector(limb.Offset);
+            slab.transform.localEulerAngles = Vector(limb.Rotation);
+            slab.transform.localScale = Vector(limb.Size);
+            WorldObjects.Destroy(slab.GetComponent<Collider>());
+            Tints.Wash(slab.GetComponent<Renderer>(), tint);
         }
 
         void Launch(PlayerLook look)
@@ -113,6 +214,12 @@ namespace Game.Presentation
         {
             WorldObjects.Destroy(weapon);
             weapon = null;
+            held = null;
+            cloak = null;
+            gripped = PlayerWeapon.None;
+            cloaked = false;
+            armed = false;
+            trophies.Clear();
         }
 
         WorldPoint MergePoint(PlayerLook look)
