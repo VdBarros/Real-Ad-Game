@@ -196,6 +196,8 @@ namespace Game.Interaction
 
         public void Advance(float deltaSeconds)
         {
+            Turn(deltaSeconds);
+
             if (!IsWalking)
             {
                 Settle();
@@ -354,6 +356,11 @@ namespace Game.Interaction
             if (figure != null)
             {
                 figure.StandOn(journey.Walk.Position);
+
+                if (!journey.Walk.IsRetreating)
+                {
+                    figure.Face(journey.Walk.Facing);
+                }
             }
 
             Act();
@@ -372,9 +379,32 @@ namespace Game.Interaction
             trail.Follow(journey.Walk.Travelled);
         }
 
+        void Turn(float deltaSeconds)
+        {
+            if (figure != null)
+            {
+                figure.Turn(deltaSeconds);
+            }
+
+            if (fights != null)
+            {
+                fights.Turn(deltaSeconds);
+            }
+        }
+
+        bool IsTheCastStillTurning()
+        {
+            if (figure != null && figure.IsTurning)
+            {
+                return true;
+            }
+
+            return fights != null && fights.IsTurning;
+        }
+
         void Settle()
         {
-            enabled = false;
+            enabled = IsTheCastStillTurning();
 
             if (acting != null)
             {
