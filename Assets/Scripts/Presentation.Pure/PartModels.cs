@@ -15,8 +15,6 @@ namespace Game.Presentation.Pure
                     return PartModel.WallPanel;
                 case PartStyle.Additive:
                     return PartModel.Chest;
-                case PartStyle.Multiplier:
-                    return PartModel.CoinStack;
                 case PartStyle.Staircase:
                     return PartModel.Staircase;
                 case PartStyle.Foundation:
@@ -25,6 +23,7 @@ namespace Game.Presentation.Pure
                 case PartStyle.Enemy:
                 case PartStyle.Boss:
                     return CharacterCast.MeshOf(style);
+                case PartStyle.Multiplier:
                 case PartStyle.Pillar:
                 case PartStyle.Trail:
                 case PartStyle.Spark:

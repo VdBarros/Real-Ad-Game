@@ -4,7 +4,6 @@ namespace Game.Presentation.Pure
     {
         Player,
         Additive,
-        Multiplier,
         Enemy,
         Boss
     }

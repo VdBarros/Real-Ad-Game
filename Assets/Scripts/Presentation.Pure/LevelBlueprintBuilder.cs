@@ -185,10 +185,10 @@ namespace Game.Presentation.Pure
                     prop = Figure(node, PartStyle.Boss, BossScale);
                     return true;
                 case NodeType.Additive:
-                    prop = Pickup(node, PartStyle.Additive, 0f);
+                    prop = Pickup(node, PartStyle.Additive);
                     return true;
                 case NodeType.Multiplier:
-                    prop = Pickup(node, PartStyle.Multiplier, 45f);
+                    prop = Gate(node);
                     return true;
                 default:
                     prop = default(WorldPart);
@@ -210,7 +210,21 @@ namespace Game.Presentation.Pure
                 new WorldPoint(scale, scale, scale));
         }
 
-        static WorldPart Pickup(DecisionNode node, PartStyle style, float yaw)
+        static WorldPart Gate(DecisionNode node)
+        {
+            var tile = IsoProjection.Of(node.Position);
+
+            return new WorldPart(
+                PartNames.Node(node.Id),
+                PartShape.Gate,
+                PartModels.Of(PartStyle.Multiplier),
+                PartStyle.Multiplier,
+                new WorldPoint(tile.X, tile.Y + GateArch.Height * 0.5f, tile.Z),
+                new WorldPoint(0f, GateArch.Yaw, 0f),
+                new WorldPoint(1f, 1f, 1f));
+        }
+
+        static WorldPart Pickup(DecisionNode node, PartStyle style)
         {
             var tile = IsoProjection.Of(node.Position);
 
@@ -220,7 +234,7 @@ namespace Game.Presentation.Pure
                 PartModels.Of(style),
                 style,
                 new WorldPoint(tile.X, tile.Y + PickupScale * 0.5f, tile.Z),
-                new WorldPoint(0f, yaw, 0f),
+                new WorldPoint(0f, 0f, 0f),
                 new WorldPoint(PickupScale, PickupScale, PickupScale));
         }
     }

@@ -76,6 +76,7 @@ namespace Game.Presentation
             var enemies = new List<EnemyFigure>();
             var pickups = new List<PickupProp>();
             var groundByName = new Dictionary<string, TilePosition>(graph.Tiles.Tiles.Count);
+            var gatesByName = new Dictionary<string, DecisionNode>();
             worn.Clear();
             WarnIfTheCameraHasTurned();
 
@@ -83,6 +84,14 @@ namespace Game.Presentation
             {
                 groundByName.Add(
                     LevelBlueprintBuilder.WalkingSurfaceOf(graph.Tiles, tile.Position), tile.Position);
+            }
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                if (node.Type == NodeType.Multiplier)
+                {
+                    gatesByName.Add(PartNames.Node(node.Id), node);
+                }
             }
 
             foreach (var terrace in blueprint.Terraces)
@@ -104,7 +113,13 @@ namespace Game.Presentation
 
                 foreach (var part in terrace.Nodes)
                 {
-                    Raise(part, nodes);
+                    var instance = Raise(part, nodes);
+
+                    DecisionNode gate;
+                    if (gatesByName.TryGetValue(part.Name, out gate))
+                    {
+                        pickups.Add(Arch(instance, gate));
+                    }
                 }
 
                 var group = Group(terraceRoot, PartNames.BadgesGroup);
@@ -139,7 +154,7 @@ namespace Game.Presentation
                         enemy.Begin(badge.transform, carried, part.NodeId, part.Value);
                         enemies.Add(enemy);
                     }
-                    else if (part.Style == BadgeStyle.Additive || part.Style == BadgeStyle.Multiplier)
+                    else if (part.Style == BadgeStyle.Additive)
                     {
                         WorldPart gem;
                         if (LevelBlueprintBuilder.TryProp(graph.Decisions.Node(part.NodeId), out gem))
@@ -203,6 +218,36 @@ namespace Game.Presentation
             return worn.TryGetValue(PartNames.Node(nodeId), out mesh) ? mesh : PartModel.None;
         }
 
+        PickupProp Arch(GameObject instance, DecisionNode node)
+        {
+            var pieces = GateArch.Pieces(node.Value);
+
+            foreach (var piece in pieces)
+            {
+                var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                block.name = piece.Name;
+                block.transform.SetParent(instance.transform, worldPositionStays: false);
+                block.transform.localPosition = Vector(piece.Position);
+                block.transform.localEulerAngles = Vector(piece.Rotation);
+                block.transform.localScale = Vector(piece.Scale);
+                WorldObjects.Destroy(block.GetComponent<Collider>());
+            }
+
+            var glow = instance.AddComponent<GateProp>();
+            glow.Begin(node.Value, pieces);
+
+            var target = instance.AddComponent<NodeTarget>();
+            target.Begin(glow, node.Id, node.Value);
+            Targets.Adopt(target);
+
+            WorldPart gate;
+            LevelBlueprintBuilder.TryProp(node, out gate);
+            var pickup = instance.AddComponent<PickupProp>();
+            pickup.Begin(gate, node.Id, null, wearsAMesh: false);
+
+            return pickup;
+        }
+
         GameObject Raise(WorldPart part, Transform parent)
         {
             var model = models.Of(part.Model);
@@ -215,7 +260,9 @@ namespace Game.Presentation
 
             var instance = raised
                 ? UnityEngine.Object.Instantiate(model)
-                : GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
+                : part.Shape == PartShape.Gate
+                    ? new GameObject()
+                    : GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
 
             if (raised && ArtPacks.IsRigged(part.Model))
             {

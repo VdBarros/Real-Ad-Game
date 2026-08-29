@@ -1155,8 +1155,32 @@ namespace Game.EditorTooling
                 Debug.LogError("Node " + nodeId + " should wear " + mark + " and wears " + target.Mark + ".");
             }
 
-            var badge = target.GetComponent<NumberBadge>();
             var look = TargetMarks.Look(mark);
+            var badge = target.Badge;
+
+            if (badge == null)
+            {
+                var gate = target.Gate;
+
+                if (gate == null)
+                {
+                    Debug.LogError(
+                        "Node " + nodeId + " marks neither a badge nor a gate, so nothing shows the aim.");
+                    return;
+                }
+
+                var glowing = Tints.Of(GateLook.Washed(gate.Tint, look));
+
+                if (gate.Colour != glowing)
+                {
+                    Debug.LogError(
+                        "Node " + nodeId + " wears " + mark + " but its arch glows " + gate.Colour
+                        + " rather than " + glowing + ".");
+                }
+
+                return;
+            }
+
             var washed = Color.Lerp(BadgePalette.Of(badge.Style), Tints.Of(look.Tint), look.Weight);
 
             if (badge.Colour != washed)

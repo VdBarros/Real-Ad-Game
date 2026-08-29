@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using Game.Domain;
 
@@ -20,6 +21,24 @@ namespace Game.Presentation.Pure
         public const string TrailGroup = "Trail";
 
         public const string Spark = "Spark";
+
+        public const string GateLeftPost = "GatePost_Left";
+
+        public const string GateRightPost = "GatePost_Right";
+
+        public const string GateLintel = "GateLintel";
+
+        public const string GatePipPrefix = "GatePip_";
+
+        public static string GatePip(int index)
+        {
+            return GatePipPrefix + index.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static bool IsGatePip(string name)
+        {
+            return name != null && name.StartsWith(GatePipPrefix, StringComparison.Ordinal);
+        }
 
         public static string Terrace(int elevation)
         {
@@ -61,9 +80,41 @@ namespace Game.Presentation.Pure
             return "Dot_" + index.ToString(CultureInfo.InvariantCulture);
         }
 
+        public const string WornPrefix = "Worn_";
+
+        public const string Cloak = WornPrefix + "Cloak";
+
+        public const string TrophyPrefix = WornPrefix + "Trophy_";
+
         public static string Trophy(int slot)
         {
-            return "Trophy_" + slot.ToString(CultureInfo.InvariantCulture);
+            return TrophyPrefix + slot.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static bool IsTrophy(string name)
+        {
+            return name != null && name.StartsWith(TrophyPrefix, StringComparison.Ordinal);
+        }
+
+        public static string Held(PlayerWeapon weapon)
+        {
+            if (weapon == PlayerWeapon.None)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(weapon), weapon, "An empty hand needs no name because it holds nothing.");
+            }
+
+            return WornPrefix + weapon;
+        }
+
+        public static string Limb(string prop, int limb)
+        {
+            return prop + "_" + limb.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static bool IsWorn(string name)
+        {
+            return name != null && name.StartsWith(WornPrefix, StringComparison.Ordinal);
         }
 
         static string Key(TilePosition position)

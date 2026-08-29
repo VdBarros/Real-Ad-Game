@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
@@ -19,25 +20,41 @@ namespace Game.EditorTooling
 
         const float Tolerance = 1e-4f;
 
+        const float LeastChroma = 0.2f;
+
+        const float CloseUpRange = 12f;
+
+        const float CloseUpSize = 1.1f;
+
+        const string ShotPath = "dev/scratch/t-137-";
+
         static readonly int[] Ladder = { 9, 47, 615, 4200 };
 
         public static void Check()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            PreviewFilm.Sun();
 
             var builder = new WorldBuilder();
 
-            var first = builder.Build(LevelGenerator.Generate(FirstSeed, MazePreset.Ship).Graph);
+            var firstGraph = LevelGenerator.Generate(FirstSeed, MazePreset.Ship).Graph;
+            var first = builder.Build(firstGraph);
             var firstSprites = SpritesOn(first);
             var firstMaterials = MaterialsOn(first);
             ReportBadgeWidths(FirstSeed, first);
+            NoMultiplierGateWearsABadge(FirstSeed, firstGraph, first);
             WorldObjects.Destroy(first);
 
-            var second = builder.Build(LevelGenerator.Generate(SecondSeed, MazePreset.Ship).Graph);
+            var secondGraph = LevelGenerator.Generate(SecondSeed, MazePreset.Ship).Graph;
+            var second = builder.Build(secondGraph);
             var secondSprites = SpritesOn(second);
             var secondMaterials = MaterialsOn(second);
             ReportBadgeWidths(SecondSeed, second);
+            NoMultiplierGateWearsABadge(SecondSeed, secondGraph, second);
+            ReportBadgeShapes(second);
             ReportPlayerGrowth(builder.PlayerBadge);
+            EveryMarkHoldsItsHueAndSpendsOpacityInstead(SecondSeed, builder.Targets);
+            PhotographTheFade(builder.Targets);
 
             firstSprites.AddRange(secondSprites);
             firstMaterials.AddRange(secondMaterials);
@@ -110,6 +127,381 @@ namespace Game.EditorTooling
                 narrowest,
                 widest,
                 BadgeMetrics.WidthFor(5)));
+        }
+
+        static void NoMultiplierGateWearsABadge(long seed, LevelGraph graph, GameObject root)
+        {
+            var gates = 0;
+            var wearing = 0;
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                if (node.Type != NodeType.Multiplier)
+                {
+                    continue;
+                }
+
+                gates++;
+                var named = PartNames.Badge(node.Id);
+
+                foreach (var badge in root.GetComponentsInChildren<NumberBadge>(true))
+                {
+                    if (badge.name == named)
+                    {
+                        wearing++;
+                    }
+                }
+
+                var prop = Named(root, PartNames.Node(node.Id));
+
+                if (prop == null)
+                {
+                    Debug.LogError(
+                        "FAIL: seed " + seed + " raised no arch over multiplier node " + node.Id + ".");
+                    continue;
+                }
+
+                if (prop.GetComponent<GateProp>() == null)
+                {
+                    Debug.LogError(
+                        "FAIL: seed " + seed + " node " + node.Id
+                        + " is not a gate arch, so a multiplier is not a world object.");
+                }
+
+                foreach (var badge in prop.GetComponentsInChildren<NumberBadge>(true))
+                {
+                    Debug.LogError(
+                        "FAIL: seed " + seed + " hangs " + badge.name + " on multiplier node "
+                        + node.Id + ", which is meant to carry no badge of any kind.");
+                }
+
+                foreach (var plate in prop.GetComponentsInChildren<SpriteRenderer>(true))
+                {
+                    Debug.LogError(
+                        "FAIL: seed " + seed + " hangs the sprite " + plate.name
+                        + " on multiplier node " + node.Id + ".");
+                }
+            }
+
+            if (gates == 0)
+            {
+                Debug.LogError(
+                    "FAIL: seed " + seed + " placed no multiplier at all, so it proves nothing "
+                    + "about a gate wearing no badge.");
+            }
+
+            if (wearing > 0)
+            {
+                Debug.LogError(
+                    "FAIL: seed " + seed + " built " + wearing + " badges named for a multiplier node.");
+            }
+
+            Debug.Log(
+                "seed " + seed + ": " + gates + " multiplier gates, each an arch, none of them badged");
+        }
+
+        static void EveryMarkHoldsItsHueAndSpendsOpacityInstead(long seed, TargetBoard board)
+        {
+            var report = new StringBuilder("badge marks, seed ")
+                .Append(seed.ToString(CultureInfo.InvariantCulture))
+                .Append(": hue held, opacity spent");
+
+            foreach (TargetMark mark in Enum.GetValues(typeof(TargetMark)))
+            {
+                var look = TargetMarks.Look(mark);
+                var aimed = TargetMarks.IsAimed(mark);
+                var worn = 0;
+                var greyed = 0;
+                var shifted = 0;
+                var misfaded = 0;
+                var floating = 0;
+                var sample = string.Empty;
+
+                foreach (var target in board.Targets)
+                {
+                    var badge = target.Badge;
+
+                    if (badge == null)
+                    {
+                        continue;
+                    }
+
+                    target.Wear(mark, badge.Value);
+                    worn++;
+
+                    var plain = BadgePalette.Of(badge.Style);
+                    var painted = badge.Colour;
+                    var label = badge.LabelColour;
+
+                    if (Chroma(painted) <= LeastChroma)
+                    {
+                        greyed++;
+                        sample = badge.name + " in " + Describe(painted);
+                    }
+
+                    if (!aimed && !SameHue(painted, plain))
+                    {
+                        shifted++;
+                        sample = badge.name + " painted " + Describe(painted)
+                            + " over a plain " + Describe(plain);
+                    }
+
+                    if (Math.Abs(painted.a - look.Opacity) > Tolerance)
+                    {
+                        misfaded++;
+                        sample = badge.name + " sits at " + painted.a.ToString("0.###")
+                            + " opaque where " + mark + " asks for " + look.Opacity.ToString("0.###");
+                    }
+
+                    if (Math.Abs(label.a - painted.a) > Tolerance)
+                    {
+                        floating++;
+                        sample = badge.name + " reads its number at " + label.a.ToString("0.###")
+                            + " over a plate at " + painted.a.ToString("0.###");
+                    }
+                }
+
+                if (worn == 0)
+                {
+                    Debug.LogError("FAIL: seed " + seed + " raised no badge to wear " + mark + " at all.");
+                    continue;
+                }
+
+                if (greyed > 0)
+                {
+                    Debug.LogError(
+                        "FAIL: " + greyed + " of " + worn + " badges wearing " + mark
+                        + " drained below " + LeastChroma.ToString("0.##", CultureInfo.InvariantCulture)
+                        + " chroma, so a colour that should say what the thing is reads as a grey ("
+                        + sample + ").");
+                }
+
+                if (shifted > 0)
+                {
+                    Debug.LogError(
+                        "FAIL: " + shifted + " of " + worn + " badges wearing " + mark
+                        + " were repainted rather than faded, so the hue no longer says what the thing is ("
+                        + sample + ").");
+                }
+
+                if (misfaded > 0)
+                {
+                    Debug.LogError(
+                        "FAIL: " + misfaded + " of " + worn + " badges wearing " + mark
+                        + " hold the wrong opacity (" + sample + ").");
+                }
+
+                if (floating > 0)
+                {
+                    Debug.LogError(
+                        "FAIL: " + floating + " of " + worn + " badges wearing " + mark
+                        + " float their number at full opacity over a faded plate (" + sample + ").");
+                }
+
+                report.AppendFormat(
+                    CultureInfo.InvariantCulture,
+                    "\n  {0,-12} {1,3} badges at {2:0.##} opaque, washed {3:0.##}, dimmest chroma {4:0.###}",
+                    mark,
+                    worn,
+                    look.Opacity,
+                    look.Weight,
+                    DimmestChroma(board, mark));
+            }
+
+            Rest(board);
+            Debug.Log(report.ToString());
+        }
+
+        static float DimmestChroma(TargetBoard board, TargetMark mark)
+        {
+            var dimmest = float.MaxValue;
+
+            foreach (var target in board.Targets)
+            {
+                var badge = target.Badge;
+
+                if (badge == null || target.Mark != mark)
+                {
+                    continue;
+                }
+
+                var chroma = Chroma(badge.Colour);
+                dimmest = chroma < dimmest ? chroma : dimmest;
+            }
+
+            return dimmest == float.MaxValue ? 0f : dimmest;
+        }
+
+        static void PhotographTheFade(TargetBoard board)
+        {
+            NodeTarget subject = null;
+            NodeTarget arch = null;
+
+            foreach (var target in board.Targets)
+            {
+                if (subject == null && target.Badge != null && target.Badge.Style != BadgeStyle.Player)
+                {
+                    subject = target;
+                }
+
+                if (arch == null && target.Gate != null)
+                {
+                    arch = target;
+                }
+            }
+
+            if (subject == null)
+            {
+                Debug.LogError("FAIL: no badge stands anywhere the fade could be photographed on.");
+            }
+            else
+            {
+                Frames(subject, "badge");
+            }
+
+            if (arch == null)
+            {
+                Debug.LogError("FAIL: no gate arch stands anywhere the fade could be photographed on.");
+            }
+            else
+            {
+                Frames(arch, "gate");
+            }
+
+            Rest(board);
+        }
+
+        static void Frames(NodeTarget subject, string name)
+        {
+            var eye = PreviewFilm.Rig(subject.transform.position, CloseUpRange, CloseUpSize);
+            var report = new StringBuilder(name + " photographed wearing each resting mark:");
+
+            PreviewFilm.Warm(eye);
+
+            foreach (var mark in new[] { TargetMark.Idle, TargetMark.Aside, TargetMark.Unreachable })
+            {
+                subject.Wear(mark, 0);
+                PreviewFilm.Shoot(eye, ShotPath + name + "-" + mark.ToString().ToLowerInvariant() + ".png");
+
+                report.Append("\n  ").Append(mark).Append(": ");
+                report.Append(
+                    subject.Badge != null
+                        ? Describe(subject.Badge.Colour) + ", number at "
+                            + subject.Badge.LabelColour.a.ToString("0.##", CultureInfo.InvariantCulture)
+                        : Describe(subject.Gate.Colour));
+            }
+
+            subject.Wear(TargetMark.Idle, 0);
+            WorldObjects.Destroy(eye.gameObject);
+            Debug.Log(report.ToString());
+        }
+
+        static void Rest(TargetBoard board)
+        {
+            foreach (var target in board.Targets)
+            {
+                target.Wear(TargetMark.Idle, target.Badge == null ? 0 : target.Badge.Value);
+            }
+        }
+
+        static bool SameHue(Color painted, Color plain)
+        {
+            return Math.Abs(painted.r - plain.r) <= Tolerance
+                && Math.Abs(painted.g - plain.g) <= Tolerance
+                && Math.Abs(painted.b - plain.b) <= Tolerance;
+        }
+
+        static float Chroma(Color colour)
+        {
+            return BadgeTints.Chroma(new Tint(colour.r, colour.g, colour.b));
+        }
+
+        static string Describe(Color colour)
+        {
+            return "#" + ColorUtility.ToHtmlStringRGB(colour)
+                + " at " + colour.a.ToString("0.##", CultureInfo.InvariantCulture) + " opaque";
+        }
+
+        static void ReportBadgeShapes(GameObject root)
+        {
+            var byStyle = new Dictionary<BadgeStyle, string>();
+            var sprites = new Dictionary<BadgeShape, Sprite>();
+
+            foreach (var badge in root.GetComponentsInChildren<NumberBadge>(true))
+            {
+                var plate = badge.GetComponent<SpriteRenderer>();
+                var shape = BadgeStyles.ShapeOf(badge.Style);
+
+                if (plate == null)
+                {
+                    Debug.LogError("FAIL: badge " + badge.name + " draws no plate behind its number.");
+                    continue;
+                }
+
+                byStyle[badge.Style] = shape + " in #" + ColorUtility.ToHtmlStringRGB(BadgePalette.Of(badge.Style));
+
+                Sprite cut;
+                if (sprites.TryGetValue(shape, out cut))
+                {
+                    if (cut != plate.sprite)
+                    {
+                        Debug.LogError(
+                            "FAIL: two " + shape + " badges were cut from different sprites.");
+                    }
+                }
+                else
+                {
+                    sprites[shape] = plate.sprite;
+                }
+            }
+
+            foreach (var style in byStyle)
+            {
+                foreach (var other in byStyle)
+                {
+                    if (!SameFamily(style.Key, other.Key) && style.Value == other.Value)
+                    {
+                        Debug.LogError(
+                            "FAIL: a " + style.Key + " badge and a " + other.Key
+                            + " badge are both " + style.Value
+                            + ", so only their numbers tell the two meanings apart.");
+                    }
+                }
+            }
+
+            var report = new StringBuilder("badge meanings, one look each:");
+
+            foreach (var style in byStyle)
+            {
+                report.Append("\n  ").Append(style.Key).Append(": ").Append(style.Value);
+            }
+
+            report.Append("\n  Multiplier: no badge at all, a lit arch on the ground");
+            Debug.Log(report.ToString());
+        }
+
+        static bool SameFamily(BadgeStyle left, BadgeStyle right)
+        {
+            if (left == right)
+            {
+                return true;
+            }
+
+            return (left == BadgeStyle.Enemy || left == BadgeStyle.Boss)
+                && (right == BadgeStyle.Enemy || right == BadgeStyle.Boss);
+        }
+
+        static Transform Named(GameObject root, string name)
+        {
+            foreach (var part in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (part.name == name)
+                {
+                    return part;
+                }
+            }
+
+            return null;
         }
 
         static void ReportPlayerGrowth(PowerBadge power)
@@ -198,7 +590,7 @@ namespace Game.EditorTooling
                 power.Width / power.CharacterWidth);
         }
 
-        static string Fate(Object asset)
+        static string Fate(UnityEngine.Object asset)
         {
             return asset == null ? "gone" : "still alive";
         }
@@ -225,7 +617,7 @@ namespace Game.EditorTooling
             return materials;
         }
 
-        static int Distinct<T>(List<T> assets) where T : Object
+        static int Distinct<T>(List<T> assets) where T : UnityEngine.Object
         {
             var seen = new List<T>();
             foreach (var asset in assets)

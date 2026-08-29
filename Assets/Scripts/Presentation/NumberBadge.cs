@@ -77,9 +77,15 @@ namespace Game.Presentation
             get { return background.color; }
         }
 
-        internal void Wash(Color colour)
+        public Color LabelColour
         {
-            background.color = colour;
+            get { return label.color; }
+        }
+
+        internal void Wash(Color colour, float opacity)
+        {
+            background.color = new Color(colour.r, colour.g, colour.b, opacity);
+            label.color = new Color(BadgePalette.Text.r, BadgePalette.Text.g, BadgePalette.Text.b, opacity);
         }
 
         internal void Fit(float cells)
