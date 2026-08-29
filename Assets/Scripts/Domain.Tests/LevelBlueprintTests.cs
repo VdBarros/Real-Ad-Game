@@ -322,7 +322,7 @@ namespace Game.Domain.Tests
             var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
 
             var grouped = blueprint.Terraces
-                .SelectMany(terrace => terrace.Tiles.Concat(terrace.Nodes))
+                .SelectMany(terrace => terrace.Tiles.Concat(terrace.Nodes).Concat(terrace.Landmarks))
                 .Count();
 
             Assert.That(grouped, Is.EqualTo(blueprint.AllParts.Count));

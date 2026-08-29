@@ -34,10 +34,12 @@ namespace Game.Presentation.Pure
             var elevations = new List<int>();
             var tilesByTerrace = new List<List<WorldPart>>();
             var nodesByTerrace = new List<List<WorldPart>>();
+            var landmarksByTerrace = new List<List<WorldPart>>();
 
             foreach (var tile in graph.Tiles.Tiles)
             {
-                var slot = TerraceSlot(elevations, tilesByTerrace, nodesByTerrace, TerraceUnder(tile.Position));
+                var slot = TerraceSlot(
+                    elevations, tilesByTerrace, nodesByTerrace, landmarksByTerrace, TerraceUnder(tile.Position));
                 var target = tilesByTerrace[slot];
                 var footing = TileFootings.Under(graph.Tiles, tile.Position);
 
@@ -75,14 +77,23 @@ namespace Game.Presentation.Pure
                     continue;
                 }
 
-                var slot = TerraceSlot(elevations, tilesByTerrace, nodesByTerrace, TerraceUnder(node.Position));
+                var slot = TerraceSlot(
+                    elevations, tilesByTerrace, nodesByTerrace, landmarksByTerrace, TerraceUnder(node.Position));
                 nodesByTerrace[slot].Add(prop);
+            }
+
+            foreach (var spot in Landmarks.Of(graph))
+            {
+                var slot = TerraceSlot(
+                    elevations, tilesByTerrace, nodesByTerrace, landmarksByTerrace, TerraceUnder(spot.Tile));
+                landmarksByTerrace[slot].Add(Landmark(spot));
             }
 
             var terraces = new List<TerraceBlueprint>(elevations.Count);
             for (var slot = 0; slot < elevations.Count; slot++)
             {
-                terraces.Add(new TerraceBlueprint(elevations[slot], tilesByTerrace[slot], nodesByTerrace[slot]));
+                terraces.Add(new TerraceBlueprint(
+                    elevations[slot], tilesByTerrace[slot], nodesByTerrace[slot], landmarksByTerrace[slot]));
             }
 
             return new LevelBlueprint(terraces);
@@ -92,6 +103,7 @@ namespace Game.Presentation.Pure
             List<int> elevations,
             List<List<WorldPart>> tilesByTerrace,
             List<List<WorldPart>> nodesByTerrace,
+            List<List<WorldPart>> landmarksByTerrace,
             int elevation)
         {
             for (var slot = 0; slot < elevations.Count; slot++)
@@ -105,6 +117,7 @@ namespace Game.Presentation.Pure
             elevations.Add(elevation);
             tilesByTerrace.Add(new List<WorldPart>());
             nodesByTerrace.Add(new List<WorldPart>());
+            landmarksByTerrace.Add(new List<WorldPart>());
             return elevations.Count - 1;
         }
 
@@ -151,6 +164,18 @@ namespace Game.Presentation.Pure
                 new WorldPoint(tile.X, tile.Y - IsoProjection.StepHeight * 0.5f, tile.Z),
                 new WorldPoint(0f, 0f, 0f),
                 new WorldPoint(IsoProjection.TileEdge, IsoProjection.StepHeight, IsoProjection.TileEdge));
+        }
+
+        public static WorldPart Landmark(LandmarkSpot spot)
+        {
+            return new WorldPart(
+                PartNames.Landmark(spot.Tile),
+                PartShape.Landmark,
+                PartModels.Of(PartStyle.Landmark),
+                PartStyle.Landmark,
+                Landmarks.StandingOf(spot),
+                new WorldPoint(0f, TileSides.InwardYaw(spot.Against), 0f),
+                new WorldPoint(1f, 1f, 1f));
         }
 
         static WorldPart Wall(TilePosition position, TileSide side)
