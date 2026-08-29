@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using Game.Domain;
 
@@ -20,6 +21,24 @@ namespace Game.Presentation.Pure
         public const string TrailGroup = "Trail";
 
         public const string Spark = "Spark";
+
+        public const string GateLeftPost = "GatePost_Left";
+
+        public const string GateRightPost = "GatePost_Right";
+
+        public const string GateLintel = "GateLintel";
+
+        public const string GatePipPrefix = "GatePip_";
+
+        public static string GatePip(int index)
+        {
+            return GatePipPrefix + index.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static bool IsGatePip(string name)
+        {
+            return name != null && name.StartsWith(GatePipPrefix, StringComparison.Ordinal);
+        }
 
         public static string Terrace(int elevation)
         {
