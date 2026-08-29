@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Game.Domain
 {
@@ -11,10 +12,27 @@ namespace Game.Domain
                 throw new ArgumentNullException(nameof(state));
             }
 
-            var route = state.RouteTo(targetNodeId);
+            return Along(state, state.RouteTo(targetNodeId));
+        }
+
+        public static ActionResult Along(RunState state, IReadOnlyList<int> route)
+        {
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
             if (route == null || state.IsLevelComplete)
             {
                 return ActionResult.Rejected(state);
+            }
+
+            if (route.Count == 0 || route[0] != state.PositionNodeId)
+            {
+                throw new ArgumentException(
+                    "A route is walked from the node the run stands on, not from node "
+                    + (route.Count == 0 ? "nowhere" : route[0].ToString()) + ".",
+                    nameof(route));
             }
 
             var decisions = state.Level.Decisions;

@@ -17,13 +17,24 @@ namespace Game.Presentation.Pure
                 throw new ArgumentNullException(nameof(state));
             }
 
+            return Aimable(NavigationMap.Of(state));
+        }
+
+        public static IReadOnlyList<int> Aimable(NavigationMap navigation)
+        {
+            if (navigation == null)
+            {
+                throw new ArgumentNullException(nameof(navigation));
+            }
+
+            var state = navigation.State;
             var aimable = new List<int>();
             if (state.IsLevelComplete)
             {
                 return aimable;
             }
 
-            foreach (var nodeId in state.ReachableNodes)
+            foreach (var nodeId in navigation.NavigableNodes)
             {
                 WorldPart prop;
                 if (nodeId == state.PositionNodeId

@@ -33,6 +33,8 @@ namespace Game.EditorTooling
 
         const int Home = 0;
 
+        const int Prizehold = 2;
+
         const int Power = 3;
 
         const int Prize = 5;
@@ -88,6 +90,9 @@ namespace Game.EditorTooling
             BothSidesRead(win, "win", FigureAct.Strike, FigureAct.Recoil);
             BothSidesRead(tie, "tie", FigureAct.Clash, FigureAct.Clash);
             BothSidesRead(loss, "loss", FigureAct.Recoil, FigureAct.Strike);
+
+            report.Append(PastTheEnemy(Power, Power - 1, "win"));
+            report.Append(PastTheEnemy(Power, Power + 1, "loss"));
 
             TieAndLossAreToldApart(tie, loss);
             NothingMoved(tie, Power);
@@ -230,6 +235,137 @@ namespace Game.EditorTooling
             builder.Dispose();
 
             return reel;
+        }
+
+        static string PastTheEnemy(int startingPower, int enemyValue, string leg)
+        {
+            var graph = Arena(enemyValue);
+            var rig = CameraRig.Raise();
+
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var opening = RunState.Begin(graph, startingPower);
+            var input = TapInput.Raise(rig, builder.Targets, opening);
+            var walker = Walker.Raise(rig, builder, input, opening);
+            var acting = root.GetComponentsInChildren<FigureAnimator>(true);
+            var won = enemyValue < startingPower;
+
+            var outcomes = new List<ActionOutcome>();
+            walker.Arrived += result => outcomes.Add(result.Outcome);
+
+            if (opening.IsReachable(Prizehold))
+            {
+                Debug.LogError(
+                    "The prize is not behind the enemy in the " + leg
+                    + " arena, so the leg proves nothing about tapping past one.");
+            }
+
+            if (!new HashSet<int>(TapAim.Aimable(opening)).Contains(Prizehold))
+            {
+                Debug.LogError(
+                    "The prize behind the enemy is not offered to the finger on the " + leg + " leg.");
+            }
+
+            var preview = TargetPreview.Of(opening, Prizehold);
+
+            if (!preview.IsLegal || preview.Route.Count != 3)
+            {
+                Debug.LogError(
+                    "A tap on the prize behind the enemy previewed " + preview.Outcome + " over "
+                    + preview.Route.Count + " nodes on the " + leg + " leg.");
+            }
+
+            walker.WalkTo(Prizehold);
+
+            if (!walker.IsWalking)
+            {
+                Debug.LogError(
+                    "A tap on the prize behind the enemy started no walk on the " + leg + " leg.");
+            }
+
+            var fought = false;
+            for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
+            {
+                fought |= walker.Walk.IsWaiting && walker.Walk.ArrivedNodeId == Doorstep;
+                Step(rig, builder, walker, acting);
+            }
+
+            if (walker.IsWalking)
+            {
+                Debug.LogError(
+                    "The walk past the enemy was still playing after " + FrameCap + " frames on the "
+                    + leg + " leg.");
+            }
+
+            if (!fought)
+            {
+                Debug.LogError(
+                    "The walk past the enemy never stopped on it, so nothing interrupted the movement "
+                    + "on the " + leg + " leg.");
+            }
+
+            var settled = walker.Run;
+            var landed = won ? Prizehold : Home;
+            var carried = won ? startingPower + enemyValue + Prize : startingPower;
+
+            if (settled.PositionNodeId != landed || settled.Power != carried)
+            {
+                Debug.LogError(
+                    "A walk past an enemy worth " + enemyValue + " at power " + startingPower
+                    + " ended on node " + settled.PositionNodeId + " at power " + settled.Power
+                    + " where it had to end on node " + landed + " at power " + carried + ".");
+            }
+
+            if (settled.IsConsumed(Prizehold) != won)
+            {
+                Debug.LogError(
+                    "The prize behind the enemy was " + (won ? "left standing" : "taken")
+                    + " on the " + leg + " leg.");
+            }
+
+            if (input.IsLocked)
+            {
+                Debug.LogError("The " + leg + " walk past the enemy ended without handing input back.");
+            }
+
+            ThePlayerStandsOnItsNode(builder, settled, leg + " past the enemy");
+
+            var report = string.Format(
+                CultureInfo.InvariantCulture,
+                "\n  a tap on the prize behind the enemy, out of passage, laid a {0} node route, "
+                + "fought on contact and {1} to node {2} at power {3} after {4}",
+                preview.Route.Count,
+                won ? "carried on" : "bounced back",
+                settled.PositionNodeId,
+                settled.Power,
+                Outcomes(outcomes));
+
+            WorldObjects.Destroy(root);
+            WorldObjects.Destroy(rig.gameObject);
+            builder.Dispose();
+
+            return report;
+        }
+
+        static string Outcomes(List<ActionOutcome> outcomes)
+        {
+            var written = new StringBuilder();
+
+            foreach (var outcome in outcomes)
+            {
+                if (written.Length > 0)
+                {
+                    written.Append(" then ");
+                }
+
+                written.Append(outcome.ToString());
+            }
+
+            return written.Length == 0 ? "no arrival at all" : written.ToString();
         }
 
         static void Expect(ActionOutcome fought, ActionOutcome wanted)
