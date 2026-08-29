@@ -30,6 +30,27 @@ namespace Game.Presentation.Pure
 
         public const string GatePipPrefix = "GatePip_";
 
+        public const string LandmarksGroup = "Landmarks";
+
+        public const string LandmarkPrefix = "Landmark";
+
+        public const string LandmarkPiecePrefix = "LandmarkPiece_";
+
+        public static string LandmarkPiece(int index)
+        {
+            return LandmarkPiecePrefix + index.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public static bool IsLandmarkPiece(string name)
+        {
+            return name != null && name.StartsWith(LandmarkPiecePrefix, StringComparison.Ordinal);
+        }
+
+        public static string Landmark(TilePosition position)
+        {
+            return LandmarkPrefix + Key(position);
+        }
+
         public static string GatePip(int index)
         {
             return GatePipPrefix + index.ToString(CultureInfo.InvariantCulture);

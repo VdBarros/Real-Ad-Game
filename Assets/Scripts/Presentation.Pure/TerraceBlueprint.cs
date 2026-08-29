@@ -5,7 +5,11 @@ namespace Game.Presentation.Pure
 {
     public sealed class TerraceBlueprint
     {
-        public TerraceBlueprint(int elevation, IReadOnlyList<WorldPart> tiles, IReadOnlyList<WorldPart> nodes)
+        public TerraceBlueprint(
+            int elevation,
+            IReadOnlyList<WorldPart> tiles,
+            IReadOnlyList<WorldPart> nodes,
+            IReadOnlyList<WorldPart> landmarks)
         {
             if (tiles == null)
             {
@@ -17,10 +21,16 @@ namespace Game.Presentation.Pure
                 throw new ArgumentNullException(nameof(nodes));
             }
 
+            if (landmarks == null)
+            {
+                throw new ArgumentNullException(nameof(landmarks));
+            }
+
             Elevation = elevation;
             Name = PartNames.Terrace(elevation);
             Tiles = tiles;
             Nodes = nodes;
+            Landmarks = landmarks;
         }
 
         public int Elevation { get; }
@@ -30,5 +40,7 @@ namespace Game.Presentation.Pure
         public IReadOnlyList<WorldPart> Tiles { get; }
 
         public IReadOnlyList<WorldPart> Nodes { get; }
+
+        public IReadOnlyList<WorldPart> Landmarks { get; }
     }
 }

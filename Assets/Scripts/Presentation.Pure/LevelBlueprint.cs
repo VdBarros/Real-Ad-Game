@@ -22,6 +22,7 @@ namespace Game.Presentation.Pure
             {
                 allParts.AddRange(terrace.Tiles);
                 allParts.AddRange(terrace.Nodes);
+                allParts.AddRange(terrace.Landmarks);
             }
         }
 

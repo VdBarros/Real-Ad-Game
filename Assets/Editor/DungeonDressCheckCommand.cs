@@ -53,6 +53,14 @@ namespace Game.EditorTooling
 
         const int Complaints = 6;
 
+        const float LandmarkFooting = 0.02f;
+
+        const float LandmarkShare = 0.3f;
+
+        const float LandmarkOutlineApart = 0.25f;
+
+        const float LandmarkColourApart = 0.3f;
+
         public static void Check()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -336,8 +344,10 @@ namespace Game.EditorTooling
             failures += EveryPartWearsItsMesh(models, graph, byName, report);
             failures += EveryWallLandsOnItsTileEdge(graph, byName, report);
             failures += EveryPropStandsOnItsTile(graph, byName, report);
+            failures += TheLandmarksMarkDecisionsWithoutBecomingOne(builder, graph, byName, report);
             failures += TheRewardsReadApart(graph, byName, report);
             failures += TheRewardsReadAgainstTheFloor(root, graph, byName, report);
+            failures += TheLandmarksReadApartAtThePlayFraming(graph, byName, report);
             failures += TheMaterialsStayFlat(root, report);
 
             WorldObjects.Destroy(root);
@@ -631,6 +641,411 @@ namespace Game.EditorTooling
                 props > 0 && standing == props,
                 "every content prop rests on its tile rather than floating at the cube's centre",
                 standing + " of " + props + " do");
+        }
+
+        static int TheLandmarksMarkDecisionsWithoutBecomingOne(
+            WorldBuilder builder,
+            LevelGraph graph,
+            IDictionary<string, Transform> byName,
+            StringBuilder report)
+        {
+            var spots = Landmarks.Of(graph);
+            var failures = 0;
+            var standing = new List<string>();
+
+            foreach (var spot in spots)
+            {
+                standing.Add(spot.ToString());
+            }
+
+            failures += Assert(
+                report,
+                spots.Count >= Landmarks.Fewest && spots.Count <= Landmarks.Most,
+                "the ship level carries between " + Landmarks.Fewest + " and " + Landmarks.Most
+                + " landmarks, so a screen has something to orient by without turning into a gallery",
+                spots.Count + ": " + string.Join(", ", standing.ToArray()));
+
+            var marking = 0;
+            var kinds = new List<LandmarkKind>();
+
+            foreach (var spot in spots)
+            {
+                if (Landmarks.MarksADecision(graph.Tiles, spot.Tile)
+                    || Landmarks.Flanks(graph.Tiles, spot.Tile))
+                {
+                    marking++;
+                }
+
+                if (!kinds.Contains(spot.Kind))
+                {
+                    kinds.Add(spot.Kind);
+                }
+            }
+
+            failures += Assert(
+                report,
+                spots.Count > 0 && marking == spots.Count && kinds.Count == spots.Count,
+                "every landmark stands at a junction or an area entrance rather than mid-corridor, and no "
+                + "two of them are the same kind",
+                marking + " of " + spots.Count + " mark a decision, in " + kinds.Count + " distinct kinds");
+
+            var onANode = new List<string>();
+            var tappable = new List<string>();
+            var solid = new List<string>();
+            var raised = 0;
+            var pieced = 0;
+
+            foreach (var spot in spots)
+            {
+                var name = PartNames.Landmark(spot.Tile);
+                Transform instance;
+
+                if (!byName.TryGetValue(name, out instance))
+                {
+                    continue;
+                }
+
+                raised++;
+
+                if (graph.Decisions.NodeAt(spot.Tile) != null)
+                {
+                    onANode.Add(name);
+                }
+
+                if (instance.GetComponentsInChildren<NodeTarget>(true).Length > 0)
+                {
+                    tappable.Add(name + " wears a node target");
+                }
+
+                if (instance.GetComponentInParent<NodeTarget>() != null)
+                {
+                    tappable.Add(name + " hangs under a node target");
+                }
+
+                foreach (var collider in instance.GetComponentsInChildren<Collider>(true))
+                {
+                    solid.Add(name + "/" + collider.name);
+                }
+
+                var prop = instance.GetComponent<LandmarkProp>();
+
+                if (prop != null && prop.Pieces == LandmarkForm.Pieces(spot.Kind).Count
+                    && prop.Kind == spot.Kind
+                    && instance.GetComponentsInChildren<Renderer>(true).Length == prop.Pieces)
+                {
+                    pieced++;
+                }
+            }
+
+            failures += Assert(
+                report,
+                raised == spots.Count && pieced == spots.Count,
+                "every landmark the placement names is standing in the world, cut from the primitives its "
+                + "kind is drawn with",
+                pieced + " of " + spots.Count + " are, and " + raised + " were raised at all");
+
+            failures += Assert(
+                report,
+                onANode.Count == 0,
+                "no landmark stands on a tile the decision graph put a node on",
+                onANode.Count == 0 ? "none does" : string.Join(", ", onANode.ToArray()));
+
+            failures += Assert(
+                report,
+                spots.Count > 0 && tappable.Count == 0,
+                "no landmark carries a node target, so a finger can never aim at one",
+                tappable.Count == 0
+                    ? "none of the " + spots.Count + " does"
+                    : string.Join("; ", tappable.ToArray()));
+
+            failures += Assert(
+                report,
+                spots.Count > 0 && solid.Count == 0,
+                "no landmark carries a collider, so nothing the world casts against can ever hit one",
+                solid.Count == 0
+                    ? "none of the " + spots.Count + " does"
+                    : string.Join(", ", solid.GetRange(0, Math.Min(Complaints, solid.Count)).ToArray()));
+
+            var aimed = 0;
+
+            foreach (var target in builder.Targets.Targets)
+            {
+                if (target != null && target.NodeId >= 0 && target.NodeId < graph.Decisions.Nodes.Count)
+                {
+                    aimed++;
+                }
+            }
+
+            failures += Assert(
+                report,
+                aimed == builder.Targets.Targets.Count,
+                "every target the board holds is a decision node, so the landmarks never entered the "
+                + "decision graph",
+                aimed + " of " + builder.Targets.Targets.Count + " targets name a node of the "
+                + graph.Decisions.Nodes.Count + " this level has");
+
+            var figure = FigureFit.SpreadOf(
+                CharacterCast.MeshOf(PartStyle.Start), LevelBlueprintBuilder.FigureScale) * 0.5f;
+            var tightest = float.MaxValue;
+            var blocking = new List<string>();
+
+            foreach (var spot in spots)
+            {
+                Transform instance;
+
+                if (!byName.TryGetValue(PartNames.Landmark(spot.Tile), out instance))
+                {
+                    continue;
+                }
+
+                var box = World(instance);
+
+                foreach (var tile in graph.Tiles.Tiles)
+                {
+                    var centre = IsoProjection.Of(tile.Position);
+                    var apart = Math.Max(
+                        Math.Max(box.min.x - centre.X, centre.X - box.max.x),
+                        Math.Max(box.min.z - centre.Z, centre.Z - box.max.z));
+
+                    if (apart < tightest)
+                    {
+                        tightest = apart;
+                    }
+
+                    if (apart <= figure)
+                    {
+                        blocking.Add(spot.Kind + " reaches " + tile.Position);
+                    }
+                }
+            }
+
+            failures += Assert(
+                report,
+                spots.Count > 0 && blocking.Count == 0,
+                "no landmark reaches within the figure's own half-spread of a tile centre the walk runs "
+                + "through, so a landmark never blocks the walk",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the tightest leaves {0:0.###} against the figure's {1:0.###} half-spread{2}",
+                    tightest,
+                    figure,
+                    blocking.Count == 0
+                        ? ""
+                        : "; " + string.Join(", ", blocking.GetRange(0, Math.Min(Complaints, blocking.Count)).ToArray())));
+
+            var footed = 0;
+            var overTheWalls = 0;
+
+            foreach (var spot in spots)
+            {
+                Transform instance;
+
+                if (!byName.TryGetValue(PartNames.Landmark(spot.Tile), out instance))
+                {
+                    continue;
+                }
+
+                var box = World(instance);
+
+                if (Math.Abs(box.min.y - IsoProjection.Of(spot.Tile).Y) <= LandmarkFooting)
+                {
+                    footed++;
+                }
+
+                if (box.size.y > IsoProjection.WallHeight)
+                {
+                    overTheWalls++;
+                }
+            }
+
+            return failures + Assert(
+                report,
+                spots.Count > 0 && footed == spots.Count && overTheWalls == spots.Count,
+                "every landmark rests on the floor of its tile and stands taller than the masonry it "
+                + "leans against, so it is visible over the walls between the player and it",
+                footed + " of " + spots.Count + " are footed and " + overTheWalls + " clear the "
+                + IsoProjection.WallHeight + " wall");
+        }
+
+        static int TheLandmarksReadApartAtThePlayFraming(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var readings = new List<LandmarkReading>();
+            var tile = ScreenFrame.TileGroundPixels(LevelFraming.PlaySize);
+
+            foreach (var spot in Landmarks.Of(graph))
+            {
+                Transform instance;
+
+                if (!byName.TryGetValue(PartNames.Landmark(spot.Tile), out instance))
+                {
+                    continue;
+                }
+
+                readings.Add(Photograph(instance, spot.Kind));
+            }
+
+            if (readings.Count < 2)
+            {
+                return Assert(
+                    report,
+                    false,
+                    "the ship level raises landmarks enough to compare against each other",
+                    readings.Count + " were photographed");
+            }
+
+            var failures = 0;
+            var specks = new List<string>();
+            var shares = new List<string>();
+
+            foreach (var reading in readings)
+            {
+                var share = tile <= 0f ? 0f : reading.Pixels / tile;
+
+                shares.Add(string.Format(
+                    CultureInfo.InvariantCulture, "{0} {1:0.##} tiles", reading.Kind, share));
+
+                if (share < LandmarkShare)
+                {
+                    specks.Add(reading.Kind + " covers only " + share.ToString("0.###", CultureInfo.InvariantCulture));
+                }
+            }
+
+            failures += Assert(
+                report,
+                specks.Count == 0,
+                "every landmark covers at least "
+                + LandmarkShare.ToString("0.##", CultureInfo.InvariantCulture)
+                + " of a tile of ground at the play framing, so it is a shape a player reads rather than "
+                + "a speck",
+                string.Join(", ", shares.ToArray())
+                + (specks.Count == 0 ? "" : "; " + string.Join("; ", specks.ToArray())));
+
+            var alike = new List<string>();
+            var closest = 1f;
+            var palest = 10f;
+
+            for (var one = 0; one < readings.Count; one++)
+            {
+                for (var other = one + 1; other < readings.Count; other++)
+                {
+                    var apart = Disagreement(readings[one].Silhouette, readings[other].Silhouette);
+                    var tone = Apart(readings[one].Colour, readings[other].Colour);
+
+                    closest = Math.Min(closest, apart);
+                    palest = Math.Min(palest, tone);
+
+                    if (apart < LandmarkOutlineApart && tone < LandmarkColourApart)
+                    {
+                        alike.Add(readings[one].Kind + " against " + readings[other].Kind);
+                    }
+                }
+            }
+
+            failures += Assert(
+                report,
+                alike.Count == 0,
+                "no two landmarks in one level share both an outline and a colour at the play framing, so "
+                + "a glance tells them apart",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the closest pair disagrees over {0:0.###} of its outline and {1:0.###} in colour, "
+                    + "against the {2:0.##} / {3:0.##} asked for{4}",
+                    closest,
+                    palest,
+                    LandmarkOutlineApart,
+                    LandmarkColourApart,
+                    alike.Count == 0 ? "" : "; alike: " + string.Join(", ", alike.ToArray())));
+
+            return failures;
+        }
+
+        struct LandmarkReading
+        {
+            public LandmarkKind Kind;
+
+            public bool[] Silhouette;
+
+            public int Pixels;
+
+            public Color Colour;
+        }
+
+        static LandmarkReading Photograph(Transform instance, LandmarkKind kind)
+        {
+            var camera = PreviewFilm.Rig(instance.position, ShotDistance, LevelFraming.PlaySize);
+            PreviewFilm.Warm(camera);
+
+            var silhouette = Silhouette(instance, camera);
+            PreviewFilm.Warm(camera);
+
+            var dressed = PreviewFilm.Frame(camera);
+            var lit = dressed.GetPixels32();
+            var covered = 0;
+            var red = 0.0;
+            var green = 0.0;
+            var blue = 0.0;
+
+            for (var pixel = 0; pixel < silhouette.Length; pixel++)
+            {
+                if (!silhouette[pixel])
+                {
+                    continue;
+                }
+
+                covered++;
+                red += lit[pixel].r;
+                green += lit[pixel].g;
+                blue += lit[pixel].b;
+            }
+
+            PreviewFilm.Save(dressed, LandmarkShot(kind));
+            UnityEngine.Object.DestroyImmediate(dressed);
+            UnityEngine.Object.DestroyImmediate(camera.gameObject);
+
+            return new LandmarkReading
+            {
+                Kind = kind,
+                Silhouette = silhouette,
+                Pixels = covered,
+                Colour = covered == 0
+                    ? Color.black
+                    : new Color(
+                        (float)(red / covered / 255.0),
+                        (float)(green / covered / 255.0),
+                        (float)(blue / covered / 255.0))
+            };
+        }
+
+        static string LandmarkShot(LandmarkKind kind)
+        {
+            return "dev/scratch/t-144-" + kind.ToString().ToLowerInvariant() + ".png";
+        }
+
+        static float Disagreement(bool[] one, bool[] other)
+        {
+            var union = 0;
+            var apart = 0;
+
+            for (var pixel = 0; pixel < one.Length; pixel++)
+            {
+                if (one[pixel] || other[pixel])
+                {
+                    union++;
+                }
+
+                if (one[pixel] != other[pixel])
+                {
+                    apart++;
+                }
+            }
+
+            return union == 0 ? 0f : (float)apart / union;
+        }
+
+        static float Apart(Color one, Color other)
+        {
+            return Math.Abs(one.r - other.r) + Math.Abs(one.g - other.g) + Math.Abs(one.b - other.b);
         }
 
         static int TheRewardsReadApart(

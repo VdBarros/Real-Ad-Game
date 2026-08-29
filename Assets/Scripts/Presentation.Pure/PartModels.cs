@@ -24,6 +24,7 @@ namespace Game.Presentation.Pure
                 case PartStyle.Boss:
                     return CharacterCast.MeshOf(style);
                 case PartStyle.Multiplier:
+                case PartStyle.Landmark:
                 case PartStyle.Pillar:
                 case PartStyle.Trail:
                 case PartStyle.Spark:
