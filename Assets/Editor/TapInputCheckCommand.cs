@@ -46,6 +46,7 @@ namespace Game.EditorTooling
             rig.Skip();
 
             var state = RunState.Begin(graph, PowerTuning.For(MazePreset.Ship).StartingPower);
+            var opening = state;
             var input = TapInput.Raise(rig, builder.Targets, state);
             var tapped = new List<TargetPreview>();
             input.Tapped += tapped.Add;
@@ -161,6 +162,7 @@ namespace Game.EditorTooling
             }
 
             report.Append(PanHeldAndGivenBack(input, rig, state));
+            report.Append(ReachesTheWalkerMidJourney(rig, builder, input, opening));
 
             report.Append("\n  ")
                 .Append(previewed.ToString(CultureInfo.InvariantCulture))
@@ -229,6 +231,182 @@ namespace Game.EditorTooling
                 "\n  a press {0:0.#} px off node {1} slid onto it, re-aimed and committed without panning",
                 ScreenPoint.Distance(from, anchor),
                 nodeId);
+        }
+
+        static string ReachesTheWalkerMidJourney(
+            CameraRig rig, WorldBuilder builder, TapInput input, RunState opening)
+        {
+            input.Show(opening);
+
+            var walker = Walker.Raise(rig, builder, input, opening);
+            var committed = new List<int>();
+            Action<TargetPreview> note = preview => committed.Add(preview.NodeId);
+            input.Tapped += note;
+
+            var first = Longest(opening);
+            if (first == TapAim.Nothing)
+            {
+                input.Tapped -= note;
+                Debug.LogError("The check needs a journey to break off, and nothing was walkable to.");
+                return "\n  nothing was walkable to, so no journey was there to break off";
+            }
+
+            walker.WalkTo(first);
+
+            if (!walker.IsWalking)
+            {
+                input.Tapped -= note;
+                Debug.LogError("A walk to node " + first + " never started, so no tap could break it off.");
+                return "\n  no journey started to break off";
+            }
+
+            for (var frame = 0; frame < 12 && walker.IsWalking; frame++)
+            {
+                Step(rig, builder, walker);
+            }
+
+            if (!walker.IsWalking)
+            {
+                input.Tapped -= note;
+                Debug.LogError("The walk to node " + first + " was over before a second tap could land.");
+                return "\n  the journey ended before a second tap could land on it";
+            }
+
+            var breakingOff = walker.Run;
+            var second = Roomiest(input, breakingOff, first);
+
+            if (second == TapAim.Nothing)
+            {
+                input.Tapped -= note;
+                Debug.LogError("The check needs a second node to break off toward, and found none.");
+                return "\n  nothing else was reachable to break the journey off toward";
+            }
+
+            var finger = FingerOn(input, breakingOff, second);
+
+            input.Reading(pressedNow: true, releasedNow: false, isPressed: true, hovers: false, finger: finger);
+
+            if (input.Preview.NodeId != second)
+            {
+                Debug.LogError(
+                    "A finger on node " + second + " with a journey running aimed at " + input.Preview.NodeId
+                    + " instead. Input does not reach the walker while it is walking.");
+            }
+
+            if (!input.Preview.IsLegal)
+            {
+                Debug.LogError(
+                    "Node " + second + " previewed as illegal while a journey was running.");
+            }
+
+            input.Reading(pressedNow: false, releasedNow: true, isPressed: false, hovers: false, finger: finger);
+            input.Tapped -= note;
+
+            if (committed.Count != 1 || committed[0] != second)
+            {
+                Debug.LogError(
+                    "A tap on node " + second + " mid-journey committed " + committed.Count
+                    + " taps rather than that one node.");
+            }
+
+            var predicted = ActionResolver.Along(
+                breakingOff, NavigationMap.Of(breakingOff).RouteTo(second)).State;
+
+            for (var frame = 0; frame < 4000 && walker.IsWalking; frame++)
+            {
+                Step(rig, builder, walker);
+            }
+
+            if (walker.IsWalking)
+            {
+                Debug.LogError("A journey broken off by a tap was still running 4000 frames later.");
+            }
+
+            if (!walker.Run.Equals(predicted))
+            {
+                Debug.LogError(
+                    "A tap on node " + second + " mid-journey ended on node " + walker.Run.PositionNodeId
+                    + " at power " + walker.Run.Power + " where breaking off on node "
+                    + breakingOff.PositionNodeId + " and walking there gives node "
+                    + predicted.PositionNodeId + " at power " + predicted.Power + ".");
+            }
+
+            if (input.IsLocked)
+            {
+                Debug.LogError("A journey broken off by a tap ended without handing input back.");
+            }
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "\n  a press and release on node {0} partway through a walk to node {1} aimed, committed "
+                + "and carried the walker off to node {2} at power {3}",
+                second,
+                first,
+                walker.Run.PositionNodeId,
+                walker.Run.Power);
+        }
+
+        static int Longest(RunState state)
+        {
+            var navigation = NavigationMap.Of(state);
+            var found = TapAim.Nothing;
+            var steps = 0;
+
+            foreach (var nodeId in TapAim.Aimable(navigation))
+            {
+                var resolved = ActionResolver.Along(state, navigation.RouteTo(nodeId));
+
+                if (resolved.Outcome == ActionOutcome.Rejected || resolved.Route.Count <= steps)
+                {
+                    continue;
+                }
+
+                found = nodeId;
+                steps = resolved.Route.Count;
+            }
+
+            return found;
+        }
+
+        static int Roomiest(TapInput input, RunState state, int excluded)
+        {
+            var found = TapAim.Nothing;
+            var clearest = 0f;
+
+            foreach (var candidate in input.Candidates())
+            {
+                if (candidate.NodeId == excluded)
+                {
+                    continue;
+                }
+
+                var room = Room(input, state, candidate);
+
+                if (room <= clearest || !TargetPreview.Of(state, candidate.NodeId).IsLegal)
+                {
+                    continue;
+                }
+
+                found = candidate.NodeId;
+                clearest = room;
+            }
+
+            return found;
+        }
+
+        static void Step(CameraRig rig, WorldBuilder builder, Walker walker)
+        {
+            const float Frame = 1f / 60f;
+
+            walker.Advance(Frame);
+            rig.Advance(Frame);
+            builder.Floor.Advance(Frame);
+            builder.Pickups.Advance(Frame);
+
+            if (builder.PlayerBadge != null)
+            {
+                builder.PlayerBadge.Advance(Frame);
+            }
         }
 
         static string PanHeldAndGivenBack(TapInput input, CameraRig rig, RunState state)
