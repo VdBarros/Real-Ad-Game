@@ -199,10 +199,10 @@ namespace Game.EditorTooling
                     continue;
                 }
 
-                var rigged = ArtPacks.IsRigged(model);
+                var shipsWithTheCast = ArtPacks.ShipsWithTheCast(model);
                 var settled = importer.materialImportMode == ModelImporterMaterialImportMode.None
-                    && importer.importAnimation == rigged
-                    && importer.animationType == (rigged
+                    && importer.importAnimation == shipsWithTheCast
+                    && importer.animationType == (shipsWithTheCast
                         ? CharacterArtPostprocessor.Rig
                         : ModelImporterAnimationType.None)
                     && !importer.importCameras
@@ -212,7 +212,7 @@ namespace Game.EditorTooling
                     && importer.optimizeMeshVertices
                     && importer.useFileScale
                     && Math.Abs(importer.globalScale - ArtPacks.ImportScaleFor(model)) < 1e-6f
-                    && (!rigged
+                    && (!shipsWithTheCast
                         || (importer.skinWeights == CharacterArtPostprocessor.SkinWeights
                             && importer.meshCompression == CharacterArtPostprocessor.Compression
                             && !importer.weldVertices

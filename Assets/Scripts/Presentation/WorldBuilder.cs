@@ -297,7 +297,7 @@ namespace Game.Presentation
                     ? new GameObject()
                     : GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
 
-            if (raised && ArtPacks.IsRigged(part.Model))
+            if (raised && ArtPacks.IsRiggedCharacter(part.Model))
             {
                 CharacterDress.Bare(instance);
             }

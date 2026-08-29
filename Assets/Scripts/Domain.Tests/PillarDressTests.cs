@@ -35,7 +35,7 @@ namespace Game.Domain.Tests
 
                 Assert.That(mesh, Is.Not.EqualTo(PartModel.None), look + " wears no mesh at all.");
                 Assert.That(
-                    ArtPacks.IsRigged(mesh),
+                    ArtPacks.IsRiggedCharacter(mesh),
                     Is.True,
                     look + " wears " + mesh + ", which no cast pack carries.");
             }
@@ -296,7 +296,7 @@ namespace Game.Domain.Tests
         {
             Assert.That(PillarDress.StageModel, Is.Not.EqualTo(PartModel.None));
             Assert.That(ArtPacks.Of(PillarDress.StageModel), Is.EqualTo(ArtPack.Dungeon));
-            Assert.That(ArtPacks.IsRigged(PillarDress.StageModel), Is.False);
+            Assert.That(ArtPacks.IsRiggedCharacter(PillarDress.StageModel), Is.False);
         }
 
         [Test]

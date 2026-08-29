@@ -108,7 +108,7 @@ namespace Game.EditorTooling
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (!ArtPacks.IsRigged(model))
+                if (!ArtPacks.ShipsWithTheCast(model))
                 {
                     continue;
                 }

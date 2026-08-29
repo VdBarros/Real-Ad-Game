@@ -58,7 +58,7 @@ namespace Game.Presentation
 
         public static FigureAnimator Raise(GameObject figure, PartModel mesh, WorldModels models)
         {
-            if (figure == null || models == null || !ArtPacks.IsRigged(mesh))
+            if (figure == null || models == null || !ArtPacks.IsRiggedCharacter(mesh))
             {
                 return null;
             }
