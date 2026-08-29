@@ -2,10 +2,10 @@ namespace Game.Presentation.Pure
 {
     public enum LandmarkKind
     {
-        Tree,
-        Statue,
-        Fountain,
-        Crystal,
-        Obelisk
+        Pillar,
+        Brazier,
+        Hoard,
+        Trophy,
+        Shrine
     }
 }

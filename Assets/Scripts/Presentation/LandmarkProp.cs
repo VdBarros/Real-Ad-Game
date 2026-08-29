@@ -13,6 +13,10 @@ namespace Game.Presentation
 
         static readonly int ColorId = Shader.PropertyToID("_Color");
 
+        static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
+
+        static readonly int MainTexId = Shader.PropertyToID("_MainTex");
+
         static readonly int SmoothnessId = Shader.PropertyToID("_Smoothness");
 
         readonly List<Material> coats = new List<Material>();
@@ -21,19 +25,16 @@ namespace Game.Presentation
 
         public int Pieces { get; private set; }
 
+        public bool Textured { get; private set; }
+
+        public Tint Tint { get; private set; }
+
         public IReadOnlyList<Material> Coats
         {
             get { return coats; }
         }
 
-        public IReadOnlyList<Tint> Tints
-        {
-            get { return tints; }
-        }
-
-        Tint[] tints = Array.Empty<Tint>();
-
-        internal void Begin(LandmarkKind kind, IReadOnlyList<LandmarkPiece> pieces)
+        internal void Begin(LandmarkKind kind, IReadOnlyList<WorldPart> pieces, Texture2D atlas)
         {
             if (pieces == null)
             {
@@ -42,45 +43,36 @@ namespace Game.Presentation
 
             Kind = kind;
             Pieces = pieces.Count;
+            Tint = LandmarkLook.Of(kind);
+            Textured = atlas != null;
 
-            var worn = new List<Tint>();
-            var painted = new List<Material>();
+            var coat = Coat(kind, Tint, atlas);
 
             foreach (var piece in pieces)
             {
-                var slot = worn.IndexOf(piece.Tint);
-
-                if (slot < 0)
-                {
-                    worn.Add(piece.Tint);
-                    painted.Add(Coat(kind, worn.Count - 1, piece.Tint));
-                    slot = worn.Count - 1;
-                }
-
-                var block = transform.Find(piece.Part.Name);
+                var block = transform.Find(piece.Name);
 
                 if (block == null)
                 {
                     throw new InvalidOperationException(
-                        "A " + kind + " landmark is missing the piece named " + piece.Part.Name + ".");
+                        "A " + kind + " landmark is missing the piece named " + piece.Name + ".");
                 }
 
                 foreach (var skin in block.GetComponentsInChildren<Renderer>(true))
                 {
-                    skin.sharedMaterial = painted[slot];
+                    skin.sharedMaterial = coat;
                 }
             }
 
-            tints = worn.ToArray();
             coats.Clear();
-            coats.AddRange(painted);
+            coats.Add(coat);
         }
 
-        Material Coat(LandmarkKind kind, int slot, Tint tint)
+        Material Coat(LandmarkKind kind, Tint tint, Texture2D atlas)
         {
             var material = new Material(LitShader())
             {
-                name = NamePrefix + kind + "_" + slot,
+                name = NamePrefix + kind,
                 hideFlags = HideFlags.HideAndDontSave
             };
 
@@ -99,6 +91,16 @@ namespace Game.Presentation
             if (material.HasProperty(SmoothnessId))
             {
                 material.SetFloat(SmoothnessId, WorldMaterials.Smoothness);
+            }
+
+            if (atlas != null && material.HasProperty(BaseMapId))
+            {
+                material.SetTexture(BaseMapId, atlas);
+            }
+
+            if (atlas != null && material.HasProperty(MainTexId))
+            {
+                material.SetTexture(MainTexId, atlas);
             }
 
             return material;

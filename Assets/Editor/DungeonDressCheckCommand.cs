@@ -65,6 +65,16 @@ namespace Game.EditorTooling
 
         const float LandmarkColourApart = 0.3f;
 
+        const float LandmarkFit = 0.004f;
+
+        static readonly float[] PanYaws =
+        {
+            IsoProjection.CameraYaw,
+            IsoProjection.CameraYaw + 90f,
+            IsoProjection.CameraYaw + 180f,
+            IsoProjection.CameraYaw + 270f
+        };
+
         public static void Check()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -276,6 +286,8 @@ namespace Game.EditorTooling
                         box.min.y));
             }
 
+            failures += TheDungeonPlanIsMeasuredFromTheMeshes(models, report);
+
             var wall = models.Of(PartModel.WallPanel);
 
             if (wall == null)
@@ -351,7 +363,10 @@ namespace Game.EditorTooling
             failures += TheLandmarksMarkDecisionsWithoutBecomingOne(builder, graph, byName, report);
             failures += TheRewardsReadApart(graph, byName, report);
             failures += TheRewardsReadAgainstTheFloor(root, graph, byName, report);
-            failures += TheLandmarksReadApartAtThePlayFraming(graph, byName, report);
+            failures += TheLandmarksAreCutFromPackMeshes(models, graph, byName, report);
+            failures += TheLandmarksStandWhereTheirReachAndHeightSayTheyDo(graph, byName, report);
+            failures += NoLandmarkClipsWhatShipsBesideIt(graph, byName, report);
+            failures += TheLandmarksReadApartFromEveryPanAngle(graph, byName, report);
             failures += TheCastReadsAgainstTheDungeon(root, graph, byName, report);
             failures += TheMaterialsStayFlat(root, report);
             failures += TheGatesAreCutFromPackMeshes(models, graph, byName, report);
@@ -1013,7 +1028,9 @@ namespace Game.EditorTooling
 
                 if (prop != null && prop.Pieces == LandmarkForm.Pieces(spot.Kind).Count
                     && prop.Kind == spot.Kind
-                    && instance.GetComponentsInChildren<Renderer>(true).Length == prop.Pieces)
+                    && prop.Textured
+                    && prop.Tint.Equals(LandmarkLook.Of(spot.Kind))
+                    && instance.GetComponentsInChildren<Renderer>(true).Length >= prop.Pieces)
                 {
                     pieced++;
                 }
@@ -1022,8 +1039,8 @@ namespace Game.EditorTooling
             failures += Assert(
                 report,
                 raised == spots.Count && pieced == spots.Count,
-                "every landmark the placement names is standing in the world, cut from the primitives its "
-                + "kind is drawn with",
+                "every landmark the placement names is standing in the world, every course of it raised "
+                + "and wearing the pack atlas under the wash its kind is given",
                 pieced + " of " + spots.Count + " are, and " + raised + " were raised at all");
 
             failures += Assert(
@@ -1149,11 +1166,206 @@ namespace Game.EditorTooling
                 + IsoProjection.WallHeight + " wall");
         }
 
-        static int TheLandmarksReadApartAtThePlayFraming(
+        static int TheDungeonPlanIsMeasuredFromTheMeshes(WorldModels models, StringBuilder report)
+        {
+            var failures = 0;
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (model == PartModel.None || ArtPacks.Of(model) != ArtPack.Dungeon)
+                {
+                    continue;
+                }
+
+                var prefab = models.Of(model);
+
+                if (prefab == null)
+                {
+                    failures += Assert(
+                        report,
+                        false,
+                        "the " + model + " mesh matches its pinned pack plan and base",
+                        "there is no mesh to measure");
+                    continue;
+                }
+
+                var box = Local(prefab);
+                var wide = DungeonPack.WidthOf(model);
+                var deep = DungeonPack.DepthOf(model);
+                var foot = DungeonPack.BaseOf(model);
+                var across = DungeonPack.ShiftAcrossOf(model);
+                var along = DungeonPack.ShiftAlongOf(model);
+
+                failures += Assert(
+                    report,
+                    Math.Abs(box.size.x - wide) <= Epsilon
+                    && Math.Abs(box.size.z - deep) <= Epsilon
+                    && Math.Abs(box.min.y - foot) <= Epsilon
+                    && Math.Abs(box.center.x - across) <= Epsilon
+                    && Math.Abs(box.center.z - along) <= Epsilon,
+                    "the imported " + model + " mesh spans the pinned "
+                    + DungeonPack.PackWidthOf(model).ToString("0.####", CultureInfo.InvariantCulture)
+                    + " by "
+                    + DungeonPack.PackDepthOf(model).ToString("0.####", CultureInfo.InvariantCulture)
+                    + " pack units off a base "
+                    + DungeonPack.PackBaseOf(model).ToString("0.####", CultureInfo.InvariantCulture)
+                    + " from its pivot, sitting "
+                    + DungeonPack.PackShiftAcrossOf(model).ToString("0.####", CultureInfo.InvariantCulture)
+                    + " by "
+                    + DungeonPack.PackShiftAlongOf(model).ToString("0.####", CultureInfo.InvariantCulture)
+                    + " off the pivot in plan",
+                    string.Format(
+                        CultureInfo.InvariantCulture,
+                        "it measures {0:0.#####} by {1:0.#####} against {2:0.#####} by {3:0.#####}, "
+                        + "its base {4:0.#####} from the pivot against {5:0.#####}, its plan centred on "
+                        + "({6:0.#####}, {7:0.#####}) against ({8:0.#####}, {9:0.#####})",
+                        box.size.x,
+                        box.size.z,
+                        wide,
+                        deep,
+                        box.min.y,
+                        foot,
+                        box.center.x,
+                        box.center.z,
+                        across,
+                        along));
+            }
+
+            return failures;
+        }
+
+        static int TheLandmarksAreCutFromPackMeshes(
+            WorldModels models,
+            LevelGraph graph,
+            IDictionary<string, Transform> byName,
+            StringBuilder report)
+        {
+            var failures = 0;
+            var pack = new Dictionary<PartModel, ISet<Mesh>>();
+            var wanted = new List<PartModel>();
+            var primitive = new List<string>();
+
+            foreach (var kind in LandmarkForm.Kinds)
+            {
+                foreach (var piece in LandmarkForm.Pieces(kind))
+                {
+                    if (piece.Model == PartModel.None)
+                    {
+                        primitive.Add(kind + "/" + piece.Name + " names no mesh at all");
+                        continue;
+                    }
+
+                    if (piece.Shape != PartShape.Landmark)
+                    {
+                        primitive.Add(kind + "/" + piece.Name + " is cut as a " + piece.Shape);
+                    }
+
+                    if (ArtPacks.Of(piece.Model) != ArtPack.Dungeon)
+                    {
+                        primitive.Add(kind + "/" + piece.Name + " reaches outside the dungeon pack");
+                    }
+
+                    if (!pack.ContainsKey(piece.Model))
+                    {
+                        pack.Add(piece.Model, PackMesh.Of(models.Of(piece.Model)));
+                        wanted.Add(piece.Model);
+                    }
+                }
+            }
+
+            var names = new List<string>();
+
+            foreach (var model in wanted)
+            {
+                names.Add(model + " = " + WorldModels.AssetPathOf(model));
+            }
+
+            failures += Assert(
+                report,
+                primitive.Count == 0,
+                "every landmark course names a dungeon-pack mesh, so no primitive is left in LandmarkForm",
+                wanted.Count + " meshes dress the " + LandmarkForm.Kinds.Count + " kinds: "
+                + string.Join(", ", names.ToArray())
+                + (primitive.Count == 0 ? "" : "; " + string.Join("; ", primitive.ToArray())));
+
+            var everyMesh = new List<Mesh>();
+
+            foreach (var model in wanted)
+            {
+                foreach (var mesh in pack[model])
+                {
+                    everyMesh.Add(mesh);
+                }
+            }
+
+            var spots = Landmarks.Of(graph);
+            var meshed = 0;
+            var raised = 0;
+            var strays = new List<string>();
+
+            foreach (var spot in spots)
+            {
+                Transform instance;
+
+                if (!byName.TryGetValue(PartNames.Landmark(spot.Tile), out instance))
+                {
+                    continue;
+                }
+
+                raised++;
+                var pieces = LandmarkForm.Pieces(spot.Kind);
+                var renderers = instance.GetComponentsInChildren<Renderer>(true);
+                var wearing = renderers.Length >= pieces.Count;
+
+                foreach (var renderer in renderers)
+                {
+                    var mesh = PackMesh.On(renderer);
+
+                    if (mesh == null || !everyMesh.Contains(mesh))
+                    {
+                        wearing = false;
+
+                        if (strays.Count < Complaints)
+                        {
+                            strays.Add(spot.Kind + "/" + renderer.name + " wears "
+                                + (mesh == null ? "nothing" : mesh.name));
+                        }
+                    }
+                }
+
+                var carried = 0;
+
+                foreach (var piece in pieces)
+                {
+                    var child = instance.Find(piece.Name);
+
+                    if (child != null && PackMesh.Around(child.gameObject).size.sqrMagnitude > 0f)
+                    {
+                        carried++;
+                    }
+                }
+
+                if (wearing && carried == pieces.Count)
+                {
+                    meshed++;
+                }
+            }
+
+            return failures + Assert(
+                report,
+                raised > 0 && meshed == raised && raised == spots.Count,
+                "every landmark standing in the world is cut from those pack meshes, with no primitive "
+                + "block left in the build",
+                meshed + " of " + raised + " raised, against " + spots.Count + " the placement names"
+                + (strays.Count == 0 ? "" : "; " + string.Join(", ", strays.ToArray())));
+        }
+
+        static int TheLandmarksStandWhereTheirReachAndHeightSayTheyDo(
             LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
-            var readings = new List<LandmarkReading>();
-            var tile = ScreenFrame.TileGroundPixels(LevelFraming.PlaySize);
+            var readings = new List<string>();
+            var lying = new List<string>();
+            var measured = 0;
 
             foreach (var spot in Landmarks.Of(graph))
             {
@@ -1164,32 +1376,231 @@ namespace Game.EditorTooling
                     continue;
                 }
 
-                readings.Add(Photograph(instance, spot.Kind));
+                measured++;
+                var box = World(instance);
+                var standing = Landmarks.StandingOf(spot);
+                var reach = Math.Max(
+                    Math.Max(box.max.x - standing.X, standing.X - box.min.x),
+                    Math.Max(box.max.z - standing.Z, standing.Z - box.min.z));
+                var promised = LandmarkForm.ReachOf(spot.Kind);
+                var tall = LandmarkForm.StandingHeightOf(spot.Kind);
+
+                readings.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} reaches {1:0.####} of a promised {2:0.####} and stands {3:0.####} of a promised "
+                    + "{4:0.####}",
+                    spot.Kind,
+                    reach,
+                    promised,
+                    box.size.y,
+                    tall));
+
+                if (Math.Abs(reach - promised) > LandmarkFit
+                    || Math.Abs(box.size.y - tall) > LandmarkFit
+                    || reach > LandmarkForm.Reach + LandmarkFit)
+                {
+                    lying.Add(spot.Kind.ToString());
+                }
             }
 
-            if (readings.Count < 2)
+            return Assert(
+                report,
+                measured > 0 && lying.Count == 0,
+                "the reach and the standing height every kind answers with are the ones its pack meshes "
+                + "actually take up in the world, and none of them claims more than the "
+                + LandmarkForm.Reach.ToString("0.###", CultureInfo.InvariantCulture)
+                + " footprint the placement budgets for, so placement and badge anchoring are told the truth",
+                string.Join("; ", readings.ToArray())
+                + (lying.Count == 0 ? "" : "; overstated by " + string.Join(", ", lying.ToArray())));
+        }
+
+        static int NoLandmarkClipsWhatShipsBesideIt(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var landmarks = new List<KeyValuePair<string, Bounds>>();
+
+            foreach (var spot in Landmarks.Of(graph))
+            {
+                Transform instance;
+
+                if (byName.TryGetValue(PartNames.Landmark(spot.Tile), out instance))
+                {
+                    landmarks.Add(new KeyValuePair<string, Bounds>(spot.Kind.ToString(), World(instance)));
+                }
+            }
+
+            var others = new List<KeyValuePair<string, Bounds>>();
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                Transform instance;
+
+                if (byName.TryGetValue(PartNames.Node(node.Id), out instance))
+                {
+                    others.Add(new KeyValuePair<string, Bounds>(
+                        node.Type + " " + PartNames.Node(node.Id), World(instance)));
+                }
+            }
+
+            var clipping = new List<string>();
+
+            for (var one = 0; one < landmarks.Count; one++)
+            {
+                for (var other = one + 1; other < landmarks.Count; other++)
+                {
+                    if (landmarks[one].Value.Intersects(landmarks[other].Value))
+                    {
+                        clipping.Add(landmarks[one].Key + " into " + landmarks[other].Key);
+                    }
+                }
+
+                foreach (var subject in others)
+                {
+                    if (landmarks[one].Value.Intersects(subject.Value))
+                    {
+                        clipping.Add(landmarks[one].Key + " into " + subject.Key);
+                    }
+                }
+            }
+
+            var failures = Assert(
+                report,
+                landmarks.Count > 0 && others.Count > 0 && clipping.Count == 0,
+                "no landmark's bounds touch another landmark, a gate, a chest or a figure the level ships",
+                landmarks.Count + " landmarks were held against " + others.Count + " node props"
+                + (clipping.Count == 0
+                    ? " and none of them meet"
+                    : "; " + string.Join(", ", clipping.GetRange(0, Math.Min(Complaints, clipping.Count)).ToArray())));
+
+            var walls = new List<KeyValuePair<string, Bounds>>();
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                foreach (var side in TileSides.All)
+                {
+                    Transform panel;
+
+                    if (byName.TryGetValue(PartNames.Wall(tile.Position, side), out panel))
+                    {
+                        walls.Add(new KeyValuePair<string, Bounds>(
+                            PartNames.Wall(tile.Position, side), World(panel)));
+                    }
+                }
+            }
+
+            var leaning = new List<string>();
+            var crowding = new List<string>();
+
+            foreach (var spot in Landmarks.Of(graph))
+            {
+                Transform instance;
+
+                if (!byName.TryGetValue(PartNames.Landmark(spot.Tile), out instance))
+                {
+                    continue;
+                }
+
+                var box = World(instance);
+                var leant = PartNames.Wall(spot.Tile, spot.Against);
+                var touched = 0;
+
+                foreach (var panel in walls)
+                {
+                    if (!box.Intersects(panel.Value))
+                    {
+                        continue;
+                    }
+
+                    if (panel.Key == leant)
+                    {
+                        touched++;
+                    }
+                    else if (crowding.Count < Complaints)
+                    {
+                        crowding.Add(spot.Kind + " into " + panel.Key);
+                    }
+                }
+
+                leaning.Add(spot.Kind + " leans on " + touched + " panel of its own side");
+            }
+
+            return failures + Assert(
+                report,
+                walls.Count > 0 && landmarks.Count > 0 && crowding.Count == 0,
+                "the only masonry a landmark meets is the parapet of the very tile side it was stood "
+                + "against, so it never pushes into a neighbouring panel",
+                landmarks.Count + " landmarks were held against " + walls.Count + " panels; "
+                + string.Join(", ", leaning.ToArray())
+                + (crowding.Count == 0 ? "" : "; " + string.Join(", ", crowding.ToArray())));
+        }
+
+        static int TheLandmarksReadApartFromEveryPanAngle(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var failures = 0;
+
+            failures += ReadApartAt(graph, byName, report, LevelFraming.PlaySize, "play");
+
+            return failures + ReadApartAt(graph, byName, report, LevelFraming.CloseUpSize, "closed");
+        }
+
+        static int ReadApartAt(
+            LevelGraph graph,
+            IDictionary<string, Transform> byName,
+            StringBuilder report,
+            float framing,
+            string framingName)
+        {
+            var readings = new List<LandmarkReading>();
+            var tile = ScreenFrame.TileGroundPixels(framing);
+
+            foreach (var spot in Landmarks.Of(graph))
+            {
+                Transform instance;
+
+                if (!byName.TryGetValue(PartNames.Landmark(spot.Tile), out instance))
+                {
+                    continue;
+                }
+
+                for (var pan = 0; pan < PanYaws.Length; pan++)
+                {
+                    readings.Add(Photograph(instance, spot.Kind, framing, PanYaws[pan], pan, framingName));
+                }
+            }
+
+            if (readings.Count < PanYaws.Length * 2)
             {
                 return Assert(
                     report,
                     false,
-                    "the ship level raises landmarks enough to compare against each other",
+                    "the ship level raises landmarks enough to compare against each other at the "
+                    + framingName + " framing",
                     readings.Count + " were photographed");
             }
 
             var failures = 0;
             var specks = new List<string>();
             var shares = new List<string>();
+            var thinnest = float.MaxValue;
 
             foreach (var reading in readings)
             {
                 var share = tile <= 0f ? 0f : reading.Pixels / tile;
 
-                shares.Add(string.Format(
-                    CultureInfo.InvariantCulture, "{0} {1:0.##} tiles", reading.Kind, share));
+                thinnest = Math.Min(thinnest, share);
+
+                if (reading.Pan == 0)
+                {
+                    shares.Add(string.Format(
+                        CultureInfo.InvariantCulture, "{0} {1:0.##} tiles", reading.Kind, share));
+                }
 
                 if (share < LandmarkShare)
                 {
-                    specks.Add(reading.Kind + " covers only " + share.ToString("0.###", CultureInfo.InvariantCulture));
+                    specks.Add(reading.Kind + " covers only "
+                        + share.ToString("0.###", CultureInfo.InvariantCulture) + " panned to "
+                        + reading.Yaw.ToString("0", CultureInfo.InvariantCulture));
                 }
             }
 
@@ -1198,48 +1609,74 @@ namespace Game.EditorTooling
                 specks.Count == 0,
                 "every landmark covers at least "
                 + LandmarkShare.ToString("0.##", CultureInfo.InvariantCulture)
-                + " of a tile of ground at the play framing, so it is a shape a player reads rather than "
-                + "a speck",
+                + " of a tile of ground at the " + framingName
+                + " framing from every pan angle, so it is a shape a player reads rather than a speck",
                 string.Join(", ", shares.ToArray())
+                + string.Format(
+                    CultureInfo.InvariantCulture, "; the thinnest angle leaves {0:0.###}", thinnest)
                 + (specks.Count == 0 ? "" : "; " + string.Join("; ", specks.ToArray())));
 
             var alike = new List<string>();
-            var closest = 1f;
-            var palest = 10f;
+            var pairings = 0;
+            var likest = 10f;
+            var closest = 0f;
+            var palest = 0f;
+            var tightest = "no pairing at all";
 
             for (var one = 0; one < readings.Count; one++)
             {
                 for (var other = one + 1; other < readings.Count; other++)
                 {
+                    if (readings[one].Kind == readings[other].Kind)
+                    {
+                        continue;
+                    }
+
+                    pairings++;
                     var apart = Disagreement(readings[one].Silhouette, readings[other].Silhouette);
                     var tone = Apart(readings[one].Colour, readings[other].Colour);
+                    var pair = readings[one].Kind + " panned to "
+                        + readings[one].Yaw.ToString("0", CultureInfo.InvariantCulture)
+                        + " against " + readings[other].Kind + " panned to "
+                        + readings[other].Yaw.ToString("0", CultureInfo.InvariantCulture);
+                    var likeness = Math.Max(
+                        apart / LandmarkOutlineApart, tone / LandmarkColourApart);
 
-                    closest = Math.Min(closest, apart);
-                    palest = Math.Min(palest, tone);
+                    if (likeness < likest)
+                    {
+                        likest = likeness;
+                        closest = apart;
+                        palest = tone;
+                        tightest = pair;
+                    }
 
                     if (apart < LandmarkOutlineApart && tone < LandmarkColourApart)
                     {
-                        alike.Add(readings[one].Kind + " against " + readings[other].Kind);
+                        alike.Add(pair);
                     }
                 }
             }
 
-            failures += Assert(
+            return failures + Assert(
                 report,
                 alike.Count == 0,
-                "no two landmarks in one level share both an outline and a colour at the play framing, so "
-                + "a glance tells them apart",
+                "no two landmark kinds share both an outline and a colour at the " + framingName
+                + " framing, at any pair of the " + PanYaws.Length
+                + " pan angles the rig can look at them from, so a glance tells them apart",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "the closest pair disagrees over {0:0.###} of its outline and {1:0.###} in colour, "
-                    + "against the {2:0.##} / {3:0.##} asked for{4}",
+                    "over {0} pairings the likest is {6}, which disagrees over {1:0.###} of its outline "
+                    + "and {2:0.###} in colour, against the {3:0.##} / {4:0.##} either of which is "
+                    + "enough{5}",
+                    pairings,
                     closest,
                     palest,
                     LandmarkOutlineApart,
                     LandmarkColourApart,
-                    alike.Count == 0 ? "" : "; alike: " + string.Join(", ", alike.ToArray())));
-
-            return failures;
+                    alike.Count == 0
+                        ? ""
+                        : "; alike: " + string.Join(", ", alike.GetRange(0, Math.Min(Complaints, alike.Count)).ToArray()),
+                    tightest));
         }
 
         struct LandmarkReading
@@ -1251,18 +1688,40 @@ namespace Game.EditorTooling
             public int Pixels;
 
             public Color Colour;
+
+            public float Yaw;
+
+            public int Pan;
         }
 
-        static LandmarkReading Photograph(Transform instance, LandmarkKind kind)
+        static LandmarkReading Photograph(
+            Transform instance, LandmarkKind kind, float framing, float yaw, int pan, string framingName)
         {
-            var camera = PreviewFilm.Rig(instance.position, ShotDistance, LevelFraming.PlaySize);
+            var camera = PreviewFilm.Rig(instance.position, ShotDistance, framing, yaw);
             PreviewFilm.Warm(camera);
 
-            var silhouette = Silhouette(instance, camera);
-            PreviewFilm.Warm(camera);
+            var was = new List<KeyValuePair<GameObject, int>>();
 
-            var dressed = PreviewFilm.Frame(camera);
-            var lit = dressed.GetPixels32();
+            foreach (var node in instance.GetComponentsInChildren<Transform>(true))
+            {
+                was.Add(new KeyValuePair<GameObject, int>(node.gameObject, node.gameObject.layer));
+                node.gameObject.layer = AloneLayer;
+            }
+
+            camera.cullingMask = 1 << AloneLayer;
+            camera.backgroundColor = Color.black;
+            var onBlack = PreviewFilm.Frame(camera);
+            camera.backgroundColor = Color.white;
+            var onWhite = PreviewFilm.Frame(camera);
+
+            foreach (var node in was)
+            {
+                node.Key.layer = node.Value;
+            }
+
+            var dark = onBlack.GetPixels32();
+            var pale = onWhite.GetPixels32();
+            var silhouette = new bool[dark.Length];
             var covered = 0;
             var red = 0.0;
             var green = 0.0;
@@ -1270,19 +1729,22 @@ namespace Game.EditorTooling
 
             for (var pixel = 0; pixel < silhouette.Length; pixel++)
             {
+                silhouette[pixel] = !Changed(dark[pixel], pale[pixel]);
+
                 if (!silhouette[pixel])
                 {
                     continue;
                 }
 
                 covered++;
-                red += lit[pixel].r;
-                green += lit[pixel].g;
-                blue += lit[pixel].b;
+                red += dark[pixel].r;
+                green += dark[pixel].g;
+                blue += dark[pixel].b;
             }
 
-            PreviewFilm.Save(dressed, LandmarkShot(kind));
-            UnityEngine.Object.DestroyImmediate(dressed);
+            PreviewFilm.Save(onBlack, LandmarkShot(kind, framingName, pan));
+            UnityEngine.Object.DestroyImmediate(onBlack);
+            UnityEngine.Object.DestroyImmediate(onWhite);
             UnityEngine.Object.DestroyImmediate(camera.gameObject);
 
             return new LandmarkReading
@@ -1290,6 +1752,8 @@ namespace Game.EditorTooling
                 Kind = kind,
                 Silhouette = silhouette,
                 Pixels = covered,
+                Yaw = yaw,
+                Pan = pan,
                 Colour = covered == 0
                     ? Color.black
                     : new Color(
@@ -1299,9 +1763,10 @@ namespace Game.EditorTooling
             };
         }
 
-        static string LandmarkShot(LandmarkKind kind)
+        static string LandmarkShot(LandmarkKind kind, string framingName, int pan)
         {
-            return "dev/scratch/t-144-" + kind.ToString().ToLowerInvariant() + ".png";
+            return "dev/scratch/t-170-" + kind.ToString().ToLowerInvariant() + "-" + framingName + "-"
+                + pan.ToString(CultureInfo.InvariantCulture) + ".png";
         }
 
         static float Disagreement(bool[] one, bool[] other)
