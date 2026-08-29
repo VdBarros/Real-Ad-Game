@@ -26,6 +26,8 @@ namespace Game.EditorTooling
 
         const float Epsilon = 1e-4f;
 
+        const int DriftRuns = 200;
+
         const float StirFloor = 1f;
 
         const string AbsentClip = "no_such_clip_the_pack_never_carried";
@@ -72,6 +74,7 @@ namespace Game.EditorTooling
                 failures += TheWholeCastCarriesTheSameClips(models, report);
                 failures += Cut(models, report);
                 failures += Answered(models, report);
+                failures += Traded(models, report);
                 failures += Degrades(models, report);
                 failures += Walked(models, report);
             }
@@ -268,12 +271,13 @@ namespace Game.EditorTooling
             foreach (var outcome in FoughtOutcomes)
             {
                 var fight = Fight.Of(outcome);
-                failures += Fits(models, report, worn, FigureCues.Striking(fight), fight.Seconds, outcome + " fight");
+                failures += Fits(models, report, worn, FigureCues.Striking(fight), fight.Beat, outcome + " fight");
                 rows.Add(string.Format(
                     CultureInfo.InvariantCulture,
-                    "{0} plays {1} for {2:0.###}s",
+                    "{0} opens on {1} cut to {2:0.###}s of a {3:0.###}s fight",
                     outcome,
                     FigureCues.Striking(fight).Act,
+                    fight.Beat,
                     fight.Seconds));
             }
 
@@ -448,7 +452,7 @@ namespace Game.EditorTooling
                 var reply = FigureCues.Answering(fight);
 
                 if (reply.Act == FigureCues.Answered(blow.Act)
-                    && Math.Abs(reply.Beat - fight.Seconds) <= Epsilon
+                    && Math.Abs(reply.Beat - fight.Beat) <= Epsilon
                     && (reply.Act == FigureAct.Clash) == (blow.Act == FigureAct.Clash))
                 {
                     mirrored++;
@@ -460,7 +464,7 @@ namespace Game.EditorTooling
                     outcome,
                     blow.Act,
                     reply.Act,
-                    fight.Seconds));
+                    fight.Beat));
 
                 foreach (var mesh in meshes)
                 {
@@ -470,7 +474,7 @@ namespace Game.EditorTooling
 
                     if (clip != null
                         && reply.EndsWithin(seconds)
-                        && Math.Abs(reply.TimeIn(seconds, fight.Seconds) - seconds) <= Epsilon)
+                        && Math.Abs(reply.TimeIn(seconds, fight.Beat) - seconds) <= Epsilon)
                     {
                         fitted++;
                     }
@@ -479,7 +483,7 @@ namespace Game.EditorTooling
                         complaint.Add(
                             mesh + " answering a " + outcome + " with " + reply.Clip + " runs "
                             + seconds.ToString("0.###", CultureInfo.InvariantCulture) + "s against a beat of "
-                            + fight.Seconds.ToString("0.###", CultureInfo.InvariantCulture) + "s");
+                            + fight.Beat.ToString("0.###", CultureInfo.InvariantCulture) + "s");
                     }
                 }
             }
@@ -502,6 +506,188 @@ namespace Game.EditorTooling
                 + (complaint.Count == 0 ? string.Empty : "; " + string.Join("; ", complaint.ToArray())));
 
             return failures;
+        }
+
+        static int Traded(WorldModels models, StringBuilder report)
+        {
+            var win = Fight.Of(ActionOutcome.Win);
+
+            var failures = Assert(
+                report,
+                Math.Abs(VictoryStages.SecondsOf(VictoryStage.Clash) - 0.9f) <= Epsilon
+                && Math.Abs(VictoryStages.SecondsOf(VictoryStage.Dissolve) - 0.3f) <= Epsilon
+                && VictoryStages.BlocksInput(VictoryStage.Clash)
+                && VictoryStages.BlocksInput(VictoryStage.Dissolve)
+                && !VictoryStages.BlocksInput(VictoryStage.Done)
+                && Math.Abs(VictoryStages.BlockingSeconds - 1.2f) <= Epsilon
+                && Math.Abs(win.Seconds - VictoryStages.BlockingSeconds) <= Epsilon,
+                "the victory names a clash and a dissolve, each with its own duration and each holding the "
+                + "controls, and a won fight is held for exactly the two of them and nothing more",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "clash {0:0.###}s holding {1}, dissolve {2:0.###}s holding {3}, {4:0.###}s of held "
+                    + "movement against a won fight of {5:0.###}s",
+                    VictoryStages.SecondsOf(VictoryStage.Clash),
+                    VictoryStages.BlocksInput(VictoryStage.Clash),
+                    VictoryStages.SecondsOf(VictoryStage.Dissolve),
+                    VictoryStages.BlocksInput(VictoryStage.Dissolve),
+                    VictoryStages.BlockingSeconds,
+                    win.Seconds));
+
+            var meshes = Rigged();
+            var blows = new List<FigureAct>();
+            var replies = new List<FigureAct>();
+            var sparked = 0;
+            var traded = 0;
+            var fitted = 0;
+            var pairs = 0;
+
+            for (var blow = 0; blow < Fight.Blows; blow++)
+            {
+                var landing = win.Advanced(Fight.BlowOpensAt(blow) + Fight.BlowSeconds * 0.5f);
+                var struck = FigureCues.Striking(landing);
+                var answered = FigureCues.Answering(landing);
+
+                if (landing.Spark.IsLit)
+                {
+                    sparked++;
+                }
+
+                if (landing.IsTrading
+                    && landing.ThePlayerThrewIt == Fight.BlowIsThePlayers(blow)
+                    && struck.Act == (Fight.BlowIsThePlayers(blow) ? FigureAct.Strike : FigureAct.Recoil)
+                    && answered.Act == FigureCues.Answered(struck.Act)
+                    && (blow == 0 || struck.Act != blows[blow - 1]))
+                {
+                    traded++;
+                }
+
+                blows.Add(struck.Act);
+                replies.Add(answered.Act);
+
+                foreach (var mesh in meshes)
+                {
+                    pairs += 2;
+                    fitted += Cued(models, mesh, struck) + Cued(models, mesh, answered);
+                }
+            }
+
+            failures += Assert(
+                report,
+                Fight.Blows >= 3 && traded == Fight.Blows && sparked == Fight.Blows,
+                "a won clash is an exchange of blows rather than one shove: the blow passes from fighter to "
+                + "fighter, each one restarts both figures on a new clip, and each one strikes its own spark",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} blows over {1:0.###}s, {2} of them handed over cleanly and {3} of them lit: the "
+                    + "player plays {4} while the enemy plays {5}",
+                    Fight.Blows,
+                    VictoryStages.ClashSeconds,
+                    traded,
+                    sparked,
+                    string.Join("/", Named(blows)),
+                    string.Join("/", Named(replies))));
+
+            failures += Assert(
+                report,
+                pairs > 0 && fitted == pairs,
+                "every clip of the exchange ends inside the blow it is cut to, on both sides and on every "
+                + "mesh the cast wears",
+                fitted + " of " + pairs + " mesh and blow pairs do");
+
+            var solid = true;
+            for (var at = 0f; at < VictoryStages.ClashSeconds; at += Frame)
+            {
+                var during = win.Advanced(at);
+                solid &= during.Fade >= 1f && FigureCues.Striking(during).Act != FigureAct.Idle;
+            }
+
+            var opening = win.Advanced(VictoryStages.ClashSeconds);
+            var closing = win.Advanced(VictoryStages.BlockingSeconds - Frame);
+            var gone = win.Advanced(VictoryStages.BlockingSeconds);
+
+            failures += Assert(
+                report,
+                solid
+                && !opening.IsTrading
+                && FigureCues.Striking(opening).Equals(FigureCue.Still)
+                && FigureCues.Answering(opening).Equals(FigureCue.Still)
+                && closing.Fade < 0.1f
+                && closing.Fade > 0f
+                && gone.Fade <= 0f,
+                "the enemy holds its own skin for the whole exchange and only then fades out over the "
+                + "dissolve, which is the stage that stands both figures still",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the enemy reads at {0:0.###} through the clash, {1:0.###} as the dissolve opens, "
+                    + "{2:0.###} a frame from its end and {3:0.###} at the end",
+                    solid ? 1f : 0f,
+                    opening.Fade,
+                    closing.Fade,
+                    gone.Fade));
+
+            var clock = 0d;
+            var carried = 0f;
+            var shortest = float.MaxValue;
+            var longest = 0f;
+
+            for (var run = 0; run < DriftRuns; run++)
+            {
+                var contact = clock - carried;
+                var fight = Fight.Of(ActionOutcome.Win).Advanced(carried);
+                var delta = Frame * (1f + 0.25f * (run % 5 - 2));
+
+                for (var frame = 0; frame < FrameCap && !fight.IsSettled; frame++)
+                {
+                    fight = fight.Advanced(delta);
+                    clock += delta;
+                }
+
+                carried = fight.Timeline.Overrun;
+
+                var span = (float)(clock - carried - contact);
+                shortest = span < shortest ? span : shortest;
+                longest = span > longest ? span : longest;
+            }
+
+            failures += Assert(
+                report,
+                longest - shortest <= 0.001f
+                && Math.Abs(shortest - VictoryStages.BlockingSeconds) <= 0.001f,
+                "a run of " + DriftRuns + " fights back to back accumulates no drift, so the last one holds "
+                + "the controls for the same span the first one did",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "held between {0:0.#####}s and {1:0.#####}s against the {2:0.###}s the stages add up to",
+                    shortest,
+                    longest,
+                    VictoryStages.BlockingSeconds));
+
+            return failures;
+        }
+
+        static int Cued(WorldModels models, PartModel mesh, FigureCue cue)
+        {
+            var clip = models.ClipOf(mesh, cue.Clip);
+            var seconds = clip == null ? 0f : clip.length;
+
+            return clip != null
+                && cue.EndsWithin(seconds)
+                && Math.Abs(cue.TimeIn(seconds, cue.Beat) - seconds) <= Epsilon
+                ? 1
+                : 0;
+        }
+
+        static string[] Named(List<FigureAct> acts)
+        {
+            var names = new string[acts.Count];
+
+            for (var slot = 0; slot < acts.Count; slot++)
+            {
+                names[slot] = acts[slot].ToString();
+            }
+
+            return names;
         }
 
         static List<PartModel> Rigged()
@@ -742,6 +928,38 @@ namespace Game.EditorTooling
                 var beatFrames = 0;
                 var beatFill = 0f;
 
+                void Record()
+                {
+                    var held = beatFrames * Frame;
+                    var allowed = BeatOf(beatAct, held);
+                    var lastFrame = allowed <= 0f ? 1f : Frame / allowed;
+
+                    beats.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} held {1} frames ({2:0.###}s of {3:0.###}s) and reached {4:0.###} of its clip",
+                        beatAct,
+                        beatFrames,
+                        held,
+                        allowed,
+                        beatFill));
+
+                    if (held > allowed + Frame + Epsilon)
+                    {
+                        overrun.Add(beatAct + " ran " + held.ToString("0.###", CultureInfo.InvariantCulture)
+                            + "s over a beat of " + allowed.ToString("0.###", CultureInfo.InvariantCulture)
+                            + "s");
+                    }
+
+                    if (beatFill < 1f - lastFrame - 1e-3f)
+                    {
+                        unfinished.Add(beatAct + " only reached "
+                            + beatFill.ToString("0.###", CultureInfo.InvariantCulture)
+                            + " of its clip, more than the "
+                            + lastFrame.ToString("0.###", CultureInfo.InvariantCulture)
+                            + " one frame of the beat is worth short of the end");
+                    }
+                }
+
                 for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
                 {
                     Step(rig, builder, walker, driven);
@@ -786,12 +1004,22 @@ namespace Game.EditorTooling
                         }
                     }
 
-                    if (driven.Act != FigureAct.Idle && driven.Act != FigureAct.Walk
-                        && driven.Act != FigureAct.Retreat)
+                    var playing = driven.Act;
+                    var beating = playing != FigureAct.Idle && playing != FigureAct.Walk
+                        && playing != FigureAct.Retreat;
+
+                    if (beatAct != FigureAct.Idle && playing != beatAct)
                     {
-                        if (driven.Act != beatAct)
+                        Record();
+                        beatAct = FigureAct.Idle;
+                        beatFrames = 0;
+                    }
+
+                    if (beating)
+                    {
+                        if (beatAct == FigureAct.Idle)
                         {
-                            beatAct = driven.Act;
+                            beatAct = playing;
                             beatFrames = 0;
                         }
 
@@ -799,40 +1027,6 @@ namespace Game.EditorTooling
                         beatFill = driven.PlayingSeconds <= 0f
                             ? 0f
                             : driven.PlayingTime / driven.PlayingSeconds;
-                    }
-                    else if (beatAct != FigureAct.Idle)
-                    {
-                        var held = beatFrames * Frame;
-                        var allowed = BeatOf(beatAct);
-                        var lastFrame = allowed <= 0f ? 1f : Frame / allowed;
-
-                        beats.Add(string.Format(
-                            CultureInfo.InvariantCulture,
-                            "{0} held {1} frames ({2:0.###}s of {3:0.###}s) and reached {4:0.###} of its clip",
-                            beatAct,
-                            beatFrames,
-                            held,
-                            allowed,
-                            beatFill));
-
-                        if (held > allowed + Frame + Epsilon)
-                        {
-                            overrun.Add(beatAct + " ran " + held.ToString("0.###", CultureInfo.InvariantCulture)
-                                + "s over a beat of " + allowed.ToString("0.###", CultureInfo.InvariantCulture)
-                                + "s");
-                        }
-
-                        if (beatFill < 1f - lastFrame - 1e-3f)
-                        {
-                            unfinished.Add(beatAct + " only reached "
-                                + beatFill.ToString("0.###", CultureInfo.InvariantCulture)
-                                + " of its clip, more than the "
-                                + lastFrame.ToString("0.###", CultureInfo.InvariantCulture)
-                                + " one frame of the beat is worth short of the end");
-                        }
-
-                        beatAct = FigureAct.Idle;
-                        beatFrames = 0;
                     }
                 }
 
@@ -997,20 +1191,55 @@ namespace Game.EditorTooling
                     back));
         }
 
-        static float BeatOf(FigureAct act)
+        static float BeatOf(FigureAct act, float held)
         {
+            var wanted = 0f;
+            var away = float.MaxValue;
+
+            foreach (var beat in BeatsOf(act))
+            {
+                var gap = Math.Abs(beat - held);
+                if (gap >= away)
+                {
+                    continue;
+                }
+
+                away = gap;
+                wanted = beat;
+            }
+
+            return wanted;
+        }
+
+        static List<float> BeatsOf(FigureAct act)
+        {
+            var beats = new List<float>();
+
             switch (act)
             {
                 case FigureAct.Strike:
-                    return Fight.Of(ActionOutcome.Win).Seconds;
+                    Blows(beats);
+                    break;
                 case FigureAct.Clash:
-                    return Fight.Of(ActionOutcome.Tie).Seconds;
+                    beats.Add(Fight.Of(ActionOutcome.Tie).Seconds);
+                    break;
                 case FigureAct.Recoil:
-                    return Fight.Of(ActionOutcome.Loss).Seconds;
+                    Blows(beats);
+                    beats.Add(Fight.Of(ActionOutcome.Loss).Seconds);
+                    break;
                 case FigureAct.Take:
-                    return Take.Seconds;
-                default:
-                    return 0f;
+                    beats.Add(Take.Seconds);
+                    break;
+            }
+
+            return beats;
+        }
+
+        static void Blows(List<float> beats)
+        {
+            for (var blow = 0; blow < Fight.Blows; blow++)
+            {
+                beats.Add(Fight.BlowSecondsOf(blow));
             }
         }
 
