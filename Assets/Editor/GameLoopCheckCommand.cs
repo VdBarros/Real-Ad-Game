@@ -26,6 +26,8 @@ namespace Game.EditorTooling
 
         const int MoveCap = 80;
 
+        const float Slack = 1e-4f;
+
         const string ShotPath = "dev/scratch/t-17-";
 
         static readonly MazePreset Unbuildable =
@@ -40,6 +42,12 @@ namespace Game.EditorTooling
             public int FinalPower;
             public int Moves;
             public int BeatsSkipped;
+            public int BeatFrames;
+            public int BeatBusyFrames;
+            public float Punch;
+            public float BiggestSizeStep;
+            public float LastSize;
+            public bool LastWasPunched;
             public int Carriers;
             public int BadgeTextures;
             public int BadgeMaterials;
@@ -80,6 +88,12 @@ namespace Game.EditorTooling
                 TheLoopIsPreviewingItsLevel(loop, turn);
                 ALevelIsOneRoot(loop, persistent, turn);
                 EnterPlay(loop, turn);
+
+                if (index == 0)
+                {
+                    ThePlayFramingHoldsTheFigureAtItsShareOfTheScreen(loop);
+                }
+
                 Win(loop, turn);
                 TheResultShowsTheFinalPower(loop, turn);
                 Measure(loop, turn);
@@ -100,6 +114,8 @@ namespace Game.EditorTooling
             }
 
             PreviewFilm.Shoot(loop.Rig.GetComponent<Camera>(), ShotPath + "twentieth.png");
+
+            TheBeatIsAPunchAndNotACut(turns);
 
             loop.Tear();
             TeardownLeavesOnlyWhatOutlivesALevel(loop, persistent, persistentCount);
@@ -293,6 +309,7 @@ namespace Game.EditorTooling
                 {
                     Step(loop);
                     frames++;
+                    ThePunchEasesInAndOutWithoutACut(loop, turn);
 
                     if (loop.Rig.IsBusy && turn.BeatsSkipped == 0)
                     {
@@ -317,6 +334,140 @@ namespace Game.EditorTooling
             if (loop.Phase != GamePhase.Result)
             {
                 Fail("Turn " + turn.Number + " ran " + turn.Moves + " moves without a result.");
+            }
+        }
+
+        static void ThePlayFramingHoldsTheFigureAtItsShareOfTheScreen(GameLoop loop)
+        {
+            var lens = loop.Rig.GetComponent<Camera>();
+
+            for (var frame = 0;
+                frame < FlightCap
+                    && Mathf.Abs(lens.orthographicSize - LevelFraming.PlaySize) > Slack;
+                frame++)
+            {
+                Step(loop);
+            }
+
+            var foot = LevelFraming.StartPoint(loop.Level.Graph);
+            var standing = new Vector3(foot.X, foot.Y, foot.Z);
+            var head = standing + Vector3.up * LevelFraming.FigureHeight;
+            var drawn = Mathf.Abs(
+                lens.WorldToViewportPoint(head).y - lens.WorldToViewportPoint(standing).y);
+            var share = LevelFraming.ShareOfScreen(LevelFraming.FigureHeight, lens.orthographicSize);
+
+            Debug.Log(string.Format(
+                CultureInfo.InvariantCulture,
+                "t-17: the play lens sits at {0:0.###} where the framing asks for {1:0.###}, which stands a"
+                + " {2:0.###} m figure across {3:0.#}% of the frame's world height and {4:0.#}% of its pixels",
+                lens.orthographicSize,
+                LevelFraming.PlaySize,
+                LevelFraming.FigureHeight,
+                share * 100f,
+                drawn * 100f));
+
+            if (Mathf.Abs(share - LevelFraming.FigureHeightFraction) > 0.002f)
+            {
+                Fail(
+                    "The live lens stands the figure across " + (share * 100f) + "% of the frame where the"
+                    + " framing asks for " + (LevelFraming.FigureHeightFraction * 100f) + "%.");
+            }
+
+            if (drawn <= 0.04f || drawn >= 0.09f)
+            {
+                Fail(
+                    "The figure draws across " + (drawn * 100f)
+                    + "% of the rendered frame, nowhere near the 7% the ad reads at.");
+            }
+        }
+
+        static void ThePunchEasesInAndOutWithoutACut(GameLoop loop, Turn turn)
+        {
+            var resting = LevelFraming.PlaySize;
+            var size = loop.Rig.Framing.OrthographicSize;
+            var punched = size < resting - Slack;
+
+            if (turn.LastSize > 0f && (punched || turn.LastWasPunched))
+            {
+                turn.BiggestSizeStep = Mathf.Max(turn.BiggestSizeStep, Mathf.Abs(size - turn.LastSize));
+            }
+
+            turn.LastSize = size;
+            turn.LastWasPunched = punched;
+
+            if (!punched)
+            {
+                return;
+            }
+
+            turn.BeatFrames++;
+            turn.Punch = Mathf.Max(turn.Punch, resting / size);
+
+            if (loop.Rig.IsBusy)
+            {
+                turn.BeatBusyFrames++;
+            }
+        }
+
+        static void TheBeatIsAPunchAndNotACut(Turn[] turns)
+        {
+            var beatFrames = 0;
+            var busyFrames = 0;
+            var punch = 0f;
+            var biggestStep = 0f;
+
+            foreach (var turn in turns)
+            {
+                beatFrames += turn.BeatFrames;
+                busyFrames += turn.BeatBusyFrames;
+                punch = Mathf.Max(punch, turn.Punch);
+                biggestStep = Mathf.Max(biggestStep, turn.BiggestSizeStep);
+            }
+
+            var span = LevelFraming.PlaySize - LevelFraming.CloseUpSize;
+
+            Debug.Log(string.Format(
+                CultureInfo.InvariantCulture,
+                "t-17: the multiplier beat ran {0} frames of punched framing over twenty turns, {1} of them"
+                + " with input locked out; deepest punch {2:0.###}x of the {3:0.###}x asked for, biggest"
+                + " single-frame size step {4:0.####} m of the {5:0.####} m the punch spans",
+                beatFrames,
+                busyFrames,
+                punch,
+                ZoomBeat.Punch,
+                biggestStep,
+                span));
+
+            if (beatFrames == 0)
+            {
+                Fail("No turn ever punched the framing, so the beat guards below went blind.");
+                return;
+            }
+
+            if (punch < 1.10f || punch > 1.25f)
+            {
+                Fail("The multiplier beat punched " + punch + "x, outside the 1.10x to 1.25x the ad reads at.");
+            }
+
+            if (Mathf.Abs(punch - ZoomBeat.Punch) > 0.01f)
+            {
+                Fail(
+                    "The beat reached " + punch + "x on screen where the constant asks for "
+                    + ZoomBeat.Punch + "x, so the lens is not carrying the ratio.");
+            }
+
+            if (biggestStep >= span * 0.5f)
+            {
+                Fail(
+                    "One frame moved the framing " + biggestStep + " m of the " + span
+                    + " m the punch spans, which reads as a cut rather than an ease.");
+            }
+
+            if (busyFrames >= beatFrames)
+            {
+                Fail(
+                    "Input was locked out for " + busyFrames + " of the " + beatFrames
+                    + " punched frames, so the lengthened beat holds the player through its whole return.");
             }
         }
 

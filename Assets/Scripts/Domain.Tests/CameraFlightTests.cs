@@ -149,7 +149,7 @@ namespace Game.Domain.Tests
             var moving = 0;
 
             var previous = staging.Framing;
-            while (staging.IsBusy)
+            while (!staging.IsSettled)
             {
                 staging = staging.Advanced(Frame);
                 if (!staging.Framing.Equals(previous))
@@ -160,7 +160,9 @@ namespace Game.Domain.Tests
                 previous = staging.Framing;
             }
 
-            var beating = staging.CutTo(new TilePosition(0, 1, 1)).Follows(new WorldPoint(9f, 2f, 9f));
+            var beating = staging.CutTo(new TilePosition(0, 1, 1))
+                .Follows(new WorldPoint(9f, 2f, 9f))
+                .Advanced(ZoomBeat.InSeconds);
             var held = beating.Framing;
             for (var step = 0; step < 30; step++)
             {

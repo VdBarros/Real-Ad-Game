@@ -46,20 +46,12 @@ namespace Game.Presentation.Pure
 
         public CameraFraming Framing
         {
-            get
-            {
-                if (!beat.IsSettled)
-                {
-                    return beat.Framing;
-                }
-
-                return flight.IsSettled ? follow.Framing : flight.Framing;
-            }
+            get { return beat.Over(flight.IsSettled ? follow.Framing : flight.Framing); }
         }
 
         public bool IsBusy
         {
-            get { return !flight.IsSettled || !beat.IsSettled; }
+            get { return !flight.IsSettled || beat.IsGripping; }
         }
 
         public bool IsSettled
@@ -123,7 +115,7 @@ namespace Game.Presentation.Pure
             }
 
             return new CameraStaging(
-                flight, follow.LookingBack(), ZoomBeat.On(LevelFraming.CloseUp(position)), pan.GivenUp());
+                flight, follow.LookingBack(), ZoomBeat.On(IsoProjection.Of(position)), pan.GivenUp());
         }
 
         public CameraStaging Released()
