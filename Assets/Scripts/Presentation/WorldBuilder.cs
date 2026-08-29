@@ -72,7 +72,6 @@ namespace Game.Presentation
             Crowd = root.AddComponent<CrowdBoard>();
             Crowd.Begin();
             Fights = root.AddComponent<FightBoard>();
-            Fights.Dress(materials.Of(PartStyle.Spark));
             Pickups = root.AddComponent<PickupBoard>();
             Trail = Group(root.transform, PartNames.TrailGroup).gameObject.AddComponent<TrailBoard>();
             Trail.Dress(materials.Of(PartStyle.Trail));

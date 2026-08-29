@@ -12,6 +12,8 @@ namespace Game.Domain.Tests
 
         const float Frame = 1f / 60f;
 
+        const PlayerWeapon Armed = PlayerWeapon.Axe;
+
         static readonly ActionOutcome[] FoughtOutcomes =
         {
             ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss
@@ -45,6 +47,12 @@ namespace Game.Domain.Tests
             Assert.That(AdventurerClips.Loops(FigureAct.Clash), Is.False);
             Assert.That(AdventurerClips.Loops(FigureAct.Recoil), Is.False);
             Assert.That(AdventurerClips.Loops(FigureAct.Take), Is.False);
+            Assert.That(AdventurerClips.Loops(FigureAct.Kick), Is.False);
+            Assert.That(AdventurerClips.Loops(FigureAct.Slice), Is.False);
+            Assert.That(AdventurerClips.Loops(FigureAct.Cleave), Is.False);
+            Assert.That(AdventurerClips.Loops(FigureAct.Thrust), Is.False);
+            Assert.That(AdventurerClips.Loops(FigureAct.Sweep), Is.False);
+            Assert.That(AdventurerClips.Loops(FigureAct.Fall), Is.False);
         }
 
         [Test]
@@ -82,8 +90,8 @@ namespace Game.Domain.Tests
         [Test]
         public void NoJourneyAtAllCuesTheIdleClip()
         {
-            Assert.That(FigureCues.Of(null), Is.EqualTo(FigureCue.Still));
-            Assert.That(FigureCues.Of(Journey.Nowhere), Is.EqualTo(FigureCue.Still));
+            Assert.That(FigureCues.Of(null, Armed), Is.EqualTo(FigureCue.Still));
+            Assert.That(FigureCues.Of(Journey.Nowhere, Armed), Is.EqualTo(FigureCue.Still));
         }
 
         [Test]
@@ -91,97 +99,21 @@ namespace Game.Domain.Tests
         {
             var journey = Journey.Toward(Opening(), Toward(Opening()));
 
-            Assert.That(FigureCues.Of(journey), Is.EqualTo(FigureCue.Walking));
-            Assert.That(FigureCues.Of(journey).Clip, Is.EqualTo(AdventurerClips.Walk));
-            Assert.That(FigureCues.Of(journey).Loops, Is.True);
+            Assert.That(FigureCues.Of(journey, Armed), Is.EqualTo(FigureCue.Walking));
+            Assert.That(FigureCues.Of(journey, Armed).Clip, Is.EqualTo(AdventurerClips.Walk));
+            Assert.That(FigureCues.Of(journey, Armed).Loops, Is.True);
 
             var falling = journey.Advanced(0.1f).Cancelled();
 
             Assert.That(falling.IsOver, Is.False);
             Assert.That(falling.Walk.IsRetreating, Is.True);
-            Assert.That(FigureCues.Of(falling).Act, Is.EqualTo(FigureAct.Retreat));
-            Assert.That(FigureCues.Of(falling).Clip, Is.EqualTo(AdventurerClips.Retreat));
-            Assert.That(FigureCues.Of(falling).Loops, Is.True);
+            Assert.That(FigureCues.Of(falling, Armed).Act, Is.EqualTo(FigureAct.Retreat));
+            Assert.That(FigureCues.Of(falling, Armed).Clip, Is.EqualTo(AdventurerClips.Retreat));
+            Assert.That(FigureCues.Of(falling, Armed).Loops, Is.True);
         }
 
         [Test]
-        public void EveryFoughtOutcomeCuesItsOwnClipCutToTheFightsOwnBeat()
-        {
-            var seen = new List<FigureAct>();
-
-            foreach (var outcome in FoughtOutcomes)
-            {
-                var fight = Fight.Of(outcome);
-                var cue = FigureCues.Striking(fight);
-
-                Assert.That(fight.IsJoined, Is.True, outcome.ToString());
-                Assert.That(cue.Loops, Is.False, outcome.ToString());
-                Assert.That(cue.Beat, Is.EqualTo(fight.Beat).Within(Tolerance), outcome.ToString());
-                Assert.That(cue.Beat, Is.GreaterThan(0f), outcome.ToString());
-                Assert.That(seen.Contains(cue.Act), Is.False, outcome.ToString());
-
-                seen.Add(cue.Act);
-            }
-
-            Assert.That(FigureCues.Striking(Fight.Of(ActionOutcome.Win)).Act, Is.EqualTo(FigureAct.Strike));
-            Assert.That(FigureCues.Striking(Fight.Of(ActionOutcome.Tie)).Act, Is.EqualTo(FigureAct.Clash));
-            Assert.That(FigureCues.Striking(Fight.Of(ActionOutcome.Loss)).Act, Is.EqualTo(FigureAct.Recoil));
-        }
-
-        [Test]
-        public void AFightNobodyJoinedCuesNothingButTheIdleClip()
-        {
-            Assert.That(FigureCues.Striking(Fight.None), Is.EqualTo(FigureCue.Still));
-            Assert.That(FigureCues.Striking(Fight.Of(ActionOutcome.Walked)), Is.EqualTo(FigureCue.Still));
-        }
-
-        [Test]
-        public void EveryFoughtOutcomeAnswersWithTheMirroredActOnTheSameBeat()
-        {
-            foreach (var outcome in FoughtOutcomes)
-            {
-                var fight = Fight.Of(outcome);
-                var blow = FigureCues.Striking(fight);
-                var reply = FigureCues.Answering(fight);
-
-                Assert.That(reply.Loops, Is.False, outcome.ToString());
-                Assert.That(reply.Beat, Is.EqualTo(blow.Beat).Within(Tolerance), outcome.ToString());
-                Assert.That(reply.Beat, Is.EqualTo(fight.Beat).Within(Tolerance), outcome.ToString());
-                Assert.That(reply.Act, Is.EqualTo(FigureCues.Answered(blow.Act)), outcome.ToString());
-            }
-
-            Assert.That(FigureCues.Answering(Fight.Of(ActionOutcome.Win)).Act, Is.EqualTo(FigureAct.Recoil));
-            Assert.That(FigureCues.Answering(Fight.Of(ActionOutcome.Tie)).Act, Is.EqualTo(FigureAct.Clash));
-            Assert.That(FigureCues.Answering(Fight.Of(ActionOutcome.Loss)).Act, Is.EqualTo(FigureAct.Strike));
-        }
-
-        [Test]
-        public void TheEnemyPlaysWhatThePlayerWouldHaveHadTheFightGoneTheOtherWay()
-        {
-            foreach (var outcome in FoughtOutcomes)
-            {
-                var reversed = Fight.Of(Reversed(outcome));
-
-                Assert.That(
-                    FigureCues.Answering(Fight.Of(outcome)).Act,
-                    Is.EqualTo(FigureCues.Striking(reversed).Act),
-                    outcome.ToString());
-            }
-        }
-
-        [Test]
-        public void TheAnswerIsCutToTheFightsOwnBeatRatherThanTheMirroredFights()
-        {
-            var win = Fight.Of(ActionOutcome.Win);
-            var loss = Fight.Of(ActionOutcome.Loss);
-
-            Assert.That(Math.Abs(win.Beat - loss.Beat), Is.GreaterThan(Tolerance));
-            Assert.That(FigureCues.Answering(win).Beat, Is.EqualTo(win.Beat).Within(Tolerance));
-            Assert.That(FigureCues.Answering(loss).Beat, Is.EqualTo(loss.Beat).Within(Tolerance));
-        }
-
-        [Test]
-        public void AWonClashCuesAStrikeAndAHitInTurnOnBothSidesAndRestartsOnEveryBlow()
+        public void AWonFightIsOneFinisherThePlayerThrowsAndNoCounterBlowComesBack()
         {
             var fight = Fight.Of(ActionOutcome.Win);
             var struck = FigureMotion.Still;
@@ -193,9 +125,8 @@ namespace Game.Domain.Tests
             for (var frame = 0; frame * Frame < VictoryStages.ClashSeconds; frame++)
             {
                 var playing = fight.Advanced(frame * Frame);
-                var wanted = FigureCues.Striking(playing);
 
-                struck = struck.Cued(wanted);
+                struck = struck.Cued(FigureCues.Striking(playing, Armed));
                 answered = answered.Cued(FigureCues.Answering(playing));
 
                 if (struck.Elapsed == 0f && frame > 0)
@@ -203,38 +134,130 @@ namespace Game.Domain.Tests
                     restarts++;
                 }
 
-                if (blows.Count == 0 || blows[blows.Count - 1] != wanted.Act)
+                if (blows.Count == 0 || blows[blows.Count - 1] != struck.Act)
                 {
-                    blows.Add(wanted.Act);
-                    replies.Add(FigureCues.Answering(playing).Act);
+                    blows.Add(struck.Act);
+                }
+
+                if (replies.Count == 0 || replies[replies.Count - 1] != answered.Act)
+                {
+                    replies.Add(answered.Act);
                 }
 
                 struck = struck.Advanced(Frame);
                 answered = answered.Advanced(Frame);
             }
 
-            Assert.That(blows.Count, Is.EqualTo(Fight.Blows));
-            Assert.That(blows[0], Is.EqualTo(FigureAct.Strike));
-            Assert.That(restarts, Is.EqualTo(Fight.Blows - 1));
+            Assert.That(restarts, Is.EqualTo(0));
+            Assert.That(blows, Is.EqualTo(new List<FigureAct> { FigureCues.FinisherOf(Armed) }));
+            Assert.That(replies, Is.EqualTo(new List<FigureAct> { FigureAct.Idle, FigureAct.Fall }));
+            Assert.That(blows, Has.No.Member(FigureAct.Recoil));
+            Assert.That(replies, Has.No.Member(FigureAct.Strike));
+            Assert.That(replies, Has.No.Member(FigureAct.Clash));
+        }
 
-            for (var blow = 0; blow < blows.Count; blow++)
+        [Test]
+        public void EachWeaponTierSwingsAFinisherOfItsOwn()
+        {
+            var weapons = Enum.GetValues(typeof(PlayerWeapon)).Cast<PlayerWeapon>().ToList();
+            var acts = new List<FigureAct>();
+            var clips = new List<string>();
+
+            foreach (var weapon in weapons)
             {
+                var act = FigureCues.FinisherOf(weapon);
+
+                Assert.That(acts, Has.No.Member(act), weapon.ToString());
+                Assert.That(AdventurerClips.Loops(act), Is.False, weapon.ToString());
+
+                acts.Add(act);
+                clips.Add(AdventurerClips.NameOf(act));
+            }
+
+            Assert.That(acts.Count, Is.EqualTo(weapons.Count));
+            Assert.That(clips.Distinct().Count(), Is.EqualTo(weapons.Count));
+            Assert.Throws<ArgumentOutOfRangeException>(() => FigureCues.FinisherOf((PlayerWeapon)99));
+        }
+
+        [Test]
+        public void ThePlayersBlowIsWhateverItIsHoldingAndTheEnemyDiesUnderAllOfThem()
+        {
+            var fight = Fight.Of(ActionOutcome.Win).Advanced(Fight.ExecutionAt);
+
+            foreach (PlayerWeapon weapon in Enum.GetValues(typeof(PlayerWeapon)))
+            {
+                var cue = FigureCues.Striking(fight, weapon);
+
+                Assert.That(cue.Act, Is.EqualTo(FigureCues.FinisherOf(weapon)), weapon.ToString());
+                Assert.That(cue.Beat, Is.EqualTo(fight.BlowBeat).Within(Tolerance), weapon.ToString());
                 Assert.That(
-                    blows[blow],
-                    Is.EqualTo(Fight.BlowIsThePlayers(blow) ? FigureAct.Strike : FigureAct.Recoil),
-                    "blow " + blow);
-
-                Assert.That(replies[blow], Is.EqualTo(FigureCues.Answered(blows[blow])), "blow " + blow);
-
-                if (blow > 0)
-                {
-                    Assert.That(blows[blow], Is.Not.EqualTo(blows[blow - 1]), "blow " + blow);
-                }
+                    FigureCues.Answering(fight).Act, Is.EqualTo(FigureAct.Fall), weapon.ToString());
             }
         }
 
         [Test]
-        public void TheDissolveCuesNothingButTheIdleClipOnBothSides()
+        public void ALostFightIsTheEnemysBlowLandingAndThePlayerNeverBlocks()
+        {
+            var loss = Fight.Of(ActionOutcome.Loss);
+            var opening = FigureCues.Striking(loss, Armed);
+
+            Assert.That(opening, Is.EqualTo(FigureCue.Still));
+
+            var struck = loss.Advanced(loss.ContactAt);
+            var falling = FigureCues.Striking(struck, Armed);
+            var swinging = FigureCues.Answering(struck);
+
+            Assert.That(falling.Act, Is.EqualTo(FigureAct.Fall));
+            Assert.That(falling.Beat, Is.EqualTo(loss.FallBeat).Within(Tolerance));
+            Assert.That(swinging.Act, Is.EqualTo(FigureAct.Strike));
+            Assert.That(swinging.Beat, Is.EqualTo(loss.BlowBeat).Within(Tolerance));
+
+            var played = new List<FigureAct>();
+            var answered = new List<FigureAct>();
+
+            for (var at = 0f; at < loss.Seconds; at += Frame)
+            {
+                var frame = loss.Advanced(at);
+
+                played.Add(FigureCues.Striking(frame, Armed).Act);
+                answered.Add(FigureCues.Answering(frame).Act);
+            }
+
+            Assert.That(played, Has.No.Member(FigureAct.Clash));
+            Assert.That(played, Has.No.Member(FigureAct.Recoil));
+            Assert.That(played, Has.No.Member(FigureAct.Strike));
+            Assert.That(played, Has.Member(FigureAct.Fall));
+            Assert.That(answered, Has.No.Member(FigureAct.Clash));
+            Assert.That(answered, Has.No.Member(FigureAct.Fall));
+            Assert.That(answered, Has.Member(FigureAct.Strike));
+        }
+
+        [Test]
+        public void ATieIsTheOnlyOutcomeStillTradedOnBothSides()
+        {
+            var tie = Fight.Of(ActionOutcome.Tie);
+
+            Assert.That(FigureCues.Striking(tie, Armed).Act, Is.EqualTo(FigureAct.Clash));
+            Assert.That(FigureCues.Answering(tie).Act, Is.EqualTo(FigureAct.Clash));
+            Assert.That(FigureCues.Striking(tie, Armed).Beat, Is.EqualTo(tie.BlowBeat).Within(Tolerance));
+            Assert.That(FigureCues.Answering(tie).Beat, Is.EqualTo(tie.BlowBeat).Within(Tolerance));
+        }
+
+        [Test]
+        public void AFightNobodyJoinedCuesNothingButTheIdleClip()
+        {
+            Assert.That(FigureCues.Striking(Fight.None, Armed), Is.EqualTo(FigureCue.Still));
+            Assert.That(
+                FigureCues.Striking(Fight.Of(ActionOutcome.Walked), Armed), Is.EqualTo(FigureCue.Still));
+            Assert.That(FigureCues.Answering(Fight.None), Is.EqualTo(FigureCue.Still));
+            Assert.That(
+                FigureCues.Answering(Fight.Of(ActionOutcome.Walked)), Is.EqualTo(FigureCue.Still));
+            Assert.That(
+                FigureCues.Answering(Fight.Of(ActionOutcome.Rejected)), Is.EqualTo(FigureCue.Still));
+        }
+
+        [Test]
+        public void TheDissolveStandsThePlayerDownAndLeavesTheEnemyFalling()
         {
             var fight = Fight.Of(ActionOutcome.Win);
 
@@ -243,97 +266,73 @@ namespace Game.Domain.Tests
                 var dissolving = fight.Advanced(at);
 
                 Assert.That(dissolving.Stage, Is.EqualTo(VictoryStage.Dissolve), at.ToString());
-                Assert.That(dissolving.IsTrading, Is.False, at.ToString());
-                Assert.That(FigureCues.Striking(dissolving), Is.EqualTo(FigureCue.Still), at.ToString());
-                Assert.That(FigureCues.Answering(dissolving), Is.EqualTo(FigureCue.Still), at.ToString());
-            }
-        }
-
-        [Test]
-        public void MirroringAnActTwiceGivesTheActBack()
-        {
-            foreach (var act in Enum.GetValues(typeof(FigureAct)).Cast<FigureAct>())
-            {
-                Assert.That(FigureCues.Answered(FigureCues.Answered(act)), Is.EqualTo(act), act.ToString());
-            }
-
-            Assert.That(FigureCues.Answered(FigureAct.Strike), Is.EqualTo(FigureAct.Recoil));
-            Assert.That(FigureCues.Answered(FigureAct.Recoil), Is.EqualTo(FigureAct.Strike));
-        }
-
-        [Test]
-        public void OnlyABlowAndItsAnswerAreMirroredAtAll()
-        {
-            var unmirrored = new[] { FigureAct.Idle, FigureAct.Walk, FigureAct.Retreat, FigureAct.Take };
-
-            foreach (var act in unmirrored)
-            {
-                Assert.That(FigureCues.Answered(act), Is.EqualTo(act), act.ToString());
-            }
-
-            Assert.That(FigureCues.Answered(FigureAct.Clash), Is.EqualTo(FigureAct.Clash));
-        }
-
-        [Test]
-        public void BothSidesOfEveryFightPlayABlowAndNeitherStandsStill()
-        {
-            foreach (var outcome in FoughtOutcomes)
-            {
-                var fight = Fight.Of(outcome);
-                var sides = new[] { FigureCues.Striking(fight).Act, FigureCues.Answering(fight).Act };
-
-                Assert.That(sides, Has.No.Member(FigureAct.Idle), outcome.ToString());
-                Assert.That(sides, Has.No.Member(FigureAct.Walk), outcome.ToString());
-                Assert.That(sides, Has.No.Member(FigureAct.Retreat), outcome.ToString());
-                Assert.That(sides, Has.No.Member(FigureAct.Take), outcome.ToString());
+                Assert.That(dissolving.IsExecuting, Is.False, at.ToString());
                 Assert.That(
-                    sides[0] == FigureAct.Clash,
-                    Is.EqualTo(sides[1] == FigureAct.Clash),
-                    outcome.ToString());
+                    FigureCues.Striking(dissolving, Armed), Is.EqualTo(FigureCue.Still), at.ToString());
+                Assert.That(
+                    FigureCues.Answering(dissolving).Act, Is.EqualTo(FigureAct.Fall), at.ToString());
             }
+
+            var settled = fight.Advanced(VictoryStages.BlockingSeconds);
+
+            Assert.That(FigureCues.Answering(settled), Is.EqualTo(FigureCue.Still));
         }
 
         [Test]
-        public void AFightNobodyJoinedIsAnsweredWithNothingButTheIdleClip()
-        {
-            Assert.That(FigureCues.Answering(Fight.None), Is.EqualTo(FigureCue.Still));
-            Assert.That(FigureCues.Answering(Fight.Of(ActionOutcome.Walked)), Is.EqualTo(FigureCue.Still));
-            Assert.That(FigureCues.Answering(Fight.Of(ActionOutcome.Rejected)), Is.EqualTo(FigureCue.Still));
-        }
-
-        [Test]
-        public void AnAnsweringCueRunsOutOnTheSameFrameTheBlowDoes()
+        public void BothSidesOfEveryFightPlayAClipAndNeitherStandsStillThroughout()
         {
             foreach (var outcome in FoughtOutcomes)
             {
                 var fight = Fight.Of(outcome);
-                var blow = FigureMotion.Still.Cued(FigureCues.Striking(fight));
-                var reply = FigureMotion.Still.Cued(FigureCues.Answering(fight));
+                var played = new HashSet<FigureAct>();
+                var answered = new HashSet<FigureAct>();
+
+                for (var at = 0f; at < fight.Seconds; at += Frame)
+                {
+                    var frame = fight.Advanced(at);
+
+                    played.Add(FigureCues.Striking(frame, Armed).Act);
+                    answered.Add(FigureCues.Answering(frame).Act);
+                }
+
+                played.Remove(FigureAct.Idle);
+                answered.Remove(FigureAct.Idle);
+
+                Assert.That(played.Count, Is.EqualTo(1), outcome.ToString());
+                Assert.That(answered.Count, Is.EqualTo(1), outcome.ToString());
+
+                foreach (var act in played)
+                {
+                    Assert.That(AdventurerClips.Loops(act), Is.False, outcome + " " + act);
+                }
+
+                foreach (var act in answered)
+                {
+                    Assert.That(AdventurerClips.Loops(act), Is.False, outcome + " " + act);
+                }
+            }
+        }
+
+        [Test]
+        public void EachSidesClipRunsOutInsideTheFightThatCuedIt()
+        {
+            foreach (var outcome in FoughtOutcomes)
+            {
+                var fight = Fight.Of(outcome);
+                var blow = FigureMotion.Still;
+                var reply = FigureMotion.Still;
 
                 for (var frame = 0; frame * Frame < fight.Seconds + Frame; frame++)
                 {
-                    blow = blow.Advanced(Frame);
-                    reply = reply.Advanced(Frame);
+                    var playing = fight.Advanced(frame * Frame);
 
-                    Assert.That(
-                        reply.Act == FigureAct.Idle,
-                        Is.EqualTo(blow.Act == FigureAct.Idle),
-                        outcome + " frame " + frame);
+                    blow = blow.Cued(FigureCues.Striking(playing, Armed)).Advanced(Frame);
+                    reply = reply.Cued(FigureCues.Answering(playing)).Advanced(Frame);
                 }
 
                 Assert.That(blow.Act, Is.EqualTo(FigureAct.Idle), outcome.ToString());
                 Assert.That(reply.Act, Is.EqualTo(FigureAct.Idle), outcome.ToString());
             }
-        }
-
-        static ActionOutcome Reversed(ActionOutcome outcome)
-        {
-            if (outcome == ActionOutcome.Win)
-            {
-                return ActionOutcome.Loss;
-            }
-
-            return outcome == ActionOutcome.Loss ? ActionOutcome.Win : outcome;
         }
 
         [Test]
@@ -569,7 +568,7 @@ namespace Game.Domain.Tests
             while (!journey.IsOver && frames < 4000)
             {
                 journey = journey.Advanced(Frame);
-                motion = motion.Cued(FigureCues.Of(journey)).Advanced(Frame);
+                motion = motion.Cued(FigureCues.Of(journey, Armed)).Advanced(Frame);
                 frames++;
 
                 if (acts.Count == 0 || acts[acts.Count - 1] != motion.Act)
