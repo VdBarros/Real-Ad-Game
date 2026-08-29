@@ -26,16 +26,16 @@ namespace Game.Domain.Tests
         [Test]
         public void ThePlayerWearsTheSameMeshAtEveryPowerTier()
         {
-            var tiers = PowersAcrossEveryTier.Select(VisualTier.Of).Distinct().ToList();
+            var tiers = PowersAcrossEveryTier.Select(PlayerTier.Of).Distinct().ToList();
 
-            Assert.That(tiers.Count, Is.EqualTo(VisualTier.Count));
+            Assert.That(tiers.Count, Is.EqualTo(PlayerTier.Count));
 
             foreach (var power in PowersAcrossEveryTier)
             {
                 var blueprint = LevelBlueprintBuilder.Build(LevelGraphFixture.TwoTerraces());
                 var player = blueprint.AllParts.First(part => part.Style == PartStyle.Start);
 
-                Assert.That(PlayerLook.Of(power).Tier, Is.EqualTo(VisualTier.Of(power)));
+                Assert.That(PlayerLook.Of(power).Tier, Is.EqualTo(PlayerTier.Of(power)));
                 Assert.That(player.Model, Is.EqualTo(PartModel.Knight), "power " + power);
             }
         }
@@ -114,10 +114,10 @@ namespace Game.Domain.Tests
         {
             var mesh = CharacterCast.MeshOf(PartStyle.Start);
 
-            for (var tier = 1; tier < VisualTier.Count; tier++)
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
-                var below = PlayerLook.Of(VisualTier.Thresholds[tier - 1] - 1).Scale;
-                var above = PlayerLook.Of(VisualTier.Thresholds[tier - 1]).Scale;
+                var below = PlayerLook.Of(PlayerTier.Thresholds[tier - 1] - 1).Scale;
+                var above = PlayerLook.Of(PlayerTier.Thresholds[tier - 1]).Scale;
 
                 Assert.That(
                     FigureFit.StandingHeight(mesh, above),
