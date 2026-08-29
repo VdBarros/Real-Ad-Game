@@ -23,9 +23,15 @@ namespace Game.EditorTooling
 
         const int RichPower = 20000;
 
+        const string BaseColour = "_BaseColor";
+
+        const string BaseMap = "_BaseMap";
+
         const string LevelPath = "dev/scratch/t-33-enemy-cast-level.png";
 
         const string PortraitPath = "dev/scratch/t-33-cast-";
+
+        const string SilhouettePath = "dev/scratch/t-131-enemy-silhouette-tier-";
 
         const string AlivePath = "dev/scratch/t-43-enemy-cast-alive.png";
 
@@ -63,6 +69,11 @@ namespace Game.EditorTooling
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
                 Wipe(PortraitPath + model + ".png");
+            }
+
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
+            {
+                Wipe(SilhouettePath + tier + ".png");
             }
 
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -121,15 +132,20 @@ namespace Game.EditorTooling
             failures += EveryCastMeshMeasuresItsPinnedFootprint(packs, report);
             failures += EveryAdversaryWearsTheMeshItsNumberNames(graph, byName, packs, report);
             failures += TheBossCannotBeMistakenForAnEnemy(graph, byName, packs, report);
+            failures += ThreeEnemySilhouettesStandApartOnTheLevel(graph, byName, report);
             failures += EveryFigureIsFittedToItsOwnTile(graph, byName, packs, report);
             failures += NoFigureHidesMoreGroundThanItsCapsule(graph, byName, packs, report);
             failures += TheStripTakesTheSparesAndLeavesTheSilhouette(graph, byName, report);
             failures += BadgesStayLegibleOverTheFigures(graph, byName, packs, report);
 
             Portraits(rig, lens, graph, byName, packs);
+            var silhouettes = Silhouettes(rig, lens, graph, byName, root);
 
             failures += EveryRiggedFigureIsPosedByAnAnimator(root, byName, rig, lens, graph, report);
-            failures += TheBandMovesTheTintAndScaleButNeverTheMesh(graph, byName, packs, power, report);
+            failures += TheBandMovesTheScaleButNeverTheMeshNorTheColour(
+                graph, byName, packs, power, report);
+            failures += EveryAdversaryShowsThePacksOwnTexture(graph, byName, report);
+            failures += EveryBandIsPhotographedWithItsBadgeCovered(silhouettes, report);
 
             Application.logMessageReceived -= watcher;
 
@@ -431,6 +447,200 @@ namespace Game.EditorTooling
                     widestEnemy <= 0f ? 0f : bossGround / widestEnemy));
 
             return failures;
+        }
+
+        static int ThreeEnemySilhouettesStandApartOnTheLevel(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var meshesOfTier = new Dictionary<int, HashSet<Mesh>>();
+            var modelOfTier = new Dictionary<int, PartModel>();
+            var lowest = new Dictionary<int, int>();
+            var highest = new Dictionary<int, int>();
+
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
+            {
+                meshesOfTier[tier] = new HashSet<Mesh>();
+            }
+
+            foreach (var figure in Adversaries(graph, byName))
+            {
+                if (figure.Style != PartStyle.Enemy)
+                {
+                    continue;
+                }
+
+                var tier = EnemyTier.Of(figure.Value);
+                modelOfTier[tier] = CharacterCast.MeshOf(figure.Style, figure.Value);
+                lowest[tier] = lowest.ContainsKey(tier)
+                    ? Math.Min(lowest[tier], figure.Value)
+                    : figure.Value;
+                highest[tier] = highest.ContainsKey(tier)
+                    ? Math.Max(highest[tier], figure.Value)
+                    : figure.Value;
+
+                foreach (var renderer in figure.Instance.GetComponentsInChildren<Renderer>(true))
+                {
+                    var mesh = PackMesh.On(renderer);
+
+                    if (mesh != null)
+                    {
+                        meshesOfTier[tier].Add(mesh);
+                    }
+                }
+            }
+
+            var standing = new List<string>();
+            var empty = new List<string>();
+
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
+            {
+                if (meshesOfTier[tier].Count == 0)
+                {
+                    empty.Add("tier " + tier);
+                    continue;
+                }
+
+                standing.Add(
+                    "tier " + tier + " -> " + modelOfTier[tier] + " on numbers "
+                    + lowest[tier] + " to " + highest[tier]);
+            }
+
+            report.Append("\n  the enemy silhouettes standing on this level: ")
+                .Append(string.Join(", ", standing.ToArray()));
+
+            var shared = new List<string>();
+
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
+            {
+                for (var other = tier + 1; other < EnemyTier.Count; other++)
+                {
+                    foreach (var mesh in meshesOfTier[tier])
+                    {
+                        if (meshesOfTier[other].Contains(mesh))
+                        {
+                            shared.Add("tiers " + tier + " and " + other + " both show " + mesh.name);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                EnemyTier.Count == 3 && CharacterCast.MeshesOf(PartStyle.Enemy).Count == 3,
+                "the enemy ramp is three bands wide and the pack dresses each of them on a mesh of "
+                + "its own, so the fourth skeleton is left to the boss alone",
+                EnemyTier.Count + " bands over "
+                + CharacterCast.MeshesOf(PartStyle.Enemy).Count + " enemy meshes, promoting at "
+                + string.Join("/", Numbers(EnemyTier.Thresholds)));
+
+            failures += Assert(
+                report,
+                empty.Count == 0,
+                "an enemy of every band stands on this level, so the whole ramp is on screen at once",
+                empty.Count == 0
+                    ? string.Join("; ", standing.ToArray())
+                    : "no enemy stands in " + string.Join(", ", empty.ToArray()));
+
+            failures += Assert(
+                report,
+                shared.Count == 0 && standing.Count == EnemyTier.Count,
+                "no two enemy bands share a single mesh, so a band reads off the silhouette with the "
+                + "badge covered",
+                shared.Count == 0
+                    ? standing.Count + " bands, each on a mesh of its own"
+                    : string.Join("; ", shared.ToArray()));
+
+            return failures;
+        }
+
+        static string[] Numbers(IReadOnlyList<int> values)
+        {
+            var named = new string[values.Count];
+
+            for (var slot = 0; slot < values.Count; slot++)
+            {
+                named[slot] = values[slot].ToString(CultureInfo.InvariantCulture);
+            }
+
+            return named;
+        }
+
+        static int EveryBandIsPhotographedWithItsBadgeCovered(
+            IList<int> shot, StringBuilder report)
+        {
+            var missing = new List<string>();
+
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
+            {
+                if (!shot.Contains(tier) || !File.Exists(SilhouettePath + tier + ".png"))
+                {
+                    missing.Add("tier " + tier);
+                }
+            }
+
+            return Assert(
+                report,
+                missing.Count == 0,
+                "every band is photographed on the same framing with every badge in the world switched "
+                + "off, so the three silhouettes can be compared with no number to read",
+                missing.Count == 0
+                    ? shot.Count + " shots at " + SilhouettePath + "N.png"
+                    : "nothing was written for " + string.Join(", ", missing.ToArray()));
+        }
+
+        static List<int> Silhouettes(
+            CameraRig rig,
+            Camera lens,
+            LevelGraph graph,
+            IDictionary<string, Transform> byName,
+            GameObject root)
+        {
+            var hidden = new List<GameObject>();
+
+            foreach (var badge in root.GetComponentsInChildren<NumberBadge>(true))
+            {
+                if (!badge.gameObject.activeSelf)
+                {
+                    continue;
+                }
+
+                badge.gameObject.SetActive(false);
+                hidden.Add(badge.gameObject);
+            }
+
+            var shot = new List<int>();
+
+            foreach (var figure in Adversaries(graph, byName))
+            {
+                if (figure.Style != PartStyle.Enemy)
+                {
+                    continue;
+                }
+
+                var tier = EnemyTier.Of(figure.Value);
+
+                if (shot.Contains(tier))
+                {
+                    continue;
+                }
+
+                shot.Add(tier);
+                var ground = figure.Figure.Ground;
+                var size = IsoProjection.TileEdge * PortraitSize;
+                rig.Hold(new CameraFraming(
+                    new WorldPoint(ground.X, ground.Y + size * 0.25f, ground.Z), size));
+                PreviewFilm.Shoot(lens, SilhouettePath + tier + ".png");
+            }
+
+            for (var slot = 0; slot < hidden.Count; slot++)
+            {
+                hidden[slot].SetActive(true);
+            }
+
+            return shot;
         }
 
         static int EveryFigureIsFittedToItsOwnTile(
@@ -797,7 +1007,7 @@ namespace Game.EditorTooling
             return failures;
         }
 
-        static int TheBandMovesTheTintAndScaleButNeverTheMesh(
+        static int TheBandMovesTheScaleButNeverTheMeshNorTheColour(
             LevelGraph graph,
             IDictionary<string, Transform> byName,
             IDictionary<PartModel, ISet<Mesh>> packs,
@@ -807,7 +1017,7 @@ namespace Game.EditorTooling
             if (power == null)
             {
                 return Assert(
-                    report, false, "the band moves the tint and the scale but never the mesh",
+                    report, false, "the band moves the scale but never the mesh nor the colour",
                     "the world raised no player badge to move the reading with");
             }
 
@@ -877,9 +1087,9 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                moved > 0 && repainted == moved && resized == moved,
-                "every adversary whose band moved took a new tint and a new size from it, so the band "
-                + "owns material and scale exactly as the number owns the mesh",
+                moved > 0 && repainted == 0 && resized == moved,
+                "every adversary whose band moved took a new size from it and kept the colour it had, so "
+                + "the band owns scale alone and the pack's own texture is left to show through",
                 repainted + " repainted and " + resized + " resized of " + moved + " that moved band");
 
             return failures;
@@ -1504,18 +1714,101 @@ namespace Game.EditorTooling
             return string.Join("+", names.ToArray());
         }
 
-        static Color Painted(EnemyFigure figure)
+        static Material Skin(EnemyFigure figure)
         {
-            var block = new MaterialPropertyBlock();
-
             foreach (var renderer in figure.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
-                renderer.GetPropertyBlock(block);
-
-                return block.GetColor("_BaseColor");
+                return renderer.sharedMaterial;
             }
 
-            return Color.black;
+            return null;
+        }
+
+        static Color Painted(EnemyFigure figure)
+        {
+            var skin = Skin(figure);
+
+            if (skin == null || !skin.HasProperty(BaseColour))
+            {
+                return Color.black;
+            }
+
+            return skin.GetColor(BaseColour);
+        }
+
+        static int Overrides(EnemyFigure figure)
+        {
+            var found = 0;
+
+            foreach (var renderer in figure.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer.HasPropertyBlock())
+                {
+                    found++;
+                }
+            }
+
+            return found;
+        }
+
+        static int EveryAdversaryShowsThePacksOwnTexture(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var read = 0;
+            var atlassed = 0;
+            var white = 0;
+            var overridden = 0;
+            var complaint = new List<string>();
+
+            foreach (var figure in Adversaries(graph, byName))
+            {
+                read++;
+
+                var skin = Skin(figure.Figure);
+                var atlas = skin != null && skin.HasProperty(BaseMap) ? skin.GetTexture(BaseMap) : null;
+
+                if (atlas != null)
+                {
+                    atlassed++;
+                }
+
+                if (Painted(figure.Figure) == Color.white)
+                {
+                    white++;
+                }
+                else if (complaint.Count < 6)
+                {
+                    complaint.Add(figure.Name + " reads " + Painted(figure.Figure));
+                }
+
+                overridden += Overrides(figure.Figure);
+            }
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                read > 0 && atlassed == read,
+                "every adversary wears a material bound to the skeleton pack's atlas, so what shows is the "
+                + "pack's own texture",
+                atlassed + " of " + read + " do");
+
+            failures += Assert(
+                report,
+                read > 0 && white == read,
+                "that material multiplies the atlas by white rather than by a palette colour, so no flat "
+                + "tint sits over the mesh",
+                white + " of " + read + " do"
+                + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+
+            failures += Assert(
+                report,
+                overridden == 0,
+                "no renderer under any adversary carries a property block, so no second colour is laid "
+                + "over the material either",
+                overridden + " renderers across " + read + " adversaries do");
+
+            return failures;
         }
 
         static ISet<Mesh> Pack(IDictionary<PartModel, ISet<Mesh>> packs, PartModel model)

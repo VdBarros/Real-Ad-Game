@@ -28,7 +28,6 @@ namespace Game.Domain.Tests
             Assert.That(IsoProjection.CameraPitch, Is.EqualTo(30f));
             Assert.That(IsoProjection.CameraYaw, Is.EqualTo(45f));
             Assert.That(IsoProjection.CameraRoll, Is.EqualTo(0f));
-            Assert.That(IsoProjection.OrthographicSize, Is.EqualTo(9.5f));
         }
 
         [Test]

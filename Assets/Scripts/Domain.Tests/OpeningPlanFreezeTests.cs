@@ -7,7 +7,7 @@ namespace Game.Domain.Tests
     {
         const int FrozenSeeds = 200;
 
-        const long FrozenFingerprint = 7573283008921576682L;
+        const long FrozenFingerprint = -6733474711901722067L;
 
         [Test]
         public void TheOpeningPlanMintsTheLevelsItAlwaysMinted()

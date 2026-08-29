@@ -133,6 +133,7 @@ watch is that `PartStyle.Staircase`'s own material never survives a built level
 [#114]: https://github.com/VdBarros/Real-Ad-Game/issues/114
 [#117]: https://github.com/VdBarros/Real-Ad-Game/issues/117
 [#129]: https://github.com/VdBarros/Real-Ad-Game/issues/129
+[#130]: https://github.com/VdBarros/Real-Ad-Game/issues/130
 
 ### Calls I made — override any of these if you disagree
 
@@ -248,6 +249,40 @@ once. It costs nothing today. The ladder cannot mint more than 24 on `tiny` and
 ten-thousand-seed sweep turns away no attempt at all and the per-reason
 histogram is unchanged. What it buys is a guard on the recipe: a fourth gate on
 `tiny` and a fifth on `ship` are refused on two ladder shuffles in three.
+
+**Dead time is budgeted in seconds** — no reasonable route walks more than
+`2.0 s` with nothing happening, which at the one walk speed the game owns
+(`Pace.StepsPerSecond`, 4 tiles a second, read by `Walk`) is **8 tile steps**
+([#130]). The seconds are the number; the tile count is derived, so the two
+cannot drift apart.
+
+A *beat* is a tile a route can meet something on: a content node, the boss, the
+start, or a climbing tile — a flight of stairs is a traversal moment with its
+own camera and animation, and it is also the one stretch the generator is
+forbidden to place a slot on, so counting it as silence would make the budget
+unsatisfiable by construction rather than by tuning. Everything else is
+silence. The measure charges **every edge of the maze** with the silence forced
+on either side of it: `crossing(u, v) = d(u) + d(v) + 1`, where `d` is the tile
+distance to the nearest beat. Any route crossing that edge must walk at least
+that far between two beats, so the maximum over all edges is the worst dead
+time over every route that does not deliberately double back — exact on
+corridors and trees, and where a route walks past content within one step
+without taking it, it charges the shorter figure, because content one step off
+your path is not silence. This is stronger than a budget over one named walk:
+it holds over `ParWalk`, `PoorWalk` and the beeline alike because it holds over
+every pair of beats, not over one traversal.
+
+It is enforced twice. `SlotSelector` spends its free slots on the deepest
+silence first, but **only while the budget is broken** — the moment the layout
+fits, the remaining slots go back to the shuffled order, so levels that were
+already well spaced keep the shape the braid was measured at. The validator
+then refuses anything left over as `DeadWalkBeyondBudget`, into the same
+fifty-attempt retry loop as every other reason. Before the change the worst
+walk was 23 steps (5.75 s) on `ship`, 9 on `tiny` and 47 on `stress`; after it
+the worst over the whole ten-thousand-seed sweep is 8 steps on every preset and
+every plan, and the retry loop turns away no attempt at all — the rejection is
+the backstop, the slot pass is the fix. Rejection rates moved *down* slightly
+(ship 12% → 11.4%, tiny 43.1% → 42.5%, level 7 44.7% → 42.5%).
 
 **Invariant C — boss requires a detour**
 

@@ -30,7 +30,23 @@ namespace Game.Presentation.Pure
                 return None;
             }
 
-            return new TargetPreview(nodeId, ActionResolver.Resolve(state, nodeId));
+            return Of(NavigationMap.Of(state), nodeId);
+        }
+
+        public static TargetPreview Of(NavigationMap navigation, int nodeId)
+        {
+            if (navigation == null)
+            {
+                throw new ArgumentNullException(nameof(navigation));
+            }
+
+            if (nodeId == TapAim.Nothing)
+            {
+                return None;
+            }
+
+            return new TargetPreview(
+                nodeId, ActionResolver.Along(navigation.State, navigation.RouteTo(nodeId)));
         }
 
         public int NodeId { get; }

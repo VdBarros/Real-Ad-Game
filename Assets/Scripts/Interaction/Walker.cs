@@ -129,23 +129,11 @@ namespace Game.Interaction
 
             if (IsWalking)
             {
+                BreakOff(journey.DivertedTo(nodeId));
                 return;
             }
 
-            var setOut = Journey.Toward(Run, nodeId);
-            if (setOut.IsOver)
-            {
-                return;
-            }
-
-            journey = setOut;
-            landed = false;
-            holding = false;
-            afoot = true;
-            input.IsLocked = true;
-            trail.Show(journey.Walk.Route);
-            Follow();
-            enabled = true;
+            SetOut(Journey.Toward(Run, nodeId));
         }
 
         public void Cancel()
@@ -155,7 +143,28 @@ namespace Game.Interaction
                 return;
             }
 
-            journey = journey.Cancelled();
+            BreakOff(journey.Cancelled());
+        }
+
+        void SetOut(Journey setOut)
+        {
+            if (setOut.IsOver)
+            {
+                return;
+            }
+
+            journey = setOut;
+            landed = false;
+            holding = false;
+            afoot = true;
+            trail.Show(journey.Walk.Route);
+            Follow();
+            enabled = true;
+        }
+
+        void BreakOff(Journey broken)
+        {
+            journey = broken;
 
             if (journey.IsOver)
             {
@@ -243,7 +252,6 @@ namespace Game.Interaction
             }
 
             input.Show(Run);
-            input.IsLocked = true;
 
             var arrived = Arrived;
             if (arrived != null)
@@ -315,6 +323,8 @@ namespace Game.Interaction
                 return;
             }
 
+            var onward = journey.Onward();
+
             trail.Clear();
             journey = Journey.Nowhere;
             landed = false;
@@ -327,6 +337,8 @@ namespace Game.Interaction
             {
                 finished(Run);
             }
+
+            SetOut(onward);
         }
 
         void Commit(TargetPreview preview)
