@@ -117,6 +117,7 @@ namespace Game.Interaction
             afoot = false;
             Run = opening;
 
+            input.Aimed += Sketch;
             input.Tapped += Commit;
             input.Released += Interrupt;
             input.IsLocked = false;
@@ -341,6 +342,22 @@ namespace Game.Interaction
             SetOut(onward);
         }
 
+        void Sketch(TargetPreview preview)
+        {
+            if (IsWalking || trail == null)
+            {
+                return;
+            }
+
+            if (!preview.IsAimed || !preview.IsLegal || preview.Route.Count < 2)
+            {
+                trail.Clear();
+                return;
+            }
+
+            trail.Preview(TileRoute.Of(Run.Level, preview.Route), Trail.MoodOf(preview));
+        }
+
         void Commit(TargetPreview preview)
         {
             WalkTo(preview.NodeId);
@@ -368,6 +385,7 @@ namespace Game.Interaction
                 return;
             }
 
+            input.Aimed -= Sketch;
             input.Tapped -= Commit;
             input.Released -= Interrupt;
         }

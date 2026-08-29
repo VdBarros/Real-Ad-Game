@@ -14,6 +14,10 @@ namespace Game.Presentation
 
         Material paint;
 
+        public TrailMood Mood { get; private set; }
+
+        public bool IsPreviewing { get; private set; }
+
         public int Showing
         {
             get
@@ -43,6 +47,16 @@ namespace Game.Presentation
 
         public void Show(TileRoute route)
         {
+            Draw(route, TrailMood.Safe, previewing: false);
+        }
+
+        public void Preview(TileRoute route, TrailMood mood)
+        {
+            Draw(route, mood, previewing: true);
+        }
+
+        void Draw(TileRoute route, TrailMood mood, bool previewing)
+        {
             if (route == null)
             {
                 throw new ArgumentNullException(nameof(route));
@@ -55,6 +69,10 @@ namespace Game.Presentation
             }
 
             plan = Trail.Along(route);
+            Mood = mood;
+            IsPreviewing = previewing;
+
+            var look = Trail.Look(mood);
 
             while (dots.Count < plan.Count)
             {
@@ -66,11 +84,15 @@ namespace Game.Presentation
                 var lit = index < plan.Count;
                 dots[index].SetActive(lit);
 
-                if (lit)
+                if (!lit)
                 {
-                    var position = plan[index].Position;
-                    dots[index].transform.localPosition = new Vector3(position.X, position.Y, position.Z);
+                    continue;
                 }
+
+                var position = plan[index].Position;
+                dots[index].transform.localPosition = new Vector3(position.X, position.Y, position.Z);
+                dots[index].transform.localScale = new Vector3(look.Size, look.Size, look.Size);
+                Tints.Wash(dots[index].GetComponent<Renderer>(), look.Tint);
             }
         }
 
@@ -94,6 +116,8 @@ namespace Game.Presentation
         public void Clear()
         {
             plan = null;
+            Mood = TrailMood.Safe;
+            IsPreviewing = false;
 
             foreach (var dot in dots)
             {

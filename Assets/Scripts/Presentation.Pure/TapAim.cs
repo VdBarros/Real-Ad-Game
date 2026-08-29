@@ -10,6 +10,8 @@ namespace Game.Presentation.Pure
 
         public const float AnchorLift = LevelBlueprintBuilder.FigureScale;
 
+        public const float Hold = 2f;
+
         public static IReadOnlyList<int> Aimable(RunState state)
         {
             if (state == null)
@@ -121,6 +123,28 @@ namespace Game.Presentation.Pure
             }
 
             return aimed;
+        }
+
+        public static int Of(
+            IReadOnlyList<TapCandidate> candidates, ScreenPoint finger, float reachPixels, int held)
+        {
+            var aimed = Of(candidates, finger, reachPixels);
+
+            if (aimed != Nothing || held == Nothing)
+            {
+                return aimed;
+            }
+
+            foreach (var candidate in candidates)
+            {
+                if (candidate.NodeId == held
+                    && ScreenPoint.Distance(finger, candidate.Point) <= reachPixels * Hold)
+                {
+                    return held;
+                }
+            }
+
+            return Nothing;
         }
 
         static bool Beats(float distance, TapCandidate candidate, float nearest, float shallowest, int aimed)

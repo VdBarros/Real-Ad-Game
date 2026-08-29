@@ -8,14 +8,16 @@ namespace Game.Presentation.Pure
     {
         static readonly int[] NoRoute = new int[0];
 
-        public static readonly TargetPreview None = new TargetPreview(TapAim.Nothing, null);
+        public static readonly TargetPreview None = new TargetPreview(TapAim.Nothing, null, 0);
 
         readonly ActionResult resolved;
 
-        TargetPreview(int nodeId, ActionResult resolved)
+        TargetPreview(int nodeId, ActionResult resolved, int fightsOnTheWay)
         {
             NodeId = nodeId;
             this.resolved = resolved;
+            FightsOnTheWay = fightsOnTheWay;
+            BlockedByNodeId = BlockerOn(resolved);
         }
 
         public static TargetPreview Of(RunState state, int nodeId)
@@ -46,10 +48,47 @@ namespace Game.Presentation.Pure
             }
 
             return new TargetPreview(
-                nodeId, ActionResolver.Along(navigation.State, navigation.RouteTo(nodeId)));
+                nodeId,
+                ActionResolver.Along(navigation.State, navigation.RouteTo(nodeId)),
+                navigation.FightsOnTheWayTo(nodeId));
         }
 
         public int NodeId { get; }
+
+        public int FightsOnTheWay { get; }
+
+        public int BlockedByNodeId { get; }
+
+        public bool IsDangerous
+        {
+            get { return BlockedByNodeId != TapAim.Nothing; }
+        }
+
+        static int BlockerOn(ActionResult walked)
+        {
+            if (walked == null || walked.Route.Count < 2)
+            {
+                return TapAim.Nothing;
+            }
+
+            var route = walked.Route;
+            var halted = walked.State.PositionNodeId;
+
+            if (route[route.Count - 1] == halted)
+            {
+                return TapAim.Nothing;
+            }
+
+            for (var step = 0; step + 1 < route.Count; step++)
+            {
+                if (route[step] == halted)
+                {
+                    return route[step + 1];
+                }
+            }
+
+            return TapAim.Nothing;
+        }
 
         public bool IsAimed
         {
