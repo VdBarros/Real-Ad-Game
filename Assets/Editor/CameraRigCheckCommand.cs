@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Game.Domain;
@@ -5,6 +7,7 @@ using Game.Presentation;
 using Game.Presentation.Pure;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Game.EditorTooling
 {
@@ -32,6 +35,10 @@ namespace Game.EditorTooling
 
         const string BeatPath = "dev/scratch/t-11-camera-beat.png";
 
+        const float ProbeTolerance = 0.03f;
+
+        const float LeastVoidShare = 0.1f;
+
         public static void Check()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -39,12 +46,10 @@ namespace Game.EditorTooling
             var graph = LevelGenerator.Generate(Seed, MazePreset.Ship).Graph;
             var rig = CameraRig.Raise();
             var lens = rig.GetComponent<Camera>();
-            lens.clearFlags = CameraClearFlags.SolidColor;
-            lens.backgroundColor = new Color(0.06f, 0.07f, 0.09f);
 
             var builder = new WorldBuilder();
             var root = builder.Build(graph);
-            PreviewFilm.Sun();
+            PreviewFilm.Sunlight();
 
             rig.Begin(graph);
             PreviewFilm.Shoot(lens, OpeningPath);
@@ -52,6 +57,8 @@ namespace Game.EditorTooling
             var report = new StringBuilder("camera rig on ship seed ")
                 .Append(Seed.ToString(CultureInfo.InvariantCulture))
                 .Append(':');
+
+            TheRigStandsTheWorldInARoomOfItsOwn(rig, lens, report);
 
             var reveal = LevelFraming.Whole(graph);
             var peak = 0f;
@@ -108,6 +115,7 @@ namespace Game.EditorTooling
             }
 
             EveryTileIsOnScreen(graph, lens, reveal);
+            TheFrameIsGradedRatherThanSkyed(rig, lens, "the opening reveal", report);
 
             var player = LevelFraming.Play(LevelFraming.StartPoint(graph));
             var settled = 0;
@@ -169,6 +177,7 @@ namespace Game.EditorTooling
             var held = rig.Framing;
             rig.Look(Horizon(IsoProjection.CameraUp));
             PreviewFilm.Shoot(lens, DraggedPath);
+            TheFrameIsGradedRatherThanSkyed(rig, lens, "a drag to the horizon", report);
 
             var showing = OnScreen(graph, lens);
             report.AppendFormat(
@@ -266,6 +275,7 @@ namespace Game.EditorTooling
             }
 
             PreviewFilm.Shoot(lens, BeatPath);
+            TheSheetCoversTheFrame(rig, lens, "the beat's deepest punch", report);
 
             var punch = resting / deepest;
             var span = resting - resting / ZoomBeat.Punch;
@@ -348,6 +358,331 @@ namespace Game.EditorTooling
 
             WorldObjects.Destroy(root);
             builder.Dispose();
+        }
+
+        static void TheRigStandsTheWorldInARoomOfItsOwn(CameraRig rig, Camera lens, StringBuilder report)
+        {
+            var backdrop = rig.Backdrop;
+
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  the rig clears to {0} with {1}, grading from {2} below to {3} above",
+                lens.clearFlags,
+                Read(lens.backgroundColor),
+                Backdrop.Below,
+                Backdrop.Above);
+
+            if (lens.clearFlags != CameraClearFlags.SolidColor)
+            {
+                Debug.LogError(
+                    "The rig raised a camera on " + lens.clearFlags
+                    + ", so the stock skybox draws behind the dungeon.");
+            }
+
+            if (Apart(Read(lens.backgroundColor), Backdrop.Clear) > ProbeTolerance)
+            {
+                Debug.LogError(
+                    "The rig clears to " + Read(lens.backgroundColor) + " rather than the backdrop's "
+                    + Backdrop.Clear + ".");
+            }
+
+            if (backdrop == null)
+            {
+                Debug.LogError("The rig hung no backdrop, so the void behind the dungeon is a flat clear.");
+                return;
+            }
+
+            if (backdrop.transform.parent != lens.transform)
+            {
+                Debug.LogError("The backdrop is not carried by the camera, so a pan will slide off it.");
+            }
+
+            if (!backdrop.Face.enabled || !backdrop.gameObject.activeInHierarchy)
+            {
+                Debug.LogError("The backdrop hangs but does not draw.");
+            }
+
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  the backdrop is {0} triangles of {1} on a {2}-band ramp, shadows {3}, probes {4}",
+                backdrop.Sheet.triangles.Length / 3,
+                backdrop.Skin.shader.name,
+                backdrop.Ramp.height,
+                backdrop.Face.shadowCastingMode,
+                backdrop.Face.lightProbeUsage);
+
+            if (backdrop.Sheet.vertexCount != 4 || backdrop.Sheet.triangles.Length != 6)
+            {
+                Debug.LogError(
+                    "The backdrop costs " + backdrop.Sheet.vertexCount
+                    + " vertices where a gradient costs four.");
+            }
+
+            if (backdrop.Skin.shader.name.IndexOf("Unlit", StringComparison.OrdinalIgnoreCase) < 0
+                && backdrop.Skin.shader.name.IndexOf("Sprites", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                Debug.LogError(
+                    "The backdrop is shaded by " + backdrop.Skin.shader.name
+                    + ", which costs the frame more per pixel than a gradient does.");
+            }
+
+            if (backdrop.Face.shadowCastingMode != ShadowCastingMode.Off
+                || backdrop.Face.receiveShadows
+                || backdrop.Face.lightProbeUsage != LightProbeUsage.Off
+                || backdrop.Face.reflectionProbeUsage != ReflectionProbeUsage.Off)
+            {
+                Debug.LogError("The backdrop asks the renderer for light it cannot use.");
+            }
+
+            TheRoomIsLitByItsOwnAmbientAndNotBySky(report);
+        }
+
+        static void TheRoomIsLitByItsOwnAmbientAndNotBySky(StringBuilder report)
+        {
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  ambient is {0} from {1} sky through {2} to {3} ground, carrying {4:0.####}"
+                + " of the {5:0.####} budget, reflection {6:0.###} off {7}",
+                RenderSettings.ambientMode,
+                Read(RenderSettings.ambientSkyColor),
+                Read(RenderSettings.ambientEquatorColor),
+                Read(RenderSettings.ambientGroundColor),
+                Backdrop.AmbientLoad,
+                Backdrop.AmbientBudget.Luminance,
+                RenderSettings.reflectionIntensity,
+                RenderSettings.skybox == null ? "no skybox" : RenderSettings.skybox.name);
+
+            if (RenderSettings.skybox != null)
+            {
+                Debug.LogError(
+                    "The scene still carries the skybox " + RenderSettings.skybox.name
+                    + ", which lights and reflects off every pack material.");
+            }
+
+            if (RenderSettings.ambientMode != AmbientMode.Trilight)
+            {
+                Debug.LogError(
+                    "Ambient runs on " + RenderSettings.ambientMode
+                    + " rather than the three-band room the rig sets, so unlit faces read flat.");
+            }
+
+            AmbientBandHolds("sky", RenderSettings.ambientSkyColor, Backdrop.AmbientSky);
+            AmbientBandHolds("equator", RenderSettings.ambientEquatorColor, Backdrop.AmbientEquator);
+            AmbientBandHolds("ground", RenderSettings.ambientGroundColor, Backdrop.AmbientGround);
+
+            if (RenderSettings.reflectionIntensity > Backdrop.ReflectionStrength)
+            {
+                Debug.LogError(
+                    "A reflection probe still washes the pack materials at "
+                    + RenderSettings.reflectionIntensity + " strength.");
+            }
+
+            if (RenderSettings.customReflectionTexture != null)
+            {
+                Debug.LogError("The scene reflects off a cubemap the dungeon never stood in.");
+            }
+        }
+
+        static void AmbientBandHolds(string band, Color live, Tint wanted)
+        {
+            if (Apart(Read(live), wanted) > ProbeTolerance)
+            {
+                Debug.LogError(
+                    "The " + band + " ambient renders at " + Read(live) + " rather than " + wanted + ".");
+            }
+        }
+
+        static void TheSheetCoversTheFrame(CameraRig rig, Camera lens, string leg, StringBuilder report)
+        {
+            var backdrop = rig.Backdrop;
+            if (backdrop == null)
+            {
+                return;
+            }
+
+            var aspect = lens.aspect;
+            lens.aspect = (float)ScreenFrame.Width / ScreenFrame.Height;
+
+            var lowX = float.MaxValue;
+            var highX = float.MinValue;
+            var lowY = float.MaxValue;
+            var highY = float.MinValue;
+
+            for (var corner = 0; corner < 4; corner++)
+            {
+                var local = new Vector3(corner % 2 == 0 ? -0.5f : 0.5f, corner < 2 ? -0.5f : 0.5f, 0f);
+                var drawn = lens.WorldToViewportPoint(backdrop.transform.TransformPoint(local));
+
+                lowX = Mathf.Min(lowX, drawn.x);
+                highX = Mathf.Max(highX, drawn.x);
+                lowY = Mathf.Min(lowY, drawn.y);
+                highY = Mathf.Max(highY, drawn.y);
+            }
+
+            lens.aspect = aspect;
+
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  at {0} the backdrop spans x {1:0.##} to {2:0.##} and y {3:0.##} to {4:0.##} of the frame",
+                leg,
+                lowX,
+                highX,
+                lowY,
+                highY);
+
+            if (lowX > 0f || highX < 1f || lowY > 0f || highY < 1f)
+            {
+                Debug.LogError(
+                    "At " + leg + " the backdrop leaves an edge of the frame uncovered, spanning x "
+                    + lowX + " to " + highX + " and y " + lowY + " to " + highY + ".");
+            }
+        }
+
+        static void TheFrameIsGradedRatherThanSkyed(
+            CameraRig rig, Camera lens, string leg, StringBuilder report)
+        {
+            TheSheetCoversTheFrame(rig, lens, leg, report);
+
+            var frame = PreviewFilm.Frame(lens);
+            var pixels = frame.GetPixels32();
+            UnityEngine.Object.DestroyImmediate(frame);
+
+            var width = ScreenFrame.Width;
+            var height = ScreenFrame.Height;
+            var voided = 0;
+            var voidLuminance = 0.0;
+            var drawn = new List<float>();
+
+            for (var row = 0; row < height; row++)
+            {
+                var wanted = Backdrop.At(row / (float)(height - 1));
+
+                for (var column = 0; column < width; column++)
+                {
+                    var pixel = Read(pixels[row * width + column]);
+
+                    if (Apart(pixel, wanted) <= ProbeTolerance)
+                    {
+                        voided++;
+                        voidLuminance += pixel.Luminance;
+                        continue;
+                    }
+
+                    drawn.Add(pixel.Luminance);
+                }
+            }
+
+            var share = voided / (float)(width * height);
+            var background = voided == 0
+                ? 0f
+                : (float)(voidLuminance / voided);
+
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  {0} renders {1:0.#}% of its pixels on the backdrop ramp, mean luminance {2:0.####},"
+                + " corners {3}",
+                leg,
+                share * 100f,
+                background,
+                Corners(pixels, width, height));
+
+            if (share < LeastVoidShare)
+            {
+                Debug.LogError(
+                    "Only " + (share * 100f) + "% of " + leg
+                    + " renders on the backdrop ramp, so something else is drawing the void.");
+            }
+
+            if (drawn.Count < width * height / 100)
+            {
+                report.Append(" (too little drawn to weigh against it)");
+                return;
+            }
+
+            drawn.Sort();
+
+            var darkest = drawn[drawn.Count / 100];
+            var middling = drawn[drawn.Count / 2];
+            var brightest = drawn[drawn.Count - 1 - drawn.Count / 100];
+
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n    what is drawn runs from a darkest hundredth at {0:0.####} for {1:0.###}:1 against the"
+                + " backdrop, through a median of {2:0.####}, to a brightest hundredth at {3:0.####} for"
+                + " {4:0.###}:1",
+                darkest,
+                Contrast(darkest, background),
+                middling,
+                brightest,
+                Contrast(brightest, background));
+
+            if (Contrast(darkest, background) < Backdrop.LeastFigureSeparation)
+            {
+                Debug.LogError(
+                    "At " + leg + " the darkest hundredth of what is drawn stands only "
+                    + Contrast(darkest, background) + ":1 off the backdrop, so it reads as a hole in it.");
+            }
+
+            if (Contrast(brightest, background) < Backdrop.LeastSurfaceSeparation)
+            {
+                Debug.LogError(
+                    "At " + leg + " the lit terraces stand only " + Contrast(brightest, background)
+                    + ":1 off the backdrop, so their edges do not cut against it.");
+            }
+        }
+
+        static string Corners(Color32[] pixels, int width, int height)
+        {
+            var written = new StringBuilder();
+
+            foreach (var corner in CornerRows(width, height))
+            {
+                if (written.Length > 0)
+                {
+                    written.Append(' ');
+                }
+
+                written.Append(Read(pixels[corner.Value * width + corner.Key]));
+            }
+
+            return written.ToString();
+        }
+
+        static IEnumerable<KeyValuePair<int, int>> CornerRows(int width, int height)
+        {
+            const int Inset = 2;
+
+            yield return new KeyValuePair<int, int>(Inset, Inset);
+            yield return new KeyValuePair<int, int>(width - 1 - Inset, Inset);
+            yield return new KeyValuePair<int, int>(Inset, height - 1 - Inset);
+            yield return new KeyValuePair<int, int>(width - 1 - Inset, height - 1 - Inset);
+        }
+
+        static float Contrast(float one, float other)
+        {
+            var high = one > other ? one : other;
+            var low = one > other ? other : one;
+
+            return (high + 0.05f) / (low + 0.05f);
+        }
+
+        static float Apart(Tint one, Tint other)
+        {
+            var red = Mathf.Abs(one.Red - other.Red);
+            var green = Mathf.Abs(one.Green - other.Green);
+            var blue = Mathf.Abs(one.Blue - other.Blue);
+
+            return Mathf.Max(red, Mathf.Max(green, blue));
+        }
+
+        static Tint Read(Color colour)
+        {
+            return new Tint(colour.r, colour.g, colour.b);
+        }
+
+        static Tint Read(Color32 colour)
+        {
+            return new Tint(colour.r / 255f, colour.g / 255f, colour.b / 255f);
         }
 
         static void ThePlayFramingStandsTheFigureAtItsShareOfTheScreen(Camera lens, StringBuilder report)

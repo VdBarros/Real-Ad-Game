@@ -12,6 +12,8 @@ namespace Game.Presentation
 
         Camera lens;
 
+        WorldBackdrop backdrop;
+
         CameraStaging staging;
 
         CameraFraming applied;
@@ -38,13 +40,21 @@ namespace Game.Presentation
             get { return staged ? staging.Following : applied; }
         }
 
+        public WorldBackdrop Backdrop
+        {
+            get { return backdrop; }
+        }
+
         public static CameraRig Raise()
         {
             var carrier = new GameObject(PartNames.Rig) { tag = MainCameraTag };
             carrier.transform.rotation = Quaternion.Euler(
                 IsoProjection.CameraPitch, IsoProjection.CameraYaw, IsoProjection.CameraRoll);
 
-            return carrier.AddComponent<CameraRig>();
+            var raised = carrier.AddComponent<CameraRig>();
+            raised.backdrop = WorldBackdrop.Hang(raised.Lens());
+
+            return raised;
         }
 
         public void Begin(LevelGraph graph)
@@ -65,6 +75,7 @@ namespace Game.Presentation
             applied = framing;
             transform.position = new Vector3(framing.Position.X, framing.Position.Y, framing.Position.Z);
             Lens().orthographicSize = framing.OrthographicSize;
+            Refit();
             enabled = false;
         }
 
@@ -169,6 +180,15 @@ namespace Game.Presentation
             applied = framing;
             transform.position = new Vector3(framing.Position.X, framing.Position.Y, framing.Position.Z);
             Lens().orthographicSize = framing.OrthographicSize;
+            Refit();
+        }
+
+        void Refit()
+        {
+            if (backdrop != null)
+            {
+                backdrop.Fit(Lens().orthographicSize);
+            }
         }
 
         Camera Lens()

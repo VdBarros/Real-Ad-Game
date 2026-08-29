@@ -79,12 +79,19 @@ namespace Game.EditorTooling
 
         public static void Sun()
         {
+            Sunlight();
+            RenderSettings.ambientMode = AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.34f, 0.34f, 0.34f);
+        }
+
+        public static Light Sunlight()
+        {
             var light = new GameObject("PreviewSun").AddComponent<Light>();
             light.type = LightType.Directional;
             light.transform.rotation = Quaternion.Euler(50f, 200f, 0f);
             light.intensity = 1.6f;
-            RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.34f, 0.34f, 0.34f);
+
+            return light;
         }
 
         static void Render(Camera camera, RenderTexture target)
