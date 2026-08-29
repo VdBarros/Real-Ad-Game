@@ -40,7 +40,7 @@ namespace Game.EditorTooling
         {
             Wipe(LevelPath);
 
-            for (var tier = 0; tier < VisualTier.Count; tier++)
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
             {
                 Wipe(PortraitPath + tier + ".png");
             }
@@ -623,7 +623,7 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                heights.Count == VisualTier.Count && heights[0] > 0f && grew == heights.Count - 1,
+                heights.Count == PlayerTier.Count && heights[0] > 0f && grew == heights.Count - 1,
                 "the mesh grows by the tier seam's own step of "
                 + PlayerLook.Growth.ToString("0.##", CultureInfo.InvariantCulture) + " at every tier",
                 grew + " of " + (heights.Count - 1) + " steps do"

@@ -17,13 +17,13 @@ namespace Game.Domain.Tests
         [Test]
         public void AnEnemysOwnNumberDecidesItsSilhouetteAndTheBandNeverDoes()
         {
-            for (var tier = 0; tier < VisualTier.Count; tier++)
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
             {
                 Assert.That(CharacterCast.TierMeshOf(tier), Is.Not.EqualTo(PartModel.None), "tier " + tier);
             }
 
             Assert.That(
-                () => CharacterCast.TierMeshOf(VisualTier.Count),
+                () => CharacterCast.TierMeshOf(EnemyTier.Count),
                 Throws.InstanceOf<ArgumentOutOfRangeException>());
             Assert.That(
                 () => CharacterCast.TierMeshOf(-1),
@@ -31,7 +31,7 @@ namespace Game.Domain.Tests
 
             foreach (var number in EnemyNumbers)
             {
-                var wanted = CharacterCast.TierMeshOf(VisualTier.Of(number));
+                var wanted = CharacterCast.TierMeshOf(EnemyTier.Of(number));
 
                 Assert.That(
                     CharacterCast.MeshOf(PartStyle.Enemy, number), Is.EqualTo(wanted), "power " + number);
@@ -83,7 +83,7 @@ namespace Game.Domain.Tests
         {
             var seen = new List<PartModel>();
 
-            for (var tier = 0; tier < VisualTier.Count; tier++)
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
             {
                 var mesh = CharacterCast.TierMeshOf(tier);
 
@@ -115,7 +115,7 @@ namespace Game.Domain.Tests
             Assert.That(CharacterCast.MeshesOf(PartStyle.Enemy), Has.No.Member(boss));
             Assert.That(CharacterCast.MeshesOf(PartStyle.Start), Has.No.Member(boss));
 
-            for (var tier = 0; tier < VisualTier.Count; tier++)
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
             {
                 Assert.That(CharacterCast.TierMeshOf(tier), Is.Not.EqualTo(boss), "tier " + tier);
             }
@@ -134,7 +134,7 @@ namespace Game.Domain.Tests
             var boss = CharacterCast.MeshOf(PartStyle.Boss);
             var bossHeight = FigureFit.StandingHeight(boss, LevelBlueprintBuilder.BossScale);
 
-            for (var tier = 0; tier < VisualTier.Count; tier++)
+            for (var tier = 0; tier < EnemyTier.Count; tier++)
             {
                 Assert.That(
                     FigureFit.StandingHeight(
@@ -336,7 +336,7 @@ namespace Game.Domain.Tests
                         prop.Name + " holding " + node.Value);
                     Assert.That(
                         prop.Model,
-                        Is.EqualTo(CharacterCast.TierMeshOf(VisualTier.Of(node.Value))),
+                        Is.EqualTo(CharacterCast.TierMeshOf(EnemyTier.Of(node.Value))),
                         prop.Name);
                 }
                 else if (node.Type == NodeType.Boss)
@@ -431,7 +431,7 @@ namespace Game.Domain.Tests
         {
             if (role == PartStyle.Start)
             {
-                return PlayerLook.Of(VisualTier.Thresholds[VisualTier.Count - 2]).Scale;
+                return PlayerLook.Of(PlayerTier.Thresholds[PlayerTier.Count - 2]).Scale;
             }
 
             var basis = role == PartStyle.Boss
