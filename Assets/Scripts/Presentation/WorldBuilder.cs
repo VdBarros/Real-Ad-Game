@@ -242,23 +242,17 @@ namespace Game.Presentation
             return worn.TryGetValue(PartNames.Node(nodeId), out mesh) ? mesh : PartModel.None;
         }
 
-        static LandmarkProp Stand(GameObject instance, LandmarkKind kind)
+        LandmarkProp Stand(GameObject instance, LandmarkKind kind)
         {
             var pieces = LandmarkForm.Pieces(kind);
 
             foreach (var piece in pieces)
             {
-                var block = GameObject.CreatePrimitive(PrimitiveOf(piece.Part.Shape));
-                block.name = piece.Part.Name;
-                block.transform.SetParent(instance.transform, worldPositionStays: false);
-                block.transform.localPosition = Vector(piece.Part.Position);
-                block.transform.localEulerAngles = Vector(piece.Part.Rotation);
-                block.transform.localScale = Vector(piece.Part.Scale);
-                WorldObjects.Destroy(block.GetComponent<Collider>());
+                Raise(piece, instance.transform);
             }
 
             var prop = instance.AddComponent<LandmarkProp>();
-            prop.Begin(kind, pieces);
+            prop.Begin(kind, pieces, models.AtlasOf(ArtPack.Dungeon));
 
             return prop;
         }

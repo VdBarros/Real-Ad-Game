@@ -23,27 +23,42 @@ namespace Game.Presentation.Pure
 
         static readonly LandmarkKind[] kinds =
         {
-            LandmarkKind.Tree,
-            LandmarkKind.Statue,
-            LandmarkKind.Fountain,
-            LandmarkKind.Crystal,
-            LandmarkKind.Obelisk
+            LandmarkKind.Pillar,
+            LandmarkKind.Brazier,
+            LandmarkKind.Hoard,
+            LandmarkKind.Trophy,
+            LandmarkKind.Shrine
         };
 
-        public static IReadOnlyList<LandmarkPiece> Pieces(LandmarkKind kind)
+        public static IReadOnlyList<WorldPart> Pieces(LandmarkKind kind)
         {
             switch (kind)
             {
-                case LandmarkKind.Tree:
-                    return Tree();
-                case LandmarkKind.Statue:
-                    return Statue();
-                case LandmarkKind.Fountain:
-                    return Fountain();
-                case LandmarkKind.Crystal:
-                    return Crystal();
-                case LandmarkKind.Obelisk:
-                    return Obelisk();
+                case LandmarkKind.Pillar:
+                    return Stack(Course(PartModel.Pillar, 0.92f), Course(PartModel.Pillar, 0.46f));
+                case LandmarkKind.Brazier:
+                    return Stack(
+                        Course(PartModel.Foundation, 0.32f),
+                        Course(PartModel.Column, 0.30f),
+                        Course(PartModel.TorchLit, 0.70f));
+                case LandmarkKind.Hoard:
+                    return Stack(
+                        Course(PartModel.BarrelLarge, 0.38f),
+                        Course(PartModel.CratesStacked, 0.30f),
+                        Course(PartModel.BarrelLarge, 0.30f),
+                        Course(PartModel.CoinStack, 0.24f));
+                case LandmarkKind.Trophy:
+                    return Stack(
+                        Course(PartModel.CratesStacked, 0.32f),
+                        Course(PartModel.Pillar, 0.64f),
+                        Turned(PartModel.SwordShield, 0.268f));
+                case LandmarkKind.Shrine:
+                    return Stack(
+                        Course(PartModel.Foundation, 0.32f),
+                        Course(PartModel.Foundation, 0.28f),
+                        Course(PartModel.Foundation, 0.25f),
+                        Course(PartModel.Foundation, 0.22f),
+                        Course(PartModel.Foundation, 0.19f));
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(kind), kind, "No landmark is drawn for that kind.");
@@ -55,9 +70,9 @@ namespace Game.Presentation.Pure
             var floor = -Height * 0.5f;
             var top = floor;
 
-            foreach (var piece in Pieces(kind))
+            foreach (var part in Pieces(kind))
             {
-                var reach = piece.Part.Position.Y + HalfHeightOf(piece.Part);
+                var reach = part.Position.Y + part.Scale.Y * 0.5f;
                 if (reach > top)
                 {
                     top = reach;
@@ -71,9 +86,9 @@ namespace Game.Presentation.Pure
         {
             var widest = 0f;
 
-            foreach (var piece in Pieces(kind))
+            foreach (var part in Pieces(kind))
             {
-                var plan = PlanReachOf(piece.Part);
+                var plan = PlanReachOf(part);
                 if (plan > widest)
                 {
                     widest = plan;
@@ -81,22 +96,6 @@ namespace Game.Presentation.Pure
             }
 
             return widest;
-        }
-
-        public static float HalfHeightOf(WorldPart part)
-        {
-            switch (part.Shape)
-            {
-                case PartShape.Cube:
-                case PartShape.Sphere:
-                    return part.Scale.Y * 0.5f;
-                case PartShape.Capsule:
-                case PartShape.Cylinder:
-                    return part.Scale.Y;
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        nameof(part), part.Shape, "No landmark piece is cut in that shape.");
-            }
         }
 
         public static float PlanReachOf(WorldPart part)
@@ -109,109 +108,80 @@ namespace Game.Presentation.Pure
 
             var sideways = halfWide * across + halfDeep * along;
             var forwards = halfWide * along + halfDeep * across;
+            var off = OffCentreOf(part);
 
             return (float)Math.Max(
-                Math.Abs(part.Position.X) + sideways, Math.Abs(part.Position.Z) + forwards);
+                Math.Abs(part.Position.X + off.X) + sideways,
+                Math.Abs(part.Position.Z + off.Z) + forwards);
         }
 
-        static IReadOnlyList<LandmarkPiece> Tree()
+        public static WorldPoint OffCentreOf(WorldPart part)
+        {
+            if (part.Model == PartModel.None)
+            {
+                return new WorldPoint(0f, 0f, 0f);
+            }
+
+            var fit = part.Scale.Y / DungeonPack.HeightOf(part.Model);
+            var wide = DungeonPack.ShiftAcrossOf(part.Model) * fit;
+            var deep = DungeonPack.ShiftAlongOf(part.Model) * fit;
+            var turn = part.Rotation.Y * Math.PI / 180.0;
+            var across = Math.Cos(turn);
+            var along = Math.Sin(turn);
+
+            return new WorldPoint(
+                (float)(wide * across + deep * along), 0f, (float)(deep * across - wide * along));
+        }
+
+        static IReadOnlyList<WorldPart> Stack(params Layer[] courses)
         {
             var floor = -Height * 0.5f;
-            var bark = LandmarkLook.FootingOf(LandmarkKind.Tree);
-            var leaf = LandmarkLook.Of(LandmarkKind.Tree);
+            var pieces = new List<WorldPart>(courses.Length);
+            var laid = 0f;
 
-            return new[]
+            for (var index = 0; index < courses.Length; index++)
             {
-                Piece(0, PartShape.Cylinder, new WorldPoint(0f, floor + 0.36f, 0f), new WorldPoint(0.12f, 0.36f, 0.12f), bark),
-                Piece(1, PartShape.Sphere, new WorldPoint(0f, floor + 0.88f, 0f), new WorldPoint(0.36f, 0.36f, 0.36f), leaf),
-                Piece(2, PartShape.Sphere, new WorldPoint(0f, floor + 1.14f, 0f), new WorldPoint(0.24f, 0.24f, 0.24f), leaf)
-            };
-        }
+                var size = DungeonPack.SizeOf(courses[index].Model, courses[index].Tall);
 
-        static IReadOnlyList<LandmarkPiece> Statue()
-        {
-            var floor = -Height * 0.5f;
-            var stone = LandmarkLook.FootingOf(LandmarkKind.Statue);
-            var marble = LandmarkLook.Of(LandmarkKind.Statue);
-
-            return new[]
-            {
-                Piece(0, PartShape.Cube, new WorldPoint(0f, floor + 0.22f, 0f), new WorldPoint(0.36f, 0.44f, 0.36f), stone),
-                Piece(1, PartShape.Capsule, new WorldPoint(0f, floor + 0.70f, 0f), new WorldPoint(0.22f, 0.26f, 0.22f), marble),
-                Piece(2, PartShape.Sphere, new WorldPoint(0f, floor + 1.07f, 0f), new WorldPoint(0.22f, 0.22f, 0.22f), marble)
-            };
-        }
-
-        static IReadOnlyList<LandmarkPiece> Fountain()
-        {
-            var floor = -Height * 0.5f;
-            var stone = LandmarkLook.FootingOf(LandmarkKind.Fountain);
-            var water = LandmarkLook.Of(LandmarkKind.Fountain);
-
-            return new[]
-            {
-                Piece(0, PartShape.Cylinder, new WorldPoint(0f, floor + 0.11f, 0f), new WorldPoint(0.36f, 0.11f, 0.36f), stone),
-                Piece(1, PartShape.Cylinder, new WorldPoint(0f, floor + 0.42f, 0f), new WorldPoint(0.14f, 0.20f, 0.14f), stone),
-                Piece(2, PartShape.Cylinder, new WorldPoint(0f, floor + 0.67f, 0f), new WorldPoint(0.28f, 0.05f, 0.28f), stone),
-                Piece(3, PartShape.Cylinder, new WorldPoint(0f, floor + 0.97f, 0f), new WorldPoint(0.09f, 0.25f, 0.09f), water),
-                Piece(4, PartShape.Sphere, new WorldPoint(0f, floor + 1.32f, 0f), new WorldPoint(0.22f, 0.22f, 0.22f), water)
-            };
-        }
-
-        static IReadOnlyList<LandmarkPiece> Crystal()
-        {
-            var floor = -Height * 0.5f;
-            var rock = LandmarkLook.FootingOf(LandmarkKind.Crystal);
-            var glass = LandmarkLook.Of(LandmarkKind.Crystal);
-
-            return new[]
-            {
-                Turned(0, new WorldPoint(0f, floor + 0.07f, 0f), new WorldPoint(0.24f, 0.14f, 0.24f), rock),
-                Turned(1, new WorldPoint(0f, floor + 0.66f, 0f), new WorldPoint(0.14f, 1.10f, 0.14f), glass),
-                Turned(2, new WorldPoint(0f, floor + 1.32f, 0f), new WorldPoint(0.09f, 0.24f, 0.09f), glass),
-                Turned(3, new WorldPoint(-0.115f, floor + 0.33f, -0.02f), new WorldPoint(0.09f, 0.66f, 0.09f), glass),
-                Turned(4, new WorldPoint(0.115f, floor + 0.23f, 0.03f), new WorldPoint(0.08f, 0.46f, 0.08f), glass)
-            };
-        }
-
-        static IReadOnlyList<LandmarkPiece> Obelisk()
-        {
-            var floor = -Height * 0.5f;
-            var slate = LandmarkLook.FootingOf(LandmarkKind.Obelisk);
-            var gold = LandmarkLook.Of(LandmarkKind.Obelisk);
-
-            return new[]
-            {
-                Piece(0, PartShape.Cube, new WorldPoint(0f, floor + 0.07f, 0f), new WorldPoint(0.36f, 0.14f, 0.36f), slate),
-                Piece(1, PartShape.Cube, new WorldPoint(0f, floor + 0.72f, 0f), new WorldPoint(0.22f, 1.16f, 0.22f), slate),
-                Piece(2, PartShape.Cube, new WorldPoint(0f, floor + 1.37f, 0f), new WorldPoint(0.14f, 0.14f, 0.14f), gold),
-                Turned(3, new WorldPoint(0f, floor + 1.50f, 0f), new WorldPoint(0.10f, 0.12f, 0.10f), gold)
-            };
-        }
-
-        static LandmarkPiece Piece(int index, PartShape shape, WorldPoint position, WorldPoint scale, Tint tint)
-        {
-            return Cut(index, shape, position, new WorldPoint(0f, 0f, 0f), scale, tint);
-        }
-
-        static LandmarkPiece Turned(int index, WorldPoint position, WorldPoint scale, Tint tint)
-        {
-            return Cut(index, PartShape.Cube, position, new WorldPoint(0f, Yaw, 0f), scale, tint);
-        }
-
-        static LandmarkPiece Cut(
-            int index, PartShape shape, WorldPoint position, WorldPoint rotation, WorldPoint scale, Tint tint)
-        {
-            return new LandmarkPiece(
-                new WorldPart(
+                pieces.Add(new WorldPart(
                     PartNames.LandmarkPiece(index),
-                    shape,
-                    PartModel.None,
+                    PartShape.Landmark,
+                    courses[index].Model,
                     PartStyle.Landmark,
-                    position,
-                    rotation,
-                    scale),
-                tint);
+                    new WorldPoint(0f, floor + laid + size.Y * 0.5f, 0f),
+                    new WorldPoint(0f, courses[index].Turn, 0f),
+                    size));
+
+                laid += size.Y;
+            }
+
+            return pieces;
+        }
+
+        static Layer Course(PartModel model, float tall)
+        {
+            return new Layer(model, tall, 0f);
+        }
+
+        static Layer Turned(PartModel model, float tall)
+        {
+            return new Layer(model, tall, Yaw);
+        }
+
+        readonly struct Layer
+        {
+            public Layer(PartModel model, float tall, float turn)
+            {
+                Model = model;
+                Tall = tall;
+                Turn = turn;
+            }
+
+            public PartModel Model { get; }
+
+            public float Tall { get; }
+
+            public float Turn { get; }
         }
     }
 }

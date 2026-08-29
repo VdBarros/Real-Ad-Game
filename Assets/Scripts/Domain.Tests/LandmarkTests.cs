@@ -359,24 +359,144 @@ namespace Game.Domain.Tests
         }
 
         [TestCaseSource(nameof(EveryKind))]
-        public void EveryKindIsPrimitivesAloneAndRestsOnTheTileFloor(LandmarkKind kind)
+        public void EveryKindIsPackMeshesAloneAndRestsOnTheTileFloor(LandmarkKind kind)
         {
             var floor = -LandmarkForm.Height * 0.5f;
             var lowest = float.MaxValue;
 
             foreach (var piece in LandmarkForm.Pieces(kind))
             {
-                Assert.That(piece.Part.Model, Is.EqualTo(PartModel.None), piece.ToString());
-                Assert.That(piece.Part.Style, Is.EqualTo(PartStyle.Landmark), piece.ToString());
-                Assert.That(PartNames.IsLandmarkPiece(piece.Part.Name), Is.True, piece.ToString());
+                Assert.That(piece.Model, Is.Not.EqualTo(PartModel.None), piece.ToString());
+                Assert.That(ArtPacks.Of(piece.Model), Is.EqualTo(ArtPack.Dungeon), piece.ToString());
+                Assert.That(piece.Shape, Is.EqualTo(PartShape.Landmark), piece.ToString());
+                Assert.That(piece.Style, Is.EqualTo(PartStyle.Landmark), piece.ToString());
+                Assert.That(PartNames.IsLandmarkPiece(piece.Name), Is.True, piece.ToString());
 
-                lowest = Math.Min(lowest, piece.Part.Position.Y - LandmarkForm.HalfHeightOf(piece.Part));
+                lowest = Math.Min(lowest, piece.Position.Y - piece.Scale.Y * 0.5f);
             }
 
-            var names = LandmarkForm.Pieces(kind).Select(piece => piece.Part.Name).ToList();
+            var names = LandmarkForm.Pieces(kind).Select(piece => piece.Name).ToList();
 
             Assert.That(names.Distinct().Count(), Is.EqualTo(names.Count));
             Assert.That(lowest, Is.EqualTo(floor).Within(Tolerance), kind + " floats above its tile.");
+        }
+
+        [TestCaseSource(nameof(EveryKind))]
+        public void EveryPieceIsSizedByTheProportionsOfTheMeshItWears(LandmarkKind kind)
+        {
+            foreach (var piece in LandmarkForm.Pieces(kind))
+            {
+                var mesh = DungeonPack.HeightOf(piece.Model);
+
+                Assert.That(
+                    piece.Scale.X,
+                    Is.EqualTo(DungeonPack.WidthOf(piece.Model) * piece.Scale.Y / mesh).Within(Tolerance),
+                    piece.ToString());
+                Assert.That(
+                    piece.Scale.Z,
+                    Is.EqualTo(DungeonPack.DepthOf(piece.Model) * piece.Scale.Y / mesh).Within(Tolerance),
+                    piece.ToString());
+
+                var fit = ModelPose.ScaleOf(piece);
+
+                Assert.That(fit.X, Is.EqualTo(fit.Y).Within(Tolerance), piece + " is stretched across.");
+                Assert.That(fit.Z, Is.EqualTo(fit.Y).Within(Tolerance), piece + " is stretched through.");
+            }
+        }
+
+        [TestCaseSource(nameof(EveryKind))]
+        public void EveryPieceStandsOnTheOneBelowItWithNoGapAndNoOverlap(LandmarkKind kind)
+        {
+            var pieces = LandmarkForm.Pieces(kind);
+            var laid = -LandmarkForm.Height * 0.5f;
+
+            Assert.That(pieces.Count, Is.GreaterThan(1), kind + " is a single mesh rather than a build.");
+
+            foreach (var piece in pieces)
+            {
+                Assert.That(
+                    piece.Position.Y - piece.Scale.Y * 0.5f,
+                    Is.EqualTo(laid).Within(Tolerance),
+                    piece + " does not rest on the course below it.");
+
+                laid += piece.Scale.Y;
+            }
+
+            Assert.That(
+                laid + LandmarkForm.Height * 0.5f,
+                Is.EqualTo(LandmarkForm.StandingHeightOf(kind)).Within(Tolerance));
+        }
+
+        [TestCaseSource(nameof(EveryKind))]
+        public void TheReachOfAKindCoversTheMeshEvenWhereItSitsOffItsOwnPivot(LandmarkKind kind)
+        {
+            var reach = LandmarkForm.ReachOf(kind);
+
+            foreach (var piece in LandmarkForm.Pieces(kind))
+            {
+                var off = LandmarkForm.OffCentreOf(piece);
+                var turn = piece.Rotation.Y * Math.PI / 180.0;
+                var across = Math.Abs(Math.Cos(turn));
+                var along = Math.Abs(Math.Sin(turn));
+                var sideways = piece.Scale.X * 0.5f * across + piece.Scale.Z * 0.5f * along;
+                var forwards = piece.Scale.X * 0.5f * along + piece.Scale.Z * 0.5f * across;
+
+                Assert.That(
+                    Math.Abs(piece.Position.X + off.X) + sideways,
+                    Is.LessThanOrEqualTo(reach + Tolerance),
+                    piece + " spills past the reach its kind promises.");
+                Assert.That(
+                    Math.Abs(piece.Position.Z + off.Z) + forwards,
+                    Is.LessThanOrEqualTo(reach + Tolerance),
+                    piece + " spills past the reach its kind promises.");
+            }
+
+            Assert.That(
+                reach,
+                Is.LessThanOrEqualTo(LandmarkForm.Reach + Tolerance),
+                kind + " claims more ground than the placement budgets for.");
+        }
+
+        [Test]
+        public void AMeshThatSitsSquareOnItsPivotIsNeverShiftedOffTheLandmarkAxis()
+        {
+            var centred = 0;
+
+            foreach (var kind in LandmarkForm.Kinds)
+            {
+                foreach (var piece in LandmarkForm.Pieces(kind))
+                {
+                    if (DungeonPack.PackShiftAcrossOf(piece.Model) != 0f
+                        || DungeonPack.PackShiftAlongOf(piece.Model) != 0f)
+                    {
+                        continue;
+                    }
+
+                    var off = LandmarkForm.OffCentreOf(piece);
+
+                    Assert.That(off.X, Is.EqualTo(0f).Within(Tolerance), piece.ToString());
+                    Assert.That(off.Z, Is.EqualTo(0f).Within(Tolerance), piece.ToString());
+                    centred++;
+                }
+            }
+
+            Assert.That(centred, Is.GreaterThan(0));
+        }
+
+        [TestCaseSource(nameof(EveryKind))]
+        public void TheMeshOfEveryPieceStandsOnTheCourseTheStackPutItOn(LandmarkKind kind)
+        {
+            foreach (var piece in LandmarkForm.Pieces(kind))
+            {
+                var posed = ModelPose.PositionOf(piece);
+                var fit = ModelPose.ScaleOf(piece);
+                var foot = posed.Y + DungeonPack.BaseOf(piece.Model) * fit.Y;
+
+                Assert.That(
+                    foot,
+                    Is.EqualTo(piece.Position.Y - piece.Scale.Y * 0.5f).Within(Tolerance),
+                    piece + " sinks below the course it was laid on or floats above it.");
+            }
         }
 
         [TestCaseSource(nameof(EveryKind))]
@@ -409,30 +529,25 @@ namespace Game.Domain.Tests
         [Test]
         public void NoTwoKindsShareASilhouetteOrAColour()
         {
-            var heights = new List<float>();
             var crowns = new List<Tint>();
-            var footings = new List<Tint>();
             var profiles = new List<string>();
 
             foreach (var kind in LandmarkForm.Kinds)
             {
-                heights.Add(LandmarkForm.StandingHeightOf(kind));
                 crowns.Add(LandmarkLook.Of(kind));
-                footings.Add(LandmarkLook.FootingOf(kind));
                 profiles.Add(Profile(kind));
             }
 
             Assert.That(crowns.Distinct().Count(), Is.EqualTo(crowns.Count), "Two kinds glow the same colour.");
-            Assert.That(footings.Distinct().Count(), Is.EqualTo(footings.Count));
             Assert.That(
                 profiles.Distinct().Count(),
                 Is.EqualTo(profiles.Count),
                 "Two kinds are stacked the same way, so they read as one thing: "
                 + string.Join(" / ", profiles.ToArray()));
 
-            for (var one = 0; one < heights.Count; one++)
+            for (var one = 0; one < crowns.Count; one++)
             {
-                for (var other = one + 1; other < heights.Count; other++)
+                for (var other = one + 1; other < crowns.Count; other++)
                 {
                     Assert.That(
                         Apart(crowns[one], crowns[other]),
@@ -441,6 +556,24 @@ namespace Game.Domain.Tests
                         + " are near enough in colour to be mistaken for each other.");
                 }
             }
+        }
+
+        [Test]
+        public void NoTwoKindsAreCrownedWithTheSameMesh()
+        {
+            var crowns = new List<PartModel>();
+
+            foreach (var kind in LandmarkForm.Kinds)
+            {
+                var pieces = LandmarkForm.Pieces(kind);
+                crowns.Add(pieces[pieces.Count - 1].Model);
+            }
+
+            Assert.That(
+                crowns.Distinct().Count(),
+                Is.EqualTo(crowns.Count),
+                "Two kinds end in the same mesh, so the piece a glance lands on first is the same: "
+                + string.Join(" / ", crowns.Select(model => model.ToString()).ToArray()));
         }
 
         [Test]
@@ -516,7 +649,7 @@ namespace Game.Domain.Tests
             return string.Join(
                 "-",
                 LandmarkForm.Pieces(kind)
-                    .Select(piece => piece.Part.Shape + ":" + piece.Part.Scale.X.ToString("0.##"))
+                    .Select(piece => piece.Model + ":" + piece.Scale.Y.ToString("0.##"))
                     .ToArray());
         }
 

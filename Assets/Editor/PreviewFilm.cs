@@ -34,9 +34,14 @@ namespace Game.EditorTooling
 
         public static Camera Rig(Vector3 centre, float distance, float orthographicSize)
         {
+            return Rig(centre, distance, orthographicSize, IsoProjection.CameraYaw);
+        }
+
+        public static Camera Rig(Vector3 centre, float distance, float orthographicSize, float yaw)
+        {
             var camera = new GameObject("PreviewCamera").AddComponent<Camera>();
             camera.transform.rotation = Quaternion.Euler(
-                IsoProjection.CameraPitch, IsoProjection.CameraYaw, IsoProjection.CameraRoll);
+                IsoProjection.CameraPitch, yaw, IsoProjection.CameraRoll);
             camera.transform.position = centre - camera.transform.forward * distance;
             camera.orthographic = true;
             camera.orthographicSize = orthographicSize;
