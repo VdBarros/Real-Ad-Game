@@ -1,10 +1,11 @@
+using System;
 using Game.Domain;
 
 namespace Game.Presentation.Pure
 {
     public static class FigureCues
     {
-        public static FigureCue Of(Journey journey)
+        public static FigureCue Of(Journey journey, PlayerWeapon gripped)
         {
             if (journey == null || journey.IsOver)
             {
@@ -19,7 +20,7 @@ namespace Game.Presentation.Pure
             var fight = journey.Fight;
             if (fight.IsJoined && !fight.IsSettled)
             {
-                return Striking(fight);
+                return Striking(fight, gripped);
             }
 
             if (journey.HoldsForABeat)
@@ -30,7 +31,27 @@ namespace Game.Presentation.Pure
             return FigureCue.Still;
         }
 
-        public static FigureCue Striking(Fight fight)
+        public static FigureAct FinisherOf(PlayerWeapon gripped)
+        {
+            switch (gripped)
+            {
+                case PlayerWeapon.None:
+                    return FigureAct.Kick;
+                case PlayerWeapon.Shortsword:
+                    return FigureAct.Slice;
+                case PlayerWeapon.Axe:
+                    return FigureAct.Cleave;
+                case PlayerWeapon.Spear:
+                    return FigureAct.Thrust;
+                case PlayerWeapon.Greatsword:
+                    return FigureAct.Sweep;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(gripped), gripped, "No finisher is swung with that weapon.");
+            }
+        }
+
+        public static FigureCue Striking(Fight fight, PlayerWeapon gripped)
         {
             if (!fight.IsJoined)
             {
@@ -40,44 +61,39 @@ namespace Game.Presentation.Pure
             switch (fight.Outcome)
             {
                 case ActionOutcome.Win:
-                    return Trading(fight);
+                    return fight.IsExecuting
+                        ? FigureCue.Within(FinisherOf(gripped), fight.BlowBeat)
+                        : FigureCue.Still;
                 case ActionOutcome.Tie:
-                    return FigureCue.Within(FigureAct.Clash, fight.Beat);
+                    return FigureCue.Within(FigureAct.Clash, fight.BlowBeat);
                 case ActionOutcome.Loss:
-                    return FigureCue.Within(FigureAct.Recoil, fight.Beat);
+                    return fight.HasStruck
+                        ? FigureCue.Within(FigureAct.Fall, fight.FallBeat)
+                        : FigureCue.Still;
                 default:
                     return FigureCue.Still;
             }
         }
 
-        static FigureCue Trading(Fight fight)
+        public static FigureCue Answering(Fight fight)
         {
-            if (!fight.IsTrading)
+            if (!fight.IsJoined)
             {
                 return FigureCue.Still;
             }
 
-            return FigureCue.Within(
-                fight.ThePlayerThrewIt ? FigureAct.Strike : FigureAct.Recoil, fight.Beat);
-        }
-
-        public static FigureCue Answering(Fight fight)
-        {
-            var struck = Striking(fight);
-
-            return struck.Loops ? FigureCue.Still : FigureCue.Within(Answered(struck.Act), struck.Beat);
-        }
-
-        public static FigureAct Answered(FigureAct act)
-        {
-            switch (act)
+            switch (fight.Outcome)
             {
-                case FigureAct.Strike:
-                    return FigureAct.Recoil;
-                case FigureAct.Recoil:
-                    return FigureAct.Strike;
+                case ActionOutcome.Win:
+                    return fight.HasStruck
+                        ? FigureCue.Within(FigureAct.Fall, fight.FallBeat)
+                        : FigureCue.Still;
+                case ActionOutcome.Tie:
+                    return FigureCue.Within(FigureAct.Clash, fight.BlowBeat);
+                case ActionOutcome.Loss:
+                    return FigureCue.Within(FigureAct.Strike, fight.BlowBeat);
                 default:
-                    return act;
+                    return FigureCue.Still;
             }
         }
     }

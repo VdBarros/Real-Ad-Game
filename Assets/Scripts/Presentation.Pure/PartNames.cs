@@ -22,8 +22,6 @@ namespace Game.Presentation.Pure
 
         public const string TrailGroup = "Trail";
 
-        public const string Spark = "Spark";
-
         public const string OrbGroup = "Orbs";
 
         public const string OrbPrefix = "Orb_";
