@@ -23,6 +23,10 @@ namespace Game.EditorTooling
 
         const int RichPower = 20000;
 
+        const string BaseColour = "_BaseColor";
+
+        const string BaseMap = "_BaseMap";
+
         const string LevelPath = "dev/scratch/t-33-enemy-cast-level.png";
 
         const string PortraitPath = "dev/scratch/t-33-cast-";
@@ -129,7 +133,9 @@ namespace Game.EditorTooling
             Portraits(rig, lens, graph, byName, packs);
 
             failures += EveryRiggedFigureIsPosedByAnAnimator(root, byName, rig, lens, graph, report);
-            failures += TheBandMovesTheTintAndScaleButNeverTheMesh(graph, byName, packs, power, report);
+            failures += TheBandMovesTheScaleButNeverTheMeshNorTheColour(
+                graph, byName, packs, power, report);
+            failures += EveryAdversaryShowsThePacksOwnTexture(graph, byName, report);
 
             Application.logMessageReceived -= watcher;
 
@@ -797,7 +803,7 @@ namespace Game.EditorTooling
             return failures;
         }
 
-        static int TheBandMovesTheTintAndScaleButNeverTheMesh(
+        static int TheBandMovesTheScaleButNeverTheMeshNorTheColour(
             LevelGraph graph,
             IDictionary<string, Transform> byName,
             IDictionary<PartModel, ISet<Mesh>> packs,
@@ -807,7 +813,7 @@ namespace Game.EditorTooling
             if (power == null)
             {
                 return Assert(
-                    report, false, "the band moves the tint and the scale but never the mesh",
+                    report, false, "the band moves the scale but never the mesh nor the colour",
                     "the world raised no player badge to move the reading with");
             }
 
@@ -877,9 +883,9 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                moved > 0 && repainted == moved && resized == moved,
-                "every adversary whose band moved took a new tint and a new size from it, so the band "
-                + "owns material and scale exactly as the number owns the mesh",
+                moved > 0 && repainted == 0 && resized == moved,
+                "every adversary whose band moved took a new size from it and kept the colour it had, so "
+                + "the band owns scale alone and the pack's own texture is left to show through",
                 repainted + " repainted and " + resized + " resized of " + moved + " that moved band");
 
             return failures;
@@ -1504,18 +1510,101 @@ namespace Game.EditorTooling
             return string.Join("+", names.ToArray());
         }
 
-        static Color Painted(EnemyFigure figure)
+        static Material Skin(EnemyFigure figure)
         {
-            var block = new MaterialPropertyBlock();
-
             foreach (var renderer in figure.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
-                renderer.GetPropertyBlock(block);
-
-                return block.GetColor("_BaseColor");
+                return renderer.sharedMaterial;
             }
 
-            return Color.black;
+            return null;
+        }
+
+        static Color Painted(EnemyFigure figure)
+        {
+            var skin = Skin(figure);
+
+            if (skin == null || !skin.HasProperty(BaseColour))
+            {
+                return Color.black;
+            }
+
+            return skin.GetColor(BaseColour);
+        }
+
+        static int Overrides(EnemyFigure figure)
+        {
+            var found = 0;
+
+            foreach (var renderer in figure.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer.HasPropertyBlock())
+                {
+                    found++;
+                }
+            }
+
+            return found;
+        }
+
+        static int EveryAdversaryShowsThePacksOwnTexture(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var read = 0;
+            var atlassed = 0;
+            var white = 0;
+            var overridden = 0;
+            var complaint = new List<string>();
+
+            foreach (var figure in Adversaries(graph, byName))
+            {
+                read++;
+
+                var skin = Skin(figure.Figure);
+                var atlas = skin != null && skin.HasProperty(BaseMap) ? skin.GetTexture(BaseMap) : null;
+
+                if (atlas != null)
+                {
+                    atlassed++;
+                }
+
+                if (Painted(figure.Figure) == Color.white)
+                {
+                    white++;
+                }
+                else if (complaint.Count < 6)
+                {
+                    complaint.Add(figure.Name + " reads " + Painted(figure.Figure));
+                }
+
+                overridden += Overrides(figure.Figure);
+            }
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                read > 0 && atlassed == read,
+                "every adversary wears a material bound to the skeleton pack's atlas, so what shows is the "
+                + "pack's own texture",
+                atlassed + " of " + read + " do");
+
+            failures += Assert(
+                report,
+                read > 0 && white == read,
+                "that material multiplies the atlas by white rather than by a palette colour, so no flat "
+                + "tint sits over the mesh",
+                white + " of " + read + " do"
+                + (complaint.Count == 0 ? "" : "; " + string.Join("; ", complaint.ToArray())));
+
+            failures += Assert(
+                report,
+                overridden == 0,
+                "no renderer under any adversary carries a property block, so no second colour is laid "
+                + "over the material either",
+                overridden + " renderers across " + read + " adversaries do");
+
+            return failures;
         }
 
         static ISet<Mesh> Pack(IDictionary<PartModel, ISet<Mesh>> packs, PartModel model)

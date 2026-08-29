@@ -99,6 +99,7 @@ namespace Game.EditorTooling
             var heights = new List<float> { Standing(player, pack) };
             var hides = new List<float> { Hiding(player, pack) };
             var tints = new List<Color> { Painted(player) };
+            var overrides = new List<int> { Overrides(player) };
 
             foreach (var target in Climb)
             {
@@ -107,10 +108,12 @@ namespace Game.EditorTooling
                 heights.Add(Standing(player, pack));
                 hides.Add(Hiding(player, pack));
                 tints.Add(Painted(player));
+                overrides.Add(Overrides(player));
                 Portrait(rig, lens, player, pack, power.Look.Tier);
             }
 
             failures += TheTierStillReads(worn, heights, hides, tints, report);
+            failures += TheMeshKeepsItsPackTexture(player, tints, overrides, report);
 
             Application.logMessageReceived -= watcher;
 
@@ -631,9 +634,10 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                tints.Count > 1 && repainted == tints.Count - 1,
-                "the mesh takes a new tint from the tier seam's ramp at every tier",
-                repainted + " of " + (tints.Count - 1) + " steps do");
+                tints.Count > 1 && repainted == 0,
+                "the mesh keeps the colour it opened on at every tier, so the tier seam moves the size "
+                + "and nothing else",
+                repainted + " of " + (tints.Count - 1) + " steps repainted it");
 
             failures += Assert(
                 report,
@@ -717,23 +721,173 @@ namespace Game.EditorTooling
             return Math.Max(box.size.x, box.size.z) * IsoProjection.SightReach(box.size.y);
         }
 
-        static Color Painted(PlayerFigure player)
+        static int TheMeshKeepsItsPackTexture(
+            PlayerFigure player,
+            IReadOnlyList<Color> tints,
+            IReadOnlyList<int> overrides,
+            StringBuilder report)
+        {
+            var skin = Skin(player);
+            var atlas = skin != null && skin.HasProperty(BaseMap) ? skin.GetTexture(BaseMap) : null;
+            var overridden = 0;
+
+            for (var step = 0; step < overrides.Count; step++)
+            {
+                overridden += overrides[step];
+            }
+
+            var flat = 0;
+
+            for (var step = 0; step < tints.Count; step++)
+            {
+                if (tints[step] == Color.white)
+                {
+                    flat++;
+                }
+            }
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                skin != null && atlas != null,
+                "the player's mesh wears one material bound to the adventurers atlas, so what shows is the "
+                + "pack's own texture",
+                skin == null
+                    ? "the player carries no skinned renderer"
+                    : "it wears " + skin.name + " bound to "
+                        + (atlas == null ? "no texture at all" : atlas.name));
+
+            failures += Assert(
+                report,
+                tints.Count > 0 && flat == tints.Count,
+                "that material multiplies the atlas by white at every tier rather than by a palette colour, "
+                + "so nothing tints the texture away",
+                flat + " of " + tints.Count + " readings are white; they read "
+                + string.Join(", ", Readings(tints)));
+
+            failures += Assert(
+                report,
+                overridden == 0,
+                "no renderer wearing that material carries a property block at any tier, so no second "
+                + "colour is laid over the texture either",
+                overridden + " overrides across " + overrides.Count + " tiers");
+
+            int tinted;
+            var carried = Trophies(player, out tinted);
+            var wanted = PlayerLook.Of(Climb[Climb.Length - 1]).Trophies;
+
+            failures += Assert(
+                report,
+                carried == wanted && tinted == carried && carried > 0,
+                "the trophy primitives hanging off the same figure are still washed with the steel tint "
+                + "they have always worn, because a primitive carries no texture for a tint to hide",
+                tinted + " of " + carried + " are, against the " + wanted + " the top tier carries");
+
+            return failures;
+        }
+
+        static bool Dressed(Renderer renderer)
+        {
+            var material = renderer.sharedMaterial;
+
+            return material != null
+                && material.name.StartsWith(WorldMaterials.NamePrefix, StringComparison.Ordinal);
+        }
+
+        static int Trophies(PlayerFigure player, out int tinted)
+        {
+            tinted = 0;
+
+            if (player == null)
+            {
+                return 0;
+            }
+
+            var found = 0;
+
+            foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
+            {
+                if (Dressed(renderer))
+                {
+                    continue;
+                }
+
+                found++;
+
+                if (renderer.HasPropertyBlock())
+                {
+                    tinted++;
+                }
+            }
+
+            return found;
+        }
+
+        static string[] Readings(IReadOnlyList<Color> tints)
+        {
+            var read = new string[tints.Count];
+
+            for (var step = 0; step < tints.Count; step++)
+            {
+                read[step] = tints[step].ToString();
+            }
+
+            return read;
+        }
+
+        static SkinnedMeshRenderer Skinned(PlayerFigure player)
         {
             if (player == null)
+            {
+                return null;
+            }
+
+            foreach (var renderer in player.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                return renderer;
+            }
+
+            return null;
+        }
+
+        static Material Skin(PlayerFigure player)
+        {
+            var renderer = Skinned(player);
+
+            return renderer == null ? null : renderer.sharedMaterial;
+        }
+
+        static int Overrides(PlayerFigure player)
+        {
+            if (player == null)
+            {
+                return 0;
+            }
+
+            var found = 0;
+
+            foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
+            {
+                if (Dressed(renderer) && renderer.HasPropertyBlock())
+                {
+                    found++;
+                }
+            }
+
+            return found;
+        }
+
+        static Color Painted(PlayerFigure player)
+        {
+            var skin = Skin(player);
+
+            if (skin == null || !skin.HasProperty(BaseColour))
             {
                 return Color.black;
             }
 
-            var block = new MaterialPropertyBlock();
-
-            foreach (var renderer in player.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-            {
-                renderer.GetPropertyBlock(block);
-
-                return block.GetColor(BaseColour);
-            }
-
-            return Color.black;
+            return skin.GetColor(BaseColour);
         }
 
         static float ScaleOn(PlayerFigure player)

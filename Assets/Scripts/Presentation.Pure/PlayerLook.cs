@@ -9,20 +9,10 @@ namespace Game.Presentation.Pure
 
         public const float BaseScale = LevelBlueprintBuilder.FigureScale;
 
-        static readonly Tint[] ramp =
-        {
-            new Tint(0.30f, 0.72f, 0.78f),
-            new Tint(0.36f, 0.80f, 0.52f),
-            new Tint(0.82f, 0.86f, 0.36f),
-            new Tint(0.95f, 0.68f, 0.24f),
-            new Tint(1.00f, 0.44f, 0.16f)
-        };
-
-        PlayerLook(int tier, float scale, Tint tint, int trophies)
+        PlayerLook(int tier, float scale, int trophies)
         {
             Tier = tier;
             Scale = scale;
-            Tint = tint;
             Trophies = trophies;
         }
 
@@ -35,7 +25,7 @@ namespace Game.Presentation.Pure
                 scale *= Growth;
             }
 
-            return new PlayerLook(tier, scale, ramp[tier], TrophiesAt(tier));
+            return new PlayerLook(tier, scale, TrophiesAt(tier));
         }
 
         static int TrophiesAt(int tier)
@@ -52,15 +42,12 @@ namespace Game.Presentation.Pure
 
         public float Scale { get; }
 
-        public Tint Tint { get; }
-
         public int Trophies { get; }
 
         public bool Equals(PlayerLook other)
         {
             return Tier == other.Tier
                 && Scale.Equals(other.Scale)
-                && Tint.Equals(other.Tint)
                 && Trophies == other.Trophies;
         }
 
@@ -75,7 +62,6 @@ namespace Game.Presentation.Pure
             {
                 var hash = Tier;
                 hash = (hash * 397) ^ Scale.GetHashCode();
-                hash = (hash * 397) ^ Tint.GetHashCode();
                 hash = (hash * 397) ^ Trophies;
                 return hash;
             }
@@ -88,8 +74,6 @@ namespace Game.Presentation.Pure
                 Tier.ToString(),
                 " at ",
                 Scale.ToString("0.###", CultureInfo.InvariantCulture),
-                " ",
-                Tint.ToString(),
                 " carrying ",
                 Trophies.ToString());
         }

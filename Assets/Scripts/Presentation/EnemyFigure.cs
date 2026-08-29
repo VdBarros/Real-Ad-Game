@@ -5,8 +5,6 @@ namespace Game.Presentation
 {
     public sealed class EnemyFigure : Figure
     {
-        static readonly Tint Ash = new Tint(0.88f, 0.88f, 0.90f);
-
         PowerBadge power;
 
         FigureAnimator acting;
@@ -65,9 +63,7 @@ namespace Game.Presentation
                 return;
             }
 
-            Wear(
-                BaseScale * EnemyBands.ScaleOf(Band) * fade,
-                Tint.Lerp(EnemyBands.TintOf(Band), Ash, 1f - fade));
+            Wear(BaseScale * EnemyBands.ScaleOf(Band) * fade);
         }
 
         void Fall()
@@ -106,7 +102,7 @@ namespace Game.Presentation
             }
 
             Band = EnemyBands.Of(value, playerPower);
-            Wear(BaseScale * EnemyBands.ScaleOf(Band), EnemyBands.TintOf(Band));
+            Wear(BaseScale * EnemyBands.ScaleOf(Band));
         }
     }
 }
