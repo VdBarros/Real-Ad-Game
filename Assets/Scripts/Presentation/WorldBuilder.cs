@@ -269,13 +269,7 @@ namespace Game.Presentation
 
             foreach (var piece in pieces)
             {
-                var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                block.name = piece.Name;
-                block.transform.SetParent(instance.transform, worldPositionStays: false);
-                block.transform.localPosition = Vector(piece.Position);
-                block.transform.localEulerAngles = Vector(piece.Rotation);
-                block.transform.localScale = Vector(piece.Scale);
-                WorldObjects.Destroy(block.GetComponent<Collider>());
+                Raise(piece, instance.transform);
             }
 
             var glow = instance.AddComponent<GateProp>();
