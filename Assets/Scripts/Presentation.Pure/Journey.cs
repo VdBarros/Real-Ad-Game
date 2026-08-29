@@ -139,12 +139,12 @@ namespace Game.Presentation.Pure
 
         public Journey Cancelled()
         {
-            return BrokenOff(TapAim.Nothing);
+            return BrokenOff(TapAim.Nothing, fight);
         }
 
         public Journey DivertedTo(int nodeId)
         {
-            return BrokenOff(nodeId);
+            return BrokenOff(nodeId, fight.Broken());
         }
 
         public Journey Onward()
@@ -157,7 +157,7 @@ namespace Game.Presentation.Pure
             return Toward(State, diversion);
         }
 
-        Journey BrokenOff(int nextNodeId)
+        Journey BrokenOff(int nextNodeId, Fight settling)
         {
             if (IsOver)
             {
@@ -169,7 +169,7 @@ namespace Game.Presentation.Pure
                 IsWaiting ? Walk.Stopped() : Walk.Backtracked(),
                 Arrival,
                 owesABeat,
-                fight,
+                settling,
                 nextNodeId);
         }
 
