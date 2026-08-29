@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Game.Presentation.Pure;
 using NUnit.Framework;
 
@@ -51,12 +53,79 @@ namespace Game.Domain.Tests
                 Assert.That(
                     looks[step].Scale,
                     Is.EqualTo(looks[step - 1].Scale * PlayerLook.Growth).Within(Tolerance));
-                Assert.That(looks[step].Tint, Is.Not.EqualTo(looks[step - 1].Tint));
             }
 
             Assert.That(
                 looks.Select(look => PartModels.Of(PartStyle.Start)).Distinct().Count(),
                 Is.EqualTo(1));
+        }
+
+        [Test]
+        public void NoReadingOfACharacterCarriesAColourWhileEveryOneStillCarriesASize()
+        {
+            foreach (var reading in new[] { typeof(PlayerLook), typeof(Promotion), typeof(PowerBeat) })
+            {
+                Assert.That(Colours(reading), Is.Empty, reading.Name);
+                Assert.That(reading.GetProperty("Scale"), Is.Not.Null, reading.Name);
+            }
+
+            Assert.That(Colours(typeof(EnemyBands)), Is.Empty);
+
+            var sizes = ((EnemyBand[])Enum.GetValues(typeof(EnemyBand)))
+                .Select(EnemyBands.ScaleOf)
+                .ToList();
+
+            Assert.That(sizes.Distinct().Count(), Is.EqualTo(sizes.Count));
+            Assert.That(
+                PowersAcrossEveryTier.Select(power => PlayerLook.Of(power).Scale).Distinct().Count(),
+                Is.EqualTo(PowersAcrossEveryTier.Length));
+        }
+
+        static List<string> Colours(Type reading)
+        {
+            const BindingFlags Everything = BindingFlags.Public
+                | BindingFlags.NonPublic
+                | BindingFlags.Instance
+                | BindingFlags.Static
+                | BindingFlags.DeclaredOnly;
+
+            var found = new List<string>();
+
+            foreach (var field in reading.GetFields(Everything))
+            {
+                if (IsColour(field.FieldType))
+                {
+                    found.Add(reading.Name + "." + field.Name);
+                }
+            }
+
+            foreach (var property in reading.GetProperties(Everything))
+            {
+                if (IsColour(property.PropertyType))
+                {
+                    found.Add(reading.Name + "." + property.Name);
+                }
+            }
+
+            foreach (var method in reading.GetMethods(Everything))
+            {
+                if (IsColour(method.ReturnType))
+                {
+                    found.Add(reading.Name + "." + method.Name + "()");
+                }
+            }
+
+            return found;
+        }
+
+        static bool IsColour(Type type)
+        {
+            if (type == typeof(Tint))
+            {
+                return true;
+            }
+
+            return type.IsArray && type.GetElementType() == typeof(Tint);
         }
 
         [Test]

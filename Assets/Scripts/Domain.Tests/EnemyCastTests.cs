@@ -48,18 +48,15 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheBandStillMovesTheTintAndTheScaleAndOnlyThose()
+        public void TheBandStillMovesTheScaleAndOnlyTheScale()
         {
-            var tints = new List<Tint>();
             var scales = new List<float>();
 
             foreach (EnemyBand band in Enum.GetValues(typeof(EnemyBand)))
             {
-                tints.Add(EnemyBands.TintOf(band));
                 scales.Add(EnemyBands.ScaleOf(band));
             }
 
-            Assert.That(tints.Distinct().Count(), Is.EqualTo(tints.Count));
             Assert.That(scales.Distinct().Count(), Is.EqualTo(scales.Count));
 
             foreach (var number in EnemyNumbers)

@@ -48,11 +48,6 @@ namespace Game.Presentation.Pure
             get { return promotion.Scale; }
         }
 
-        public Tint Tint
-        {
-            get { return promotion.Tint; }
-        }
-
         public PowerBeat Toward(int power)
         {
             var retargeted = countUp.Toward(power);

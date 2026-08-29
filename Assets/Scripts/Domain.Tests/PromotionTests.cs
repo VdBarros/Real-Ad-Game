@@ -15,7 +15,6 @@ namespace Game.Domain.Tests
 
             Assert.That(promotion.IsSettled, Is.True);
             Assert.That(promotion.Scale, Is.EqualTo(look.Scale).Within(1e-6f));
-            Assert.That(promotion.Tint, Is.EqualTo(look.Tint));
         }
 
         [Test]
@@ -66,7 +65,6 @@ namespace Game.Domain.Tests
             var promotion = Promotion.Settled(from).Toward(PlayerLook.Of(9));
 
             Assert.That(promotion.Scale, Is.EqualTo(from.Scale).Within(1e-6f));
-            Assert.That(promotion.Tint, Is.EqualTo(from.Tint));
         }
 
         [Test]
@@ -92,17 +90,20 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheColourNeverLeavesTheRampEvenWhileTheScaleOvershoots()
+        public void TheScaleNeverLeavesTheRampWhileItOvershoots()
         {
-            var promotion = Promotion.Settled(PlayerLook.Of(2)).Toward(PlayerLook.Of(400));
+            var from = PlayerLook.Of(2);
+            var to = PlayerLook.Of(400);
+            var promotion = Promotion.Settled(from).Toward(to);
 
             while (!promotion.IsSettled)
             {
                 promotion = promotion.Advanced(Frame);
-                Assert.That(promotion.Tint.Red, Is.InRange(0f, 1f));
-                Assert.That(promotion.Tint.Green, Is.InRange(0f, 1f));
-                Assert.That(promotion.Tint.Blue, Is.InRange(0f, 1f));
+                Assert.That(promotion.Scale, Is.GreaterThan(0f));
+                Assert.That(promotion.Scale, Is.GreaterThanOrEqualTo(from.Scale));
             }
+
+            Assert.That(promotion.Scale, Is.EqualTo(to.Scale).Within(1e-6f));
         }
 
         [Test]

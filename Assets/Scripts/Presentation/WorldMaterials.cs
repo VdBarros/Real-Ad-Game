@@ -68,6 +68,16 @@ namespace Game.Presentation
             return byStyle[slot];
         }
 
+        public static bool ShowsItsPack(PartStyle style)
+        {
+            return CharacterCast.IsRole(style);
+        }
+
+        public static Color ColourFor(PartStyle style, bool textured)
+        {
+            return textured && ShowsItsPack(style) ? Color.white : WorldPalette.Of(style);
+        }
+
         Material Create(PartStyle style)
         {
             var material = new Material(LitShader())
@@ -76,7 +86,9 @@ namespace Game.Presentation
                 hideFlags = HideFlags.HideAndDontSave
             };
 
-            var colour = WorldPalette.Of(style);
+            var atlas = AtlasFor(style);
+            var colour = ColourFor(style, atlas != null);
+
             if (material.HasProperty(BaseColorId))
             {
                 material.SetColor(BaseColorId, colour);
@@ -92,19 +104,23 @@ namespace Game.Presentation
                 material.SetFloat(SmoothnessId, Smoothness);
             }
 
-            Texture(material, style);
+            Texture(material, atlas);
 
             return material;
         }
 
-        void Texture(Material material, PartStyle style)
+        Texture2D AtlasFor(PartStyle style)
         {
             if (models == null || !models.Dresses(style))
             {
-                return;
+                return null;
             }
 
-            var atlas = models.AtlasFor(PartModels.Of(style));
+            return models.AtlasFor(PartModels.Of(style));
+        }
+
+        static void Texture(Material material, Texture2D atlas)
+        {
             if (atlas == null)
             {
                 return;
