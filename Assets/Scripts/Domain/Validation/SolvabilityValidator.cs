@@ -60,6 +60,10 @@ namespace Game.Domain
             {
                 reason = SolvabilityReason.MultiplierProductBeyondCap;
             }
+            else if (DeadWalk.LongestOf(board) > Pace.DeadWalkBudgetSteps)
+            {
+                reason = SolvabilityReason.DeadWalkBeyondBudget;
+            }
 
             return new SolvabilityVerdict(
                 reason, offendingNodeId, bossNodeId, bossPower, bound, beelinePower, beelineBlocked, stall);

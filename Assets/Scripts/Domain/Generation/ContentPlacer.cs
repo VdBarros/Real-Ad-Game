@@ -111,6 +111,9 @@ namespace Game.Domain
                 case SolvabilityReason.MultiplierProductBeyondCap:
                     return ContentRejection.MultiplierProductBeyondCap;
 
+                case SolvabilityReason.DeadWalkBeyondBudget:
+                    return ContentRejection.DeadWalkBeyondBudget;
+
                 default:
                     throw new InvalidOperationException(
                         "Placement built a level no seed can excuse: " + verdict + ".");
