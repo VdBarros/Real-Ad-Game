@@ -57,7 +57,7 @@ namespace Game.Presentation
             for (var slot = 0; slot < badges.Count; slot++)
             {
                 var badge = badges[slot];
-                if (badge == null || !badge.gameObject.activeInHierarchy)
+                if (badge == null || !badge.gameObject.activeInHierarchy || !badge.IsDrawn)
                 {
                     continue;
                 }

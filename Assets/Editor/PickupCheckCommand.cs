@@ -53,6 +53,14 @@ namespace Game.EditorTooling
 
         const int Power = 2;
 
+        const int GalleryEnemy = 3;
+
+        const int Rich = 2000;
+
+        const int Poor = 200;
+
+        const string ObsoletePath = "dev/scratch/t-143-";
+
         const float Frame = 1f / 60f;
 
         const int FrameCap = 4000;
@@ -94,7 +102,9 @@ namespace Game.EditorTooling
                 .Append(TheLidSwingsUpBeforeTheChestThins())
                 .Append(AResumedLevelShowsNothingOfAChestItAlreadyTook())
                 .Append(AMultiplierIsAnArchOnTheGroundAndNotABadge())
-                .Append(TheFourNumericMeaningsWearFourDifferentForms());
+                .Append(TheFourNumericMeaningsWearFourDifferentForms())
+                .Append(AGateWorthNothingHidesItsNumberAndIsStillThereToBeTaken())
+                .Append(OnlyAGateGoesQuietWhenThePlayerOutgrowsIt());
 
             TheOrderShowsInTheResult(addFirst, multiplyFirst);
 
@@ -722,6 +732,250 @@ namespace Game.EditorTooling
             }
 
             return line.ToString();
+        }
+
+        static string AGateWorthNothingHidesItsNumberAndIsStillThereToBeTaken()
+        {
+            var graph = Arena();
+            var rig = CameraRig.Raise();
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph, Rich);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var target = builder.Targets.Of(Additive);
+            var badge = target == null ? null : target.Badge;
+            var chest = builder.Pickups.Of(Additive);
+
+            if (target == null || badge == null || chest == null)
+            {
+                Debug.LogError(
+                    "FAIL: the arena raised no badge target or chest for node " + Additive + ".");
+                Clear(root, rig, builder);
+                return "\n  the gate never rose";
+            }
+
+            var rich = RunState.Begin(graph, Rich);
+            var poor = RunState.Begin(graph, Poor);
+
+            var quiet = Marks(builder, badge, rich);
+            var loud = Marks(builder, badge, poor);
+            var quietAgain = Marks(builder, badge, rich);
+            var loudAgain = Marks(builder, badge, poor);
+
+            if (quiet > 0f)
+            {
+                Debug.LogError(
+                    "FAIL: a +" + AdditiveValue + " beside a held " + Rich + " is worth "
+                    + GateWorth.ShareOf(AdditiveValue, Rich).ToString("P2", CultureInfo.InvariantCulture)
+                    + " and still draws at " + quiet.ToString("F3", CultureInfo.InvariantCulture)
+                    + " opacity, so an obsolete gate is still spending screen.");
+            }
+
+            if (loud <= 0f)
+            {
+                Debug.LogError(
+                    "FAIL: a +" + AdditiveValue + " beside a held " + Poor
+                    + " draws at " + loud.ToString("F3", CultureInfo.InvariantCulture)
+                    + ", so a drain under the cut left the gate hidden and the mark is latched.");
+            }
+
+            if (quietAgain != quiet || loudAgain != loud)
+            {
+                Debug.LogError(
+                    "FAIL: the same two powers read " + quiet + "/" + loud + " the first time and "
+                    + quietAgain + "/" + loudAgain + " the second, so the badge remembers where the "
+                    + "player has been rather than reading what they hold.");
+            }
+
+            Marks(builder, badge, rich);
+
+            if (badge.LabelColour.a != badge.Colour.a)
+            {
+                Debug.LogError(
+                    "FAIL: a suppressed gate hides its plate at " + badge.Colour.a
+                    + " and its number at " + badge.LabelColour.a + ", so a bare glyph is left floating.");
+            }
+
+            if (!badge.gameObject.activeInHierarchy || !target.gameObject.activeInHierarchy)
+            {
+                Debug.LogError(
+                    "FAIL: node " + Additive + " left the hierarchy when its badge went quiet. "
+                    + "Suppression fades a number; it does not take the node off the map.");
+            }
+
+            var plate = badge.GetComponent<SpriteRenderer>();
+
+            if (plate == null || !plate.enabled)
+            {
+                Debug.LogError(
+                    "FAIL: a suppressed gate switched its plate renderer off rather than fading it, "
+                    + "so the badge is gone rather than quiet.");
+            }
+
+            if (badge.Value != AdditiveValue)
+            {
+                Debug.LogError(
+                    "FAIL: a suppressed gate reads " + badge.Value + " rather than " + AdditiveValue
+                    + ", so hiding the number changed it.");
+            }
+
+            if (!chest.Draws || chest.IsSpent)
+            {
+                Debug.LogError(
+                    "FAIL: the chest on node " + Additive + " reads " + chest.Reel
+                    + " once its badge went quiet, so the reward went with the number.");
+            }
+
+            var eye = PreviewFilm.Rig(
+                chest.transform.position + Vector3.up * CloseUpLift, CloseUpRange, CloseUpSize);
+            PreviewFilm.Shoot(eye, ObsoletePath + "gate-1-quiet.png");
+            Marks(builder, badge, poor);
+            PreviewFilm.Shoot(eye, ObsoletePath + "gate-2-back.png");
+            WorldObjects.Destroy(eye.gameObject);
+
+            var input = TapInput.Raise(rig, builder.Targets, rich);
+            var walker = Walker.Raise(rig, builder, input, rich);
+            var before = walker.Run.Power;
+
+            if (badge.Colour.a > 0f)
+            {
+                Debug.LogError(
+                    "FAIL: a run resumed on " + Rich + " draws the +" + AdditiveValue
+                    + " at " + badge.Colour.a + " on its first frame.");
+            }
+
+            if (!TapAim.Aimable(walker.Run).Contains(Additive))
+            {
+                Debug.LogError(
+                    "FAIL: node " + Additive + " stopped being aimable once its badge went quiet, "
+                    + "so a hidden number took the tap target with it.");
+            }
+
+            walker.WalkTo(Additive);
+
+            for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
+            {
+                Step(rig, builder, walker);
+            }
+
+            for (var frame = 0; frame < SettleFrames; frame++)
+            {
+                Step(rig, builder, walker);
+            }
+
+            var after = walker.Run.Power;
+
+            if (after != before + AdditiveValue)
+            {
+                Debug.LogError(
+                    "FAIL: walking into a suppressed gate took power from " + before + " to " + after
+                    + " rather than " + (before + AdditiveValue)
+                    + ", so hiding the badge cost the player the reward.");
+            }
+
+            if (!walker.Run.IsConsumed(Additive) || !chest.IsSpent || chest.Draws)
+            {
+                Debug.LogError(
+                    "FAIL: a suppressed gate reads " + chest.Reel + " and consumed "
+                    + walker.Run.IsConsumed(Additive) + " after the player walked into it.");
+            }
+
+            Clear(root, rig, builder);
+
+            return new StringBuilder("\n  a +")
+                .Append(AdditiveValue.ToString(CultureInfo.InvariantCulture))
+                .Append(" is worth ")
+                .Append(GateWorth.ShareOf(AdditiveValue, Rich).ToString("P2", CultureInfo.InvariantCulture))
+                .Append(" beside a held ")
+                .Append(Rich.ToString(CultureInfo.InvariantCulture))
+                .Append(" and draws at ")
+                .Append(quiet.ToString("F2", CultureInfo.InvariantCulture))
+                .Append(", ")
+                .Append(GateWorth.ShareOf(AdditiveValue, Poor).ToString("P2", CultureInfo.InvariantCulture))
+                .Append(" beside ")
+                .Append(Poor.ToString(CultureInfo.InvariantCulture))
+                .Append(" and draws at ")
+                .Append(loud.ToString("F2", CultureInfo.InvariantCulture))
+                .Append(", the same both ways round the ramp; walking into the quiet one still took ")
+                .Append(before.ToString(CultureInfo.InvariantCulture))
+                .Append(" to ")
+                .Append(after.ToString(CultureInfo.InvariantCulture))
+                .ToString();
+        }
+
+        static string OnlyAGateGoesQuietWhenThePlayerOutgrowsIt()
+        {
+            var graph = Gallery();
+            var rig = CameraRig.Raise();
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph, Rich);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var rich = RunState.Begin(graph, Rich);
+            builder.Targets.Show(rich, TargetPreview.None);
+
+            var quiet = new List<string>();
+
+            foreach (var target in builder.Targets.Targets)
+            {
+                var badge = target.Badge;
+
+                if (badge == null)
+                {
+                    continue;
+                }
+
+                if (badge.Colour.a > 0f)
+                {
+                    continue;
+                }
+
+                quiet.Add(badge.Style + " " + badge.Value);
+
+                if (badge.Style != BadgeStyle.Additive)
+                {
+                    Debug.LogError(
+                        "FAIL: a " + badge.Style + " badge showing " + badge.Value
+                        + " went quiet beside a held " + Rich
+                        + ". Only a gain is ever clutter; an enemy worth nothing is a door standing "
+                        + "open and the player still has to see it.");
+                }
+            }
+
+            var enemy = builder.Targets.Of(GalleryEnemy);
+
+            if (enemy == null || enemy.Badge == null)
+            {
+                Debug.LogError("FAIL: the gallery raised no badge for the enemy on node " + GalleryEnemy + ".");
+            }
+            else if (enemy.Badge.Colour.a <= 0f)
+            {
+                Debug.LogError(
+                    "FAIL: the x" + enemy.Badge.Value + " enemy went quiet beside a held " + Rich + ".");
+            }
+
+            if (quiet.Count == 0)
+            {
+                Debug.LogError(
+                    "FAIL: nothing in the gallery went quiet beside a held " + Rich
+                    + ", so it proves nothing about who is allowed to.");
+            }
+
+            Clear(root, rig, builder);
+
+            return "\n  beside a held " + Rich.ToString(CultureInfo.InvariantCulture)
+                + " the gallery hides only " + string.Join(", ", quiet.ToArray())
+                + ", and keeps every fight and the player's own number";
+        }
+
+        static float Marks(WorldBuilder builder, NumberBadge badge, RunState state)
+        {
+            builder.Targets.Show(state, TargetPreview.None);
+            return badge.Colour.a;
         }
 
         static LevelGraph Gallery()

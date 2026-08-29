@@ -11,6 +11,8 @@ namespace Game.Presentation.Pure
 
         public const float UnreachableOpacity = 0.4f;
 
+        public const float Suppressed = 0f;
+
         static readonly Tint Unpainted = new Tint(1f, 1f, 1f);
 
         static readonly MarkLook[] looks =
@@ -67,6 +69,18 @@ namespace Game.Presentation.Pure
                     Look(mark);
                     return false;
             }
+        }
+
+        public static bool IsSuppressed(TargetMark mark, BadgeStyle style, int gain, int power)
+        {
+            return !IsAimed(mark)
+                && style == BadgeStyle.Additive
+                && GateWorth.IsNegligible(gain, power);
+        }
+
+        public static float Opacity(TargetMark mark, BadgeStyle style, int gain, int power)
+        {
+            return IsSuppressed(mark, style, gain, power) ? Suppressed : Look(mark).Opacity;
         }
 
         public static MarkLook Look(TargetMark mark)

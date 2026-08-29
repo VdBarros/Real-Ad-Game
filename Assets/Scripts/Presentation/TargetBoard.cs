@@ -57,7 +57,7 @@ namespace Game.Presentation
 
             foreach (var target in targets)
             {
-                target.Wear(TargetMarks.Of(state, target.NodeId, preview), preview.Power);
+                target.Wear(TargetMarks.Of(state, target.NodeId, preview), preview.Power, state.Power);
             }
         }
 
