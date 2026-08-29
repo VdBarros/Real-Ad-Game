@@ -1181,7 +1181,8 @@ namespace Game.EditorTooling
                 return;
             }
 
-            var washed = Color.Lerp(BadgePalette.Of(badge.Style), Tints.Of(look.Tint), look.Weight);
+            var washed = Tints.Of(BadgeTints.Washed(badge.Style, look));
+            washed.a = look.Opacity;
 
             if (badge.Colour != washed)
             {
