@@ -16,7 +16,7 @@ namespace Game.Presentation.Pure
 
         static readonly TrailLook[] looks =
         {
-            new TrailLook(new Tint(0.97f, 0.93f, 0.55f), Size),
+            new TrailLook(new Tint(0.72f, 0.5f, 0.06f), Size),
             new TrailLook(new Tint(1f, 0.27f, 0.14f), DangerSize)
         };
 

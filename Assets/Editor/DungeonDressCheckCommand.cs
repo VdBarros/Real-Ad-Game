@@ -31,6 +31,8 @@ namespace Game.EditorTooling
 
         const float ToneContrast = 1.5f;
 
+        const float CastContrast = 1.5f;
+
         const float ShotDistance = 60f;
 
         const int ChannelTolerance = 8;
@@ -348,6 +350,7 @@ namespace Game.EditorTooling
             failures += TheRewardsReadApart(graph, byName, report);
             failures += TheRewardsReadAgainstTheFloor(root, graph, byName, report);
             failures += TheLandmarksReadApartAtThePlayFraming(graph, byName, report);
+            failures += TheCastReadsAgainstTheDungeon(root, graph, byName, report);
             failures += TheMaterialsStayFlat(root, report);
 
             WorldObjects.Destroy(root);
@@ -1169,6 +1172,143 @@ namespace Game.EditorTooling
             failures += ReadsAgainstTheFloor(report, additive, tile);
 
             return failures;
+        }
+
+        static int TheCastReadsAgainstTheDungeon(
+            GameObject root, LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            PreviewFilm.Sun();
+            var badges = Unbadge(root);
+            Unmark(root);
+
+            var cast = CharacterCast.Roles;
+            var rounds = new Reading[cast.Count][];
+
+            for (var slot = 0; slot < cast.Count; slot++)
+            {
+                rounds[slot] = new Reading[Rounds];
+                rounds[slot][Cursed] = Photograph(
+                    graph, byName, cast[slot], cast[slot].ToString().ToLowerInvariant(), CastShot(cast[slot]), null);
+            }
+
+            Material cursed;
+            var repainted = Repaint(root, out cursed);
+
+            for (var slot = 0; slot < cast.Count; slot++)
+            {
+                rounds[slot][Cleared] = Photograph(
+                    graph, byName, cast[slot], cast[slot].ToString().ToLowerInvariant(), null, null);
+            }
+
+            foreach (var renderer in repainted)
+            {
+                renderer.sharedMaterial = cursed;
+            }
+
+            foreach (var group in badges)
+            {
+                group.SetActive(true);
+            }
+
+            var failures = 0;
+            var photographed = 0;
+
+            for (var slot = 0; slot < cast.Count; slot++)
+            {
+                if (!rounds[slot][Cursed].Found)
+                {
+                    report.Append("\n  no ").Append(cast[slot]).Append(" stands on the ship seed to photograph");
+                    continue;
+                }
+
+                photographed++;
+                failures += CastReadsAgainstTheFloor(report, rounds[slot]);
+            }
+
+            failures += Assert(
+                report,
+                photographed > 0,
+                "at least one of the cast stands somewhere the gameplay camera can photograph it",
+                photographed + " of " + cast.Count + " cast styles were raised by the ship seed");
+
+            failures += TheTableSeparatesFigureFromSurface(report);
+
+            return failures;
+        }
+
+        static int CastReadsAgainstTheFloor(StringBuilder report, Reading[] rounds)
+        {
+            var worst = Math.Min(rounds[Cursed].Contrast, rounds[Cleared].Contrast);
+
+            return Assert(
+                report,
+                worst >= CastContrast,
+                "the " + rounds[Cursed].Name + " figure reads at least "
+                + CastContrast.ToString("0.##", CultureInfo.InvariantCulture)
+                + ":1 in tone against the ground and masonry behind it, over a cursed floor and again "
+                + "over a cleared one, so a greyscale frame keeps it as a silhouette",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "over a cursed floor its silhouette averages {0:0.####} relative luminance against the "
+                    + "{1:0.####} of the ground it hides, {2:0.##}:1; over a cleared floor {3:0.####} against "
+                    + "{4:0.####}, {5:0.##}:1",
+                    rounds[Cursed].Prop,
+                    rounds[Cursed].Ground,
+                    rounds[Cursed].Contrast,
+                    rounds[Cleared].Prop,
+                    rounds[Cleared].Ground,
+                    rounds[Cleared].Contrast));
+        }
+
+        static int TheTableSeparatesFigureFromSurface(StringBuilder report)
+        {
+            var worst = float.MaxValue;
+            var pairing = string.Empty;
+
+            foreach (PartStyle figure in Enum.GetValues(typeof(PartStyle)))
+            {
+                if (WorldTints.LayerOf(figure) != PartLayer.Figure)
+                {
+                    continue;
+                }
+
+                foreach (PartStyle surface in Enum.GetValues(typeof(PartStyle)))
+                {
+                    if (WorldTints.LayerOf(surface) != PartLayer.Surface)
+                    {
+                        continue;
+                    }
+
+                    var apart = Tint.Contrast(WorldTints.Of(figure), WorldTints.Of(surface));
+
+                    if (WorldTints.Of(figure).Luminance >= WorldTints.Of(surface).Luminance)
+                    {
+                        apart = 0f;
+                    }
+
+                    if (apart >= worst)
+                    {
+                        continue;
+                    }
+
+                    worst = apart;
+                    pairing = figure + " against " + surface;
+                }
+            }
+
+            return Assert(
+                report,
+                worst >= WorldTints.LeastSeparation,
+                "every figure style in the world palette stands at least "
+                + WorldTints.LeastSeparation.ToString("0.##", CultureInfo.InvariantCulture)
+                + ":1 darker than every surface style, so a greyscale frame keeps its silhouettes",
+                "the closest pairing is " + pairing + " at "
+                + worst.ToString("0.###", CultureInfo.InvariantCulture) + ":1");
+        }
+
+        static string CastShot(PartStyle style)
+        {
+            return "dev/scratch/t-141-" + style.ToString().ToLowerInvariant() + ".png";
         }
 
         static int ReadsAgainstTheFloor(StringBuilder report, Reading[] rounds, float tile)
