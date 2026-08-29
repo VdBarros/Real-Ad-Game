@@ -11,8 +11,6 @@ namespace Game.Presentation.Pure
         {
             PartModel.SkeletonMinion,
             PartModel.SkeletonRogue,
-            PartModel.SkeletonRogue,
-            PartModel.SkeletonWarrior,
             PartModel.SkeletonWarrior
         };
 
