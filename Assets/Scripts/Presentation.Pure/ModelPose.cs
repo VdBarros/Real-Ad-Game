@@ -129,7 +129,7 @@ namespace Game.Presentation.Pure
         {
             return new WorldPoint(
                 part.Scale.X / DungeonPack.StaircaseWidth,
-                part.Scale.Y / DungeonPack.HeightOf(part.Model),
+                part.Scale.Y / DungeonPack.StaircaseTread,
                 part.Scale.Z / DungeonPack.StaircaseRun);
         }
 

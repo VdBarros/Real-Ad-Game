@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Game.Domain;
@@ -390,26 +391,274 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AddingStaircasesLeavesEveryWallWhereItWas()
+        public void AddingStaircasesLeavesEveryWallWhereItWasExceptWhereAFlightRailsItself()
         {
             var graph = Ship();
             var blueprint = LevelBlueprintBuilder.Build(graph);
             var walls = blueprint.AllParts.Where(part => part.Style == PartStyle.Wall).ToList();
             var outward = 0;
+            var railed = 0;
 
             foreach (var tile in graph.Tiles.Tiles)
             {
                 foreach (var side in TileSides.All)
                 {
                     var beyond = TileSides.Step(tile.Position, side);
-                    if (!graph.Tiles.ContainsPlace(beyond.X, beyond.Y))
+                    if (graph.Tiles.ContainsPlace(beyond.X, beyond.Y))
                     {
-                        outward++;
+                        continue;
                     }
+
+                    if (RailedByItsOwnFlight(graph, tile.Position, side))
+                    {
+                        railed++;
+                        continue;
+                    }
+
+                    outward++;
                 }
             }
 
+            Assert.That(railed, Is.GreaterThan(0));
             Assert.That(walls.Count, Is.EqualTo(outward));
+        }
+
+        [Test]
+        public void NoPanelIsLeftHangingOverTheSlopeOfTheFlightBesideIt()
+        {
+            var graph = Ship();
+            var walls = LevelBlueprintBuilder.Build(graph).AllParts
+                .Where(part => part.Style == PartStyle.Wall)
+                .ToDictionary(part => part.Name);
+            var dropped = 0;
+
+            foreach (var tile in graph.Tiles.Tiles)
+            {
+                foreach (var side in TileSides.All)
+                {
+                    var name = PartNames.Wall(tile.Position, side);
+                    WorldPart wall;
+
+                    if (!walls.TryGetValue(name, out wall))
+                    {
+                        if (RailedByItsOwnFlight(graph, tile.Position, side))
+                        {
+                            dropped++;
+                        }
+
+                        continue;
+                    }
+
+                    Assert.That(RailedByItsOwnFlight(graph, tile.Position, side), Is.False, name);
+                    Assert.That(
+                        wall.Position.Y - IsoProjection.WallHeight * 0.5f,
+                        Is.EqualTo(StaircaseFlight.HandsOverAt(graph.Tiles, tile.Position, side))
+                            .Within(Tolerance),
+                        name);
+                }
+            }
+
+            Assert.That(dropped, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void APanelBesideAFlightStandsOnTheFlightRatherThanOverIt()
+        {
+            foreach (var ascent in TileSides.All)
+            {
+                var tiles = ARunClimbing(ascent);
+                var flight = Standing(tiles, TileSides.Step(new TilePosition(0, 0, 0), ascent));
+                var ground = IsoProjection.Of(flight).Y;
+
+                Assert.That(TileFootings.Under(tiles, flight), Is.EqualTo(TileFooting.Flight));
+                Assert.That(TileFootings.AscentOf(tiles, flight), Is.EqualTo(ascent));
+
+                foreach (var side in TileSides.All)
+                {
+                    var standing = StaircaseFlight.HandsOverAt(tiles, flight, side);
+                    var rails = StaircaseFlight.RailsItsOwn(side, ascent);
+                    WorldPart wall;
+
+                    Assert.That(
+                        LevelBlueprintBuilder.TryWall(tiles, flight, side, out wall),
+                        Is.EqualTo(!rails),
+                        ascent + " railed on " + side);
+
+                    if (side == ascent)
+                    {
+                        Assert.That(standing, Is.EqualTo(ground).Within(Tolerance), side.ToString());
+                    }
+                    else if (rails)
+                    {
+                        Assert.That(
+                            standing,
+                            Is.EqualTo(ground - IsoProjection.StepHeight * 0.5f).Within(Tolerance),
+                            side.ToString());
+                        continue;
+                    }
+                    else
+                    {
+                        Assert.That(
+                            standing,
+                            Is.EqualTo(ground - IsoProjection.StepHeight).Within(Tolerance),
+                            side.ToString());
+                    }
+
+                    Assert.That(
+                        wall.Position.Y - IsoProjection.WallHeight * 0.5f,
+                        Is.EqualTo(standing).Within(Tolerance),
+                        wall.Name);
+                }
+            }
+        }
+
+        [Test]
+        public void TheFirstGroundOfTheUpperTerraceIsTheLastGroundOfTheTopStep()
+        {
+            foreach (var ascent in TileSides.All)
+            {
+                var tiles = ARunClimbing(ascent);
+                var joins = 0;
+
+                foreach (var tile in tiles.Tiles)
+                {
+                    foreach (var neighbour in tiles.Neighbours(tile.Position))
+                    {
+                        var side = TileSides.Between(tile.Position, neighbour);
+
+                        joins++;
+                        Assert.That(
+                            StaircaseFlight.HandsOverAt(tiles, tile.Position, side),
+                            Is.EqualTo(StaircaseFlight.HandsOverAt(
+                                tiles, neighbour, TileSides.Opposite(side))).Within(Tolerance),
+                            ascent + ": " + tile.Position + " hands over to " + neighbour);
+                    }
+                }
+
+                Assert.That(joins, Is.EqualTo(6));
+            }
+        }
+
+        [Test]
+        public void TheTopStepEndsOnTheEdgeTheUpperFloorStartsAt()
+        {
+            foreach (var ascent in TileSides.All)
+            {
+                var tiles = ARunClimbing(ascent);
+                var flights = 0;
+
+                foreach (var tile in tiles.Tiles)
+                {
+                    if (TileFootings.Under(tiles, tile.Position) != TileFooting.Flight)
+                    {
+                        continue;
+                    }
+
+                    flights++;
+                    var part = LevelBlueprintBuilder.WalkingSurface(tiles, tile.Position);
+                    var ground = IsoProjection.Of(tile.Position);
+                    var above = Standing(tiles, TileSides.Step(tile.Position, ascent));
+                    var beyond = LevelBlueprintBuilder.WalkingSurface(tiles, above);
+                    var crest = StaircaseFlight.CrestOf(part);
+                    var tread = crest.Y + DungeonPack.StaircaseTread * ModelPose.ScaleOf(part).Y;
+
+                    Assert.That(
+                        StaircaseFlight.ReachAlong(crest, ground, ascent),
+                        Is.EqualTo(IsoProjection.TileEdge * 0.5f).Within(Tolerance),
+                        part.Name);
+                    Assert.That(
+                        StaircaseFlight.ReachAlong(crest, beyond.Position, ascent),
+                        Is.EqualTo(IsoProjection.TileEdge * -0.5f).Within(Tolerance),
+                        part.Name);
+                    Assert.That(
+                        StaircaseFlight.ReachAlong(StaircaseFlight.SinkOf(part), ground, ascent),
+                        Is.EqualTo(IsoProjection.TileEdge * -0.5f).Within(Tolerance),
+                        part.Name);
+                    Assert.That(tread, Is.EqualTo(ground.Y).Within(Tolerance), part.Name);
+                    Assert.That(
+                        tread,
+                        Is.EqualTo(StaircaseFlight.HandsOverAt(
+                            tiles, above, TileSides.Opposite(ascent))).Within(Tolerance),
+                        part.Name);
+                    Assert.That(
+                        crest.Y,
+                        Is.EqualTo(ground.Y - IsoProjection.StepHeight).Within(Tolerance),
+                        part.Name);
+                }
+
+                Assert.That(flights, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void NoFloorQuadIsLaidOverTheTileAFlightClimbsAcross()
+        {
+            foreach (var ascent in TileSides.All)
+            {
+                var tiles = ARunClimbing(ascent);
+                var surfaces = new List<WorldPart>();
+
+                foreach (var tile in tiles.Tiles)
+                {
+                    surfaces.Add(LevelBlueprintBuilder.WalkingSurface(tiles, tile.Position));
+                }
+
+                foreach (var tile in tiles.Tiles)
+                {
+                    var flight = TileFootings.Under(tiles, tile.Position) == TileFooting.Flight;
+                    var ground = IsoProjection.Of(tile.Position);
+
+                    Assert.That(
+                        surfaces.Any(part => part.Name == PartNames.Tile(tile.Position)),
+                        Is.EqualTo(!flight),
+                        PartNames.Tile(tile.Position));
+
+                    if (!flight)
+                    {
+                        continue;
+                    }
+
+                    foreach (var part in surfaces)
+                    {
+                        if (part.Style != PartStyle.Floor)
+                        {
+                            continue;
+                        }
+
+                        Assert.That(
+                            Math.Abs(part.Position.X - ground.X) + Math.Abs(part.Position.Z - ground.Z),
+                            Is.GreaterThanOrEqualTo(IsoProjection.TileEdge - Tolerance),
+                            part.Name + " over " + PartNames.Stair(tile.Position));
+                    }
+                }
+            }
+        }
+
+        static TileGrid ARunClimbing(TileSide ascent)
+        {
+            var tiles = new List<Tile>();
+            var place = new TilePosition(0, 0, 0);
+
+            for (var step = 0; step < 4; step++)
+            {
+                tiles.Add(new Tile(new TilePosition(Math.Min(step, 2), place.X, place.Y), regionId: 0));
+                place = TileSides.Step(place, ascent);
+            }
+
+            return new TileGrid(tiles);
+        }
+
+        static TilePosition Standing(TileGrid tiles, TilePosition place)
+        {
+            foreach (var tile in tiles.Tiles)
+            {
+                if (tile.Position.X == place.X && tile.Position.Y == place.Y)
+                {
+                    return tile.Position;
+                }
+            }
+
+            throw new InvalidOperationException("No tile stands where " + place + " does.");
         }
 
         [Test]
@@ -427,6 +676,12 @@ namespace Game.Domain.Tests
         static LevelGraph Ship()
         {
             return LevelGenerator.Generate(Seed, MazePreset.Ship).Graph;
+        }
+
+        static bool RailedByItsOwnFlight(LevelGraph graph, TilePosition position, TileSide side)
+        {
+            return TileFootings.Under(graph.Tiles, position) == TileFooting.Flight
+                && StaircaseFlight.RailsItsOwn(side, TileFootings.AscentOf(graph.Tiles, position));
         }
 
         static IDictionary<string, WorldPart> StairsByName(LevelGraph graph)

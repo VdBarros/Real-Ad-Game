@@ -177,6 +177,13 @@ namespace Game.Domain.Tests
                     {
                         Assert.That(walls.Contains(name), Is.False, name + " walls off a tile that is there.");
                     }
+                    else if (RailedByItsOwnFlight(graph, tile.Position, side))
+                    {
+                        Assert.That(
+                            walls.Contains(name),
+                            Is.False,
+                            name + " doubles the railing the flight under it already carries.");
+                    }
                     else
                     {
                         Assert.That(walls.Contains(name), Is.True, name + " is missing.");
@@ -212,7 +219,8 @@ namespace Game.Domain.Tests
                 foreach (var side in TileSides.All)
                 {
                     var beyond = TileSides.Step(tile.Position, side);
-                    if (graph.Tiles.ContainsPlace(beyond.X, beyond.Y))
+                    if (graph.Tiles.ContainsPlace(beyond.X, beyond.Y)
+                        || RailedByItsOwnFlight(graph, tile.Position, side))
                     {
                         continue;
                     }
@@ -455,6 +463,12 @@ namespace Game.Domain.Tests
         {
             var node = graph.Decisions.Nodes.First(candidate => candidate.Type == type);
             return blueprint.AllParts.First(part => part.Name == PartNames.Node(node.Id));
+        }
+
+        static bool RailedByItsOwnFlight(LevelGraph graph, TilePosition position, TileSide side)
+        {
+            return TileFootings.Under(graph.Tiles, position) == TileFooting.Flight
+                && StaircaseFlight.RailsItsOwn(side, TileFootings.AscentOf(graph.Tiles, position));
         }
 
         static IReadOnlyList<WorldPart> PartsStyled(LevelBlueprint blueprint, PartStyle style)

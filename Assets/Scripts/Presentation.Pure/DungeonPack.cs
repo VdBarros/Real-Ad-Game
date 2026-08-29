@@ -20,6 +20,8 @@ namespace Game.Presentation.Pure
 
         public const float StaircasePackHeight = 5.1f;
 
+        public const float StaircasePackTread = 4f;
+
         public const float StaircasePackWidth = GridUnits;
 
         public const float StaircasePackRun = GridUnits;
@@ -48,6 +50,16 @@ namespace Game.Presentation.Pure
         public static float StaircaseRun
         {
             get { return StaircasePackRun * ImportScale; }
+        }
+
+        public static float StaircaseTread
+        {
+            get { return StaircasePackTread * ImportScale; }
+        }
+
+        public static float StaircaseParapet
+        {
+            get { return (StaircasePackHeight - StaircasePackTread) * ImportScale; }
         }
 
         public static float FoundationWidth

@@ -484,7 +484,10 @@ namespace Game.EditorTooling
                 foreach (var side in TileSides.All)
                 {
                     var beyond = TileSides.Step(tile.Position, side);
-                    if (graph.Tiles.ContainsPlace(beyond.X, beyond.Y))
+                    WorldPart panel;
+
+                    if (graph.Tiles.ContainsPlace(beyond.X, beyond.Y)
+                        || !LevelBlueprintBuilder.TryWall(graph.Tiles, tile.Position, side, out panel))
                     {
                         continue;
                     }
@@ -502,7 +505,9 @@ namespace Game.EditorTooling
 
                     var there = IsoProjection.Of(beyond);
                     var wanted = new Vector3(
-                        (here.X + there.X) * 0.5f, here.Y, (here.Z + there.Z) * 0.5f);
+                        (here.X + there.X) * 0.5f,
+                        StaircaseFlight.HandsOverAt(graph.Tiles, tile.Position, side),
+                        (here.Z + there.Z) * 0.5f);
                     var at = instance.position;
 
                     if ((at - wanted).magnitude <= Epsilon)

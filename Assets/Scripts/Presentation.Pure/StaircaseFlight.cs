@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Game.Domain;
 
 namespace Game.Presentation.Pure
 {
@@ -27,6 +29,37 @@ namespace Game.Presentation.Pure
         public static TileSide LaidAgainst(TileSide ascent)
         {
             return TileSides.Opposite(ascent);
+        }
+
+        public static bool RailsItsOwn(TileSide side, TileSide ascent)
+        {
+            return side != ascent && side != TileSides.Opposite(ascent);
+        }
+
+        public static float HandsOverAt(TileGrid tiles, TilePosition position, TileSide side)
+        {
+            if (tiles == null)
+            {
+                throw new ArgumentNullException(nameof(tiles));
+            }
+
+            var ground = IsoProjection.Of(position).Y;
+
+            if (TileFootings.Under(tiles, position) != TileFooting.Flight)
+            {
+                return ground;
+            }
+
+            var ascent = TileFootings.AscentOf(tiles, position);
+
+            if (side == ascent)
+            {
+                return ground;
+            }
+
+            return RailsItsOwn(side, ascent)
+                ? ground - IsoProjection.StepHeight * 0.5f
+                : ground - IsoProjection.StepHeight;
         }
 
         public static WorldPoint CrestOf(WorldPart part)
