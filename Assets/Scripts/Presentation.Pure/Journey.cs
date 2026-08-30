@@ -140,6 +140,23 @@ namespace Game.Presentation.Pure
                 diversion);
         }
 
+        public static RunState LeftAlone(ActionResult resolved)
+        {
+            if (resolved == null)
+            {
+                throw new ArgumentNullException(nameof(resolved));
+            }
+
+            if (!Drains(resolved))
+            {
+                return resolved.State;
+            }
+
+            var left = Drain.PowerAfter(resolved.State.Power, Drain.Seconds);
+
+            return left < resolved.State.Power ? resolved.State.Drained(left) : resolved.State;
+        }
+
         static bool Drains(ActionResult resolved)
         {
             return resolved.Outcome == ActionOutcome.Tie || resolved.Outcome == ActionOutcome.Loss;
