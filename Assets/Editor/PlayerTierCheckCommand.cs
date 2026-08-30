@@ -139,6 +139,7 @@ namespace Game.EditorTooling
             failures += TheWeaponSitsWhereThePackHangsItsOwn(power, player, report);
             failures += TheMountedKitMeasuresWhatTheKitTablePins(power, player, report);
             failures += TheWeaponRidesTheHandThroughEveryClip(power, player, report);
+            failures += TheStowedKitWalksThroughAGate(power, player, report);
 
             Application.logMessageReceived -= watcher;
 
@@ -1978,6 +1979,196 @@ namespace Game.EditorTooling
         static bool Drawn(Renderer renderer)
         {
             return renderer.enabled && renderer.gameObject.activeInHierarchy;
+        }
+
+        struct Swept
+        {
+            public float Across;
+
+            public float Kit;
+
+            public float Crest;
+        }
+
+        static Swept SweptThroughTheWalk(
+            PlayerFigure player, FigureAnimator animator, ICollection<Mesh> body)
+        {
+            var swept = default(Swept);
+
+            animator.Cue(FigureCue.Looping(FigureAct.Walk));
+            animator.Advance(0f);
+
+            var seconds = animator.PlayingSeconds;
+
+            if (animator.Playing == null || seconds <= 0f)
+            {
+                return swept;
+            }
+
+            var step = seconds / ClipSamples;
+            var ground = player.Ground.Y;
+
+            for (var sample = 0; sample < ClipSamples; sample++)
+            {
+                animator.Advance(step);
+
+                var arms = Armed(player, body, player.Wielding);
+                var whole = Silhouette(player);
+
+                swept.Across = Math.Max(swept.Across, Math.Max(arms.size.x, arms.size.z));
+                swept.Kit = Math.Max(swept.Kit, Math.Max(whole.size.x, whole.size.z));
+                swept.Crest = Math.Max(swept.Crest, whole.max.y - ground);
+            }
+
+            return swept;
+        }
+
+        static int TheStowedKitWalksThroughAGate(
+            PowerBadge power, PlayerFigure player, StringBuilder report)
+        {
+            var animator = player == null ? null : player.GetComponent<FigureAnimator>();
+
+            if (power == null || player == null || animator == null)
+            {
+                return Assert(
+                    report, false, "there is a driveable figure to walk at a gate", "there is none");
+            }
+
+            var worn = CharacterCast.MeshOf(PartStyle.Start);
+            var body = MeshesOf(worn);
+            var tiers = 0;
+            var cleared = 0;
+            var housed = 0;
+            var narrowed = 0;
+            var gripping = 0;
+            var redrawn = 0;
+            var strayed = new List<string>();
+
+            report.Append("\n  the swept corridor across ")
+                .Append(AdventurerClips.Walk)
+                .Append(", against a walkway of ")
+                .Append(GateArch.Walkway.ToString("0.####", CultureInfo.InvariantCulture))
+                .Append(" under a lintel at ")
+                .Append(GateArch.PostHeight.ToString("0.####", CultureInfo.InvariantCulture))
+                .Append(':');
+
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                PowerPump.Settle(power, PowerAt(tier));
+                tiers++;
+
+                var weapon = PlayerKit.WeaponOf(tier);
+
+                player.Sling(false);
+                var held = SweptThroughTheWalk(player, animator, body);
+
+                player.Sling(true);
+                var away = SweptThroughTheWalk(player, animator, body);
+                var stowed = player.Wielding;
+                var gripped = player.Gripping;
+
+                if (gripped == weapon
+                    && FigureCues.FinisherOf(gripped) == FigureCues.FinisherOf(weapon)
+                    && (weapon == PlayerWeapon.None
+                        || (stowed != null && stowed.name == PartNames.Held(weapon))))
+                {
+                    gripping++;
+                }
+                else
+                {
+                    strayed.Add("tier " + tier + " stows and forgets it grips " + weapon);
+                }
+
+                if (away.Across <= GateArch.Walkway && away.Kit <= GateArch.Walkway)
+                {
+                    cleared++;
+                }
+                else
+                {
+                    strayed.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} sweeps {1:0.####} of a {2:0.####} walkway",
+                        tier,
+                        Math.Max(away.Across, away.Kit),
+                        GateArch.Walkway));
+                }
+
+                if (away.Crest <= GateArch.PostHeight)
+                {
+                    housed++;
+                }
+                else
+                {
+                    strayed.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} reaches {1:0.####} into a {2:0.####} lintel",
+                        tier,
+                        away.Crest,
+                        GateArch.PostHeight));
+                }
+
+                if (away.Across <= held.Across + Epsilon)
+                {
+                    narrowed++;
+                }
+
+                report.AppendFormat(
+                    CultureInfo.InvariantCulture,
+                    "\n    tier {0} at scale {1:0.####} sweeps {2:0.####} holding its {3} out and "
+                    + "{4:0.####} with it stowed, whole kit {5:0.####}, crest {6:0.####}",
+                    tier,
+                    power.Look.Scale,
+                    held.Across,
+                    weapon,
+                    away.Across,
+                    away.Kit,
+                    away.Crest);
+
+                player.Sling(false);
+                var hand = CharacterDress.Hand(player.gameObject);
+                var back = player.Wielding;
+
+                if (weapon == PlayerWeapon.None
+                    ? back == null
+                    : back != null && ReferenceEquals(back.parent, hand))
+                {
+                    redrawn++;
+                }
+                else
+                {
+                    strayed.Add("tier " + tier + " never gets its " + weapon + " back into the hand");
+                }
+            }
+
+            player.Sling(false);
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                tiers == PlayerTier.Count && cleared == tiers && housed == tiers,
+                "the whole kit of a player of every tier fits the gate's walkway and stays under its "
+                + "lintel across every frame of the walk clip, which is the corridor a figure actually "
+                + "sweeps through an arch rather than the pose it stands in",
+                cleared + " of " + tiers + " clear the posts and " + housed + " the lintel"
+                + (strayed.Count == 0 ? "" : "; " + string.Join("; ", strayed.ToArray())));
+
+            failures += Assert(
+                report,
+                tiers > 0 && narrowed == tiers,
+                "and stowing never widens a tier that was already narrow enough, so the beat costs "
+                + "nothing at the tiers that never needed it",
+                narrowed + " of " + tiers + " sweep no wider stowed than held");
+
+            failures += Assert(
+                report,
+                tiers > 0 && gripping == tiers && redrawn == tiers,
+                "a stowed weapon is still the weapon the figure grips, so the finisher a fight picks off "
+                + "it is unchanged by where it is hanging, and drawing puts the same mesh back on the "
+                + "rig's own hand slot",
+                gripping + " of " + tiers + " keep their grip stowed and " + redrawn + " draw it again");
+
+            return failures;
         }
 
         static int TheFinisherSwingsWhatTheHandHolds(
