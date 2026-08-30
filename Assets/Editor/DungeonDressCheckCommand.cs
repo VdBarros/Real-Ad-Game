@@ -33,7 +33,7 @@ namespace Game.EditorTooling
 
         const float CastContrast = 1.5f;
 
-        const float ShotDistance = 60f;
+        const float ShotDistance = IsoProjection.CameraBack;
 
         const int ChannelTolerance = 8;
 
@@ -1895,7 +1895,8 @@ namespace Game.EditorTooling
         {
             PreviewFilm.Sun();
             var failures = PhotographedUnderTheBuildsLighting("the reward props are", report)
-                + PhotographedInTheBuildsRoom("the reward props are", report);
+                + PhotographedInTheBuildsRoom("the reward props are", report)
+                + PhotographedThroughTheBuildsLens("the reward props are", report);
             var badges = Unbadge(root);
             Unmark(root);
 
@@ -1959,7 +1960,8 @@ namespace Game.EditorTooling
         {
             PreviewFilm.Sun();
             var lighting = PhotographedUnderTheBuildsLighting("the cast is", report)
-                + PhotographedInTheBuildsRoom("the cast is", report);
+                + PhotographedInTheBuildsRoom("the cast is", report)
+                + PhotographedThroughTheBuildsLens("the cast is", report);
             var badges = Unbadge(root);
             Unmark(root);
 
@@ -2029,6 +2031,22 @@ namespace Game.EditorTooling
                 + " is the tone that ships",
                 "the frame is lit by " + risen
                 + (risen == 1 ? " directional light" : " directional lights"));
+        }
+
+        static int PhotographedThroughTheBuildsLens(string subject, StringBuilder report)
+        {
+            var lens = PreviewFilm.Rig(Vector3.zero, ShotDistance, LevelFraming.PlaySize);
+            var elsewhere = PreviewFilm.LensApartFromTheBuild(lens);
+            var reading = PreviewFilm.LensAsPhotographed(lens);
+
+            WorldObjects.Destroy(lens.gameObject);
+
+            return Assert(
+                report,
+                elsewhere == null,
+                subject + " photographed through the lens the build raises, so what stands behind the"
+                + " silhouette below is what the game draws behind it",
+                elsewhere ?? reading);
         }
 
         static int PhotographedInTheBuildsRoom(string subject, StringBuilder report)

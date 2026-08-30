@@ -27,7 +27,7 @@ namespace Game.EditorTooling
 
         const int Samples = 24;
 
-        const float ShotDistance = 60f;
+        const float ShotDistance = IsoProjection.CameraBack;
 
         const float DetailOrthographicSize = 4f;
 
