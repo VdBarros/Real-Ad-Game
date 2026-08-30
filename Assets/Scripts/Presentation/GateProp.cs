@@ -5,6 +5,7 @@ using UnityEngine;
 
 namespace Game.Presentation
 {
+    [ExecuteAlways]
     public sealed class GateProp : MonoBehaviour
     {
         public const string NamePrefix = "Gate_";

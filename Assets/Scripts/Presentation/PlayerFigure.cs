@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace Game.Presentation
 {
+    [ExecuteAlways]
     public sealed class PlayerFigure : Figure
     {
         readonly List<GameObject> trophies = new List<GameObject>();

@@ -1699,6 +1699,7 @@ namespace Game.EditorTooling
         static string OrbsInFlightAreTornDownWithTheLevel()
         {
             var graph = Gauntlet(First, Second);
+            var census = MintedAssets.Census();
             var rig = CameraRig.Raise();
             var builder = new WorldBuilder();
             var root = builder.Build(graph, Opener);
@@ -1748,14 +1749,27 @@ namespace Game.EditorTooling
                     + " orb boards behind, where it owes nothing at all.");
             }
 
+            var stranded = MintedAssets.StrandedSince(census);
+
+            if (stranded.Count != 0)
+            {
+                Debug.LogError(
+                    "Tearing the level down stranded " + stranded.Count
+                    + " of the assets it minted, which the Editor loads for good because they are "
+                    + "HideAndDontSave: " + string.Join("; ", stranded.ToArray())
+                    + ". Whatever mints them releases them from a path edit mode never walks - a "
+                    + "MonoBehaviour without [ExecuteAlways] is given no OnDestroy outside play mode.");
+            }
+
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "\n  a level torn down with {0} stream and {1} orb objects in the air left {2} objects "
-                + "and {3} boards behind",
+                "\n  a level torn down with {0} stream and {1} orb objects in the air left {2} objects, "
+                + "{3} boards and {4} minted assets behind",
                 aloft,
                 standing,
                 left,
-                boards);
+                boards,
+                stranded.Count);
         }
 
         static int OrbsInTheScene()

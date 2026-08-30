@@ -5,6 +5,7 @@ using UnityEngine;
 
 namespace Game.Presentation
 {
+    [ExecuteAlways]
     public sealed class LandmarkProp : MonoBehaviour
     {
         public const string NamePrefix = "Landmark_";

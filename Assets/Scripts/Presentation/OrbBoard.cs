@@ -5,6 +5,7 @@ using UnityEngine;
 
 namespace Game.Presentation
 {
+    [ExecuteAlways]
     public sealed class OrbBoard : MonoBehaviour
     {
         const float BurstEdge = 0.9f;
@@ -256,6 +257,11 @@ namespace Game.Presentation
 
         void Update()
         {
+            if (!Application.isPlaying)
+            {
+                return;
+            }
+
             Advance(Time.deltaTime);
         }
 

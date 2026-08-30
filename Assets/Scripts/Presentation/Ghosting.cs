@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Game.Presentation.Pure;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -7,7 +8,7 @@ namespace Game.Presentation
 {
     public static class Ghosting
     {
-        public const string NamePrefix = "Ghost_";
+        public const string NamePrefix = PartNames.GhostPrefix;
 
         public const float Alpha = 0.55f;
 
@@ -136,7 +137,7 @@ namespace Game.Presentation
         {
             var ghost = new Material(worn)
             {
-                name = NamePrefix + worn.name,
+                name = PartNames.Ghosted(worn.name),
                 hideFlags = HideFlags.HideAndDontSave
             };
 

@@ -7,6 +7,7 @@ using UnityEngine;
 
 namespace Game.Flow
 {
+    [ExecuteAlways]
     public sealed class GameLoop : MonoBehaviour
     {
         public const string LoopName = "GameLoop";
@@ -355,7 +356,7 @@ namespace Game.Flow
 
         void Update()
         {
-            if (closed || supply == null)
+            if (!Application.isPlaying || closed || supply == null)
             {
                 return;
             }
