@@ -1894,7 +1894,8 @@ namespace Game.EditorTooling
             GameObject root, LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
             PreviewFilm.Sun();
-            var failures = PhotographedUnderTheBuildsLighting("the reward props are", report);
+            var failures = PhotographedUnderTheBuildsLighting("the reward props are", report)
+                + PhotographedInTheBuildsRoom("the reward props are", report);
             var badges = Unbadge(root);
             Unmark(root);
 
@@ -1957,7 +1958,8 @@ namespace Game.EditorTooling
             GameObject root, LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
             PreviewFilm.Sun();
-            var lighting = PhotographedUnderTheBuildsLighting("the cast is", report);
+            var lighting = PhotographedUnderTheBuildsLighting("the cast is", report)
+                + PhotographedInTheBuildsRoom("the cast is", report);
             var badges = Unbadge(root);
             Unmark(root);
 
@@ -2027,6 +2029,18 @@ namespace Game.EditorTooling
                 + " is the tone that ships",
                 "the frame is lit by " + risen
                 + (risen == 1 ? " directional light" : " directional lights"));
+        }
+
+        static int PhotographedInTheBuildsRoom(string subject, StringBuilder report)
+        {
+            var elsewhere = PreviewFilm.RoomApartFromTheBuild();
+
+            return Assert(
+                report,
+                elsewhere == null,
+                subject + " photographed in the room the build ships, so the tone measured below is the"
+                + " tone that ships",
+                elsewhere ?? PreviewFilm.RoomAsPhotographed());
         }
 
         static int CastReadsAgainstTheFloor(StringBuilder report, Reading[] rounds)
