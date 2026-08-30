@@ -309,6 +309,11 @@ namespace Game.Presentation
             instance.transform.localScale = Vector(raised ? ModelPose.ScaleOf(part) : part.Scale);
             Dress(instance, materials.Of(part.Style));
 
+            if (raised && FigureRim.Contours(part.Style))
+            {
+                FigureContour.Draw(instance, materials.Contour());
+            }
+
             if (!LevelBlueprintBuilder.IsWalkingSurface(part.Style))
             {
                 WorldObjects.Destroy(instance.GetComponent<Collider>());
