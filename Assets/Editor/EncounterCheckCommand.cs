@@ -213,8 +213,6 @@ namespace Game.EditorTooling
             var graph = Arena(enemyValue);
             var rig = CameraRig.Raise();
             var lens = rig.GetComponent<Camera>();
-            lens.clearFlags = CameraClearFlags.SolidColor;
-            lens.backgroundColor = new Color(0.06f, 0.07f, 0.09f);
 
             var builder = new WorldBuilder();
             var root = builder.Build(graph, startingPower);

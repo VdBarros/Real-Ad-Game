@@ -358,6 +358,7 @@ namespace Game.EditorTooling
             report.Append("\n  a tap leaves the rig ").Append(rig.IsBusy ? "busy" : "free");
 
             TheHarnessPhotographsInTheRoomTheBuildRaises(report);
+            TheHarnessPhotographsThroughTheLensTheBuildRaises(lens, report);
 
             Debug.Log(report.ToString());
 
@@ -408,6 +409,39 @@ namespace Game.EditorTooling
                     "The harness photographs in an environment the build never ships: " + elsewhere
                     + ", so every tone it measures is measured somewhere else.");
             }
+        }
+
+        static void TheHarnessPhotographsThroughTheLensTheBuildRaises(Camera raised, StringBuilder report)
+        {
+            var harness = PreviewFilm.Rig(Vector3.zero, IsoProjection.CameraBack, raised.orthographicSize);
+            var elsewhere = PreviewFilm.LensApartFromTheBuild(harness);
+
+            report.Append("\n  and through ").Append(PreviewFilm.LensAsPhotographed(harness));
+
+            if (elsewhere != null)
+            {
+                Debug.LogError(
+                    "The harness photographs through a lens the build never raises: " + elsewhere
+                    + ", so every frame it takes is framed somewhere else.");
+            }
+
+            if (!Mathf.Approximately(harness.nearClipPlane, raised.nearClipPlane)
+                || !Mathf.Approximately(harness.farClipPlane, raised.farClipPlane))
+            {
+                Debug.LogError(
+                    "The harness lens clips from " + harness.nearClipPlane + " to " + harness.farClipPlane
+                    + " where the rig the build raises clips from " + raised.nearClipPlane + " to "
+                    + raised.farClipPlane + ".");
+            }
+
+            if (PreviewFilm.LensApartFromTheBuild(raised) != null)
+            {
+                Debug.LogError(
+                    "The rig the build raises fails the harness's own reading of a build lens: "
+                    + PreviewFilm.LensApartFromTheBuild(raised) + ".");
+            }
+
+            WorldObjects.Destroy(harness.gameObject);
         }
 
         static void TheRigStandsTheWorldInARoomOfItsOwn(CameraRig rig, Camera lens, StringBuilder report)

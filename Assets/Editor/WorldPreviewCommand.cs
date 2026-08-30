@@ -14,7 +14,7 @@ namespace Game.EditorTooling
     {
         const long PreviewSeed = 20250824L;
 
-        const float CameraDistance = 60f;
+        const float CameraDistance = IsoProjection.CameraBack;
 
         const string CapturePath = "dev/scratch/t-08-world-preview.png";
 
@@ -24,7 +24,7 @@ namespace Game.EditorTooling
 
         const int TopTierPower = 420;
 
-        const float BadgeCameraDistance = 20f;
+        const float BadgeCameraDistance = IsoProjection.CameraBack;
 
         const float BadgeOrthographicSize = 4.2f;
 
