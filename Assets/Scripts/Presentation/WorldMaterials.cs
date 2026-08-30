@@ -39,6 +39,8 @@ namespace Game.Presentation
 
         Shader shader;
 
+        Material contour;
+
         bool disposed;
 
         public WorldMaterials()
@@ -66,6 +68,21 @@ namespace Game.Presentation
             }
 
             return byStyle[slot];
+        }
+
+        public Material Contour()
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(WorldMaterials));
+            }
+
+            if (contour == null)
+            {
+                contour = FigureContour.Raise();
+            }
+
+            return contour;
         }
 
         public static bool ShowsItsPack(PartStyle style)
@@ -165,6 +182,12 @@ namespace Game.Presentation
                     WorldObjects.Destroy(byStyle[slot]);
                     byStyle[slot] = null;
                 }
+            }
+
+            if (contour != null)
+            {
+                WorldObjects.Destroy(contour);
+                contour = null;
             }
 
             shader = null;
