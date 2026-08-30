@@ -71,6 +71,18 @@ namespace Game.Presentation.Pure
             return ArtPacks.DepthOf(model) * ScaleOf(model) * figureScale;
         }
 
+        public static float TurnOf(PartModel model, float figureScale)
+        {
+            if (model == PartModel.None)
+            {
+                return figureScale;
+            }
+
+            Guard(model);
+
+            return ArtPacks.TurnOf(model) * ScaleOf(model) * figureScale;
+        }
+
         public static float SpreadOf(PartModel model, float figureScale)
         {
             var width = WidthOf(model, figureScale);

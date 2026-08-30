@@ -42,6 +42,14 @@ namespace Game.Presentation.Pure
 
         public const float MagePackBase = -0.17844f;
 
+        public const float MinionPackTurn = 1.93891f;
+
+        public const float RoguePackTurn = 1.94385f;
+
+        public const float WarriorPackTurn = 1.94385f;
+
+        public const float MagePackTurn = 1.93891f;
+
         static readonly float shortestPackHeight = Shortest();
 
         public static float ImportScale
@@ -119,6 +127,23 @@ namespace Game.Presentation.Pure
                     return WarriorPackDepth;
                 case PartModel.SkeletonMage:
                     return MagePackDepth;
+                default:
+                    throw Stranger(model);
+            }
+        }
+
+        public static float PackTurnOf(PartModel model)
+        {
+            switch (model)
+            {
+                case PartModel.SkeletonMinion:
+                    return MinionPackTurn;
+                case PartModel.SkeletonRogue:
+                    return RoguePackTurn;
+                case PartModel.SkeletonWarrior:
+                    return WarriorPackTurn;
+                case PartModel.SkeletonMage:
+                    return MagePackTurn;
                 default:
                     throw Stranger(model);
             }

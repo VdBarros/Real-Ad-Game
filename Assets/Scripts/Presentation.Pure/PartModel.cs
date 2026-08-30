@@ -19,6 +19,7 @@ namespace Game.Presentation.Pure
         Knight,
         Barbarian,
         Rogue,
+        Mage,
         SkeletonMinion,
         SkeletonRogue,
         SkeletonWarrior,

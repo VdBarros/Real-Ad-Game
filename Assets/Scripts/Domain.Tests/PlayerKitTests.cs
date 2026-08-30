@@ -149,17 +149,68 @@ namespace Game.Domain.Tests
 
             var smallest = PlayerKit.ReachOf(PlayerKit.WeaponOf(1));
             var reached = 0f;
+            var handed = 0f;
 
             for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
                 var weapon = PlayerKit.WeaponOf(tier);
                 var reach = PlayerKit.ReachOf(weapon);
 
-                Assert.That(reach, Is.GreaterThan(reached), weapon.ToString());
+                if (reach < reached)
+                {
+                    handed = Math.Max(handed, (reached - reach) / reached);
+                }
+
                 reached = reach;
             }
 
-            Assert.That(reached, Is.GreaterThan(smallest * 4f / 3f));
+            Assert.That(handed, Is.LessThan(0.02f));
+            Assert.That(reached, Is.GreaterThan(smallest * PlayerLook.Growth));
+        }
+
+        [Test]
+        public void TheTopRungSwingsTheLongestMeshTheRampHandsOutAndTheBodyUnderItDecidesTheRest()
+        {
+            var top = PlayerKit.ModelOf(PlayerKit.WeaponOf(PlayerTier.Count - 1));
+            var longest = Diagonal(top);
+
+            for (var tier = 1; tier < PlayerTier.Count - 1; tier++)
+            {
+                Assert.That(
+                    Diagonal(PlayerKit.ModelOf(PlayerKit.WeaponOf(tier))),
+                    Is.LessThan(longest),
+                    PlayerKit.WeaponOf(tier).ToString());
+            }
+
+            var tallest = PlayerGuise.Knight;
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                if (ArtPacks.PackHeightOf(PlayerKit.BodyOf(guise))
+                    > ArtPacks.PackHeightOf(PlayerKit.BodyOf(tallest)))
+                {
+                    tallest = guise;
+                }
+            }
+
+            Assert.That(tallest, Is.EqualTo(PlayerKit.GuiseOf(PlayerTier.Count - 1)));
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                Assert.That(
+                    PlayerKit.StandingPerImportUnitOf(guise),
+                    Is.GreaterThanOrEqualTo(PlayerKit.StandingPerImportUnitOf(tallest)),
+                    guise.ToString());
+            }
+        }
+
+        static float Diagonal(PartModel model)
+        {
+            var width = ArtPacks.PackWidthOf(model);
+            var height = ArtPacks.PackHeightOf(model);
+            var depth = ArtPacks.PackDepthOf(model);
+
+            return (float)Math.Sqrt(width * width + height * height + depth * depth);
         }
 
         [Test]

@@ -6,6 +6,6 @@ namespace Game.Presentation.Pure
         Shortsword,
         Axe,
         Bow,
-        Greatsword
+        Staff
     }
 }

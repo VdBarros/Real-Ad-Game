@@ -730,7 +730,7 @@ namespace Game.EditorTooling
                 tiers > 0 && clear == tiers,
                 "the whole kit of a player of every tier sweeps through the gate's walkway across every "
                 + "frame of the walk clip without touching a single triangle of its posts or its lintel, "
-                + "the weapon it is carrying counted in rather than excused",
+                + "read square on, the weapon it is carrying counted in rather than excused",
                 string.Format(
                     CultureInfo.InvariantCulture,
                     "{0} of {1} tiers pass through the arch's {2} triangles; the widest leaves {3:0.###} "
@@ -749,11 +749,15 @@ namespace Game.EditorTooling
             animator.Cue(FigureCue.Looping(FigureAct.Walk));
             animator.Advance(0f);
 
+            var facing = player.transform.rotation;
+            player.transform.rotation = Quaternion.identity;
             var swept = World(player.transform);
             var seconds = animator.PlayingSeconds;
 
             if (animator.Playing == null || seconds <= 0f)
             {
+                player.transform.rotation = facing;
+
                 return swept;
             }
 
@@ -764,6 +768,8 @@ namespace Game.EditorTooling
                 animator.Advance(step);
                 swept.Encapsulate(World(player.transform));
             }
+
+            player.transform.rotation = facing;
 
             return swept;
         }

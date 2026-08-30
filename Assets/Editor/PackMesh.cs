@@ -40,6 +40,70 @@ namespace Game.EditorTooling
             return meshes;
         }
 
+        public const int TurnSamples = 180;
+
+        public static float Turned(GameObject prefab)
+        {
+            var instance = Object.Instantiate(prefab);
+            instance.transform.position = Vector3.zero;
+            instance.transform.rotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+            CharacterDress.Bare(instance);
+
+            var ground = Footprint(instance);
+            var widest = 0f;
+
+            for (var sample = 0; sample < TurnSamples; sample++)
+            {
+                var radians = Mathf.PI * sample / TurnSamples;
+                var axis = new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
+                var low = float.MaxValue;
+                var high = float.MinValue;
+
+                for (var point = 0; point < ground.Count; point++)
+                {
+                    var along = Vector2.Dot(ground[point], axis);
+
+                    low = Mathf.Min(low, along);
+                    high = Mathf.Max(high, along);
+                }
+
+                if (high - low > widest)
+                {
+                    widest = high - low;
+                }
+            }
+
+            WorldObjects.Destroy(instance);
+
+            return widest;
+        }
+
+        static List<Vector2> Footprint(GameObject instance)
+        {
+            var ground = new List<Vector2>();
+
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                var mesh = On(renderer);
+                if (mesh == null)
+                {
+                    continue;
+                }
+
+                var vertices = mesh.vertices;
+
+                for (var vertex = 0; vertex < vertices.Length; vertex++)
+                {
+                    var placed = renderer.transform.TransformPoint(vertices[vertex]);
+
+                    ground.Add(new Vector2(placed.x, placed.z));
+                }
+            }
+
+            return ground;
+        }
+
         public static Bounds Bare(GameObject prefab)
         {
             var instance = Object.Instantiate(prefab);

@@ -287,11 +287,11 @@ namespace Game.Domain.Tests
 
             foreach (var restYaw in new[] { 0f, 45f, 90f, 225f, 315f })
             {
-                var pose = WeaponStow.PoseOf(PlayerWeapon.Greatsword, restYaw);
+                var pose = WeaponStow.PoseOf(PlayerWeapon.Staff, restYaw);
                 var reach = (float)Math.Sqrt(pose.X * pose.X + pose.Z * pose.Z);
 
                 Assert.That(reach, Is.EqualTo(WeaponStow.Back).Within(1e-4f));
-                Assert.That(pose.Y, Is.EqualTo(WeaponStow.LiftOf(PlayerWeapon.Greatsword)).Within(1e-6f));
+                Assert.That(pose.Y, Is.EqualTo(WeaponStow.LiftOf(PlayerWeapon.Staff)).Within(1e-6f));
             }
         }
 

@@ -4,6 +4,7 @@ namespace Game.Presentation.Pure
     {
         Knight,
         Barbarian,
-        Rogue
+        Rogue,
+        Mage
     }
 }

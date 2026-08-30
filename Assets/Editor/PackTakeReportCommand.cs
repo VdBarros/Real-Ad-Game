@@ -249,6 +249,17 @@ namespace Game.EditorTooling
                 box.min.x / scale,
                 box.min.z / scale));
 
+            var turned = PackMesh.Turned(prefab);
+
+            report.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "  TURN {0:0.#####} across its widest yaw against the {1:0.#####} its own box diagonal "
+                + "bounds it at",
+                turned / scale,
+                Math.Sqrt(
+                    box.size.x / scale * (box.size.x / scale)
+                    + box.size.z / scale * (box.size.z / scale))));
+
             report.AppendLine("  NODES " + named.Count);
 
             foreach (var trail in named)

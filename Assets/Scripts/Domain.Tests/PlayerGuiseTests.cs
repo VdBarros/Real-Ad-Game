@@ -133,7 +133,7 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheRampChangesGuiseAtTwoPowersAndTheKnightOpensTheRun()
+        public void TheRampChangesGuiseAtThreePowersAndTheKnightOpensTheRun()
         {
             Assert.That(PlayerKit.GuiseOf(0), Is.EqualTo(PlayerGuise.Knight));
             Assert.That(PlayerKit.GuiseOf(1), Is.EqualTo(PlayerGuise.Knight));
@@ -141,6 +141,8 @@ namespace Game.Domain.Tests
             Assert.That(PlayerKit.WeaponOf(2), Is.EqualTo(PlayerWeapon.Axe));
             Assert.That(PlayerKit.GuiseOf(3), Is.EqualTo(PlayerGuise.Rogue));
             Assert.That(PlayerKit.WeaponOf(3), Is.EqualTo(PlayerWeapon.Bow));
+            Assert.That(PlayerKit.GuiseOf(4), Is.EqualTo(PlayerGuise.Mage));
+            Assert.That(PlayerKit.WeaponOf(4), Is.EqualTo(PlayerWeapon.Staff));
             Assert.That(PlayerKit.Body, Is.EqualTo(PlayerGuises.MeshOf(PlayerGuise.Knight)));
 
             var swaps = new List<int>();
@@ -153,11 +155,13 @@ namespace Game.Domain.Tests
                 }
             }
 
-            Assert.That(swaps.Count, Is.EqualTo(2));
+            Assert.That(swaps.Count, Is.EqualTo(3));
             Assert.That(swaps[0], Is.EqualTo(PlayerTier.Thresholds[1]));
             Assert.That(swaps[0], Is.EqualTo(30));
             Assert.That(swaps[1], Is.EqualTo(PlayerTier.Thresholds[2]));
             Assert.That(swaps[1], Is.EqualTo(100));
+            Assert.That(swaps[2], Is.EqualTo(PlayerTier.Thresholds[3]));
+            Assert.That(swaps[2], Is.EqualTo(300));
         }
 
         [Test]
@@ -200,10 +204,6 @@ namespace Game.Domain.Tests
                     PlayerGuises.FinisherOf(guise),
                     Is.Not.EqualTo(FigureAct.Loose),
                     guise.ToString());
-                Assert.That(
-                    AnimationSets.SetOf(PlayerGuises.FinisherOf(guise)),
-                    Is.EqualTo(AnimationSets.CombatMelee),
-                    guise.ToString());
             }
 
             foreach (var outcome in new[] { ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss })
@@ -222,6 +222,59 @@ namespace Game.Domain.Tests
                 Does.Not.Contain("Flight"));
             Assert.That(
                 SourceTree.Read("Presentation.Pure", "PlayerGuises.cs"),
+                Does.Not.Contain("Flight"));
+        }
+
+        [Test]
+        public void TheMageFinishesWithACastNoOtherGuiseMakesAndNothingEverLeavesTheStaff()
+        {
+            Assert.That(PlayerGuises.FinisherOf(PlayerGuise.Mage), Is.EqualTo(FigureAct.Cast));
+            Assert.That(AdventurerClips.NameOf(FigureAct.Cast), Is.EqualTo(AdventurerClips.Cast));
+            Assert.That(SkeletonClips.NameOf(FigureAct.Cast), Is.EqualTo(SkeletonClips.Cast));
+            Assert.That(AnimationSets.SetOf(FigureAct.Cast), Is.EqualTo(AnimationSets.CombatRanged));
+            Assert.That(FigureAct.Cast, Is.Not.EqualTo(FigureAct.Loose));
+
+            var swung = 0;
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                var finisher = PlayerGuises.FinisherOf(guise);
+
+                if (guise == PlayerGuise.Mage)
+                {
+                    continue;
+                }
+
+                Assert.That(finisher, Is.Not.EqualTo(FigureAct.Cast), guise.ToString());
+
+                if (AnimationSets.SetOf(finisher) == AnimationSets.CombatMelee)
+                {
+                    swung++;
+                }
+            }
+
+            Assert.That(swung, Is.EqualTo(PlayerGuises.Count - 2));
+
+            foreach (var outcome in new[] { ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss })
+            {
+                var fight = Fight.Of(outcome).Advanced(Fight.Of(outcome).ContactAt);
+                var cast = FigureCues.Striking(fight, PlayerWeapon.Staff);
+                var chopped = FigureCues.Striking(fight, PlayerWeapon.Axe);
+
+                Assert.That(cast.Act, Is.EqualTo(FigureAct.Cast).Or.EqualTo(chopped.Act), outcome.ToString());
+                Assert.That(cast.Beat, Is.EqualTo(chopped.Beat), outcome.ToString());
+                Assert.That(cast.Loops, Is.EqualTo(chopped.Loops), outcome.ToString());
+                Assert.That(fight.Seconds, Is.EqualTo(Fight.Of(outcome).Seconds), outcome.ToString());
+            }
+
+            Assert.That(
+                SourceTree.Read("Presentation.Pure", "FigureCues.cs"),
+                Does.Not.Contain("Flight"));
+            Assert.That(
+                SourceTree.Read("Presentation.Pure", "PlayerGuises.cs"),
+                Does.Not.Contain("Flight"));
+            Assert.That(
+                SourceTree.Read("Presentation.Pure", "PlayerKit.cs"),
                 Does.Not.Contain("Flight"));
         }
 

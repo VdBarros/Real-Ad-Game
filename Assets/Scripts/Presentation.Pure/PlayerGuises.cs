@@ -6,7 +6,12 @@ namespace Game.Presentation.Pure
     public static class PlayerGuises
     {
         static readonly PlayerGuise[] all =
-            { PlayerGuise.Knight, PlayerGuise.Barbarian, PlayerGuise.Rogue };
+        {
+            PlayerGuise.Knight,
+            PlayerGuise.Barbarian,
+            PlayerGuise.Rogue,
+            PlayerGuise.Mage
+        };
 
         public static IReadOnlyList<PlayerGuise> All
         {
@@ -28,6 +33,8 @@ namespace Game.Presentation.Pure
                     return PartModel.Barbarian;
                 case PlayerGuise.Rogue:
                     return PartModel.Rogue;
+                case PlayerGuise.Mage:
+                    return PartModel.Mage;
                 default:
                     throw Stranger(guise);
             }
@@ -43,6 +50,8 @@ namespace Game.Presentation.Pure
                     return AdventurerPack.BarbarianCloakNode;
                 case PlayerGuise.Rogue:
                     return AdventurerPack.RogueCloakNode;
+                case PlayerGuise.Mage:
+                    return AdventurerPack.MageCloakNode;
                 default:
                     throw Stranger(guise);
             }
@@ -58,6 +67,8 @@ namespace Game.Presentation.Pure
                     return FigureAct.Cleave;
                 case PlayerGuise.Rogue:
                     return FigureAct.Loose;
+                case PlayerGuise.Mage:
+                    return FigureAct.Cast;
                 default:
                     throw Stranger(guise);
             }

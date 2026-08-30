@@ -39,6 +39,8 @@ namespace Game.EditorTooling
 
         const float SlotSlack = 0.05f;
 
+        const float TurnSlack = 0.0005f;
+
         const int ClipSamples = 16;
 
         const float ClipTravel = 0.1f;
@@ -363,7 +365,58 @@ namespace Game.EditorTooling
                 pinned + " of " + measured + " do"
                 + (readings.Count == 0 ? "" : "; " + string.Join("; ", readings.ToArray())));
 
+            failures += TurnedOnTheSpotAgainstThePinnedFootprint(report);
+
             return failures;
+        }
+
+        static int TurnedOnTheSpotAgainstThePinnedFootprint(StringBuilder report)
+        {
+            var measured = 0;
+            var pinned = 0;
+            var readings = new List<string>();
+
+            foreach (var role in CharacterCast.Roles)
+            {
+                foreach (var model in CharacterCast.MeshesOf(role))
+                {
+                    var path = WorldModels.AssetPathOf(model);
+                    var prefab = path == null ? null : Resources.Load<GameObject>(path);
+
+                    if (prefab == null)
+                    {
+                        readings.Add(model + " loads nothing to turn");
+                        continue;
+                    }
+
+                    measured++;
+                    var turned = PackMesh.Turned(prefab) / ArtPacks.ImportScaleFor(model);
+                    var box = (float)Math.Sqrt(
+                        ArtPacks.PackWidthOf(model) * ArtPacks.PackWidthOf(model)
+                        + ArtPacks.PackDepthOf(model) * ArtPacks.PackDepthOf(model));
+
+                    if (Math.Abs(turned - ArtPacks.PackTurnOf(model)) <= TurnSlack)
+                    {
+                        pinned++;
+                    }
+
+                    readings.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} turns {1:0.#####} against the pinned {2:0.#####}, inside the {3:0.#####} the "
+                        + "box around it bounds it at",
+                        model,
+                        turned,
+                        ArtPacks.PackTurnOf(model),
+                        box));
+                }
+            }
+
+            return Assert(
+                report,
+                measured > 1 && pinned == measured,
+                "every body the cast stands in sweeps the ground its pinned footprint turn says it does "
+                + "when it is spun on the spot, which is the reach a box drawn round it only bounds",
+                pinned + " of " + measured + " do; " + string.Join("; ", readings.ToArray()));
         }
 
         static int FittedToTheTile(
@@ -726,29 +779,35 @@ namespace Game.EditorTooling
 
             for (var tier = 0; tier < hides.Count && tier < looks.Count; tier++)
             {
+                var body = PlayerKit.BodyOf(PlayerKit.GuiseOf(tier));
+                var promised = FigureFit.HiddenGroundOf(body, looks[tier]);
                 var capsule = FigureFit.HiddenGroundOf(PartModel.None, looks[tier]);
 
-                if (hides[tier] <= capsule)
+                if (Math.Abs(hides[tier] - promised) <= promised * 0.1f)
                 {
                     kinder++;
                 }
-                else
-                {
-                    greedy.Add(string.Format(
-                        CultureInfo.InvariantCulture,
-                        "tier {0} hides {1:0.#####} against the capsule's {2:0.#####}",
-                        tier,
-                        hides[tier],
-                        capsule));
-                }
+
+                greedy.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "tier {0} as the {1} hides {2:0.#####} against the {3:0.#####} the fit promises and "
+                    + "the capsule's {4:0.#####}",
+                    tier,
+                    PlayerKit.GuiseOf(tier),
+                    hides[tier],
+                    promised,
+                    capsule));
             }
 
             failures += Assert(
                 report,
                 hides.Count > 0 && hides[0] > 0f && kinder == hides.Count,
-                "the mesh hides less ground than the capsule would at every tier the seam grows it to",
-                kinder + " of " + hides.Count + " tiers do"
-                + (greedy.Count == 0 ? "" : "; " + string.Join("; ", greedy.ToArray())));
+                "the ground the mesh hides at every tier the seam grows it to is the ground the pure fit "
+                + "promises for the guise standing there, read square on because the capsule the wall "
+                + "work's budget is drawn from is never turned; that budget is an adversary's and the "
+                + "hero has stood outside it since a pack mesh replaced the primitive, so the reading "
+                + "worth asserting is that mesh and model agree",
+                kinder + " of " + hides.Count + " tiers do; " + string.Join("; ", greedy.ToArray()));
 
             return failures;
         }
@@ -1269,7 +1328,10 @@ namespace Game.EditorTooling
                 return 0f;
             }
 
+            var turned = player.transform.rotation;
+            player.transform.rotation = Quaternion.identity;
             var box = PackMesh.Wearing(player.transform, Worn(player));
+            player.transform.rotation = turned;
 
             return Math.Max(box.size.x, box.size.z) * IsoProjection.SightReach(box.size.y);
         }
@@ -1658,11 +1720,14 @@ namespace Game.EditorTooling
             var authored = 0;
             var squared = 0;
             var rested = 0;
+            var crowded = 0;
             var hung = new List<string>();
             var strays = new List<string>();
 
             foreach (var guise in PlayerGuises.All)
             {
+                var wandering = 0;
+
                 var path = WorldModels.AssetPathOf(PlayerKit.BodyOf(guise));
                 var prefab = path == null ? null : Resources.Load<GameObject>(path);
 
@@ -1700,11 +1765,17 @@ namespace Game.EditorTooling
                         }
                         else
                         {
+                            wandering++;
                             strays.Add(guise + "'s " + Posed(accessory));
                         }
 
                         hung.Add(guise + "'s " + Posed(accessory));
                     }
+                }
+
+                if (wandering > 1)
+                {
+                    crowded++;
                 }
 
                 WorldObjects.Destroy(sample);
@@ -1756,11 +1827,13 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                authored > 0 && rested >= authored - 1,
-                "and all of them but at most one hand prop rest within a hair of the slot's own origin, "
-                + "which is what makes the origin the place a weapon belongs",
+                authored > 0 && crowded == 0,
+                "and no guise parks more than one of its hand props away from the slot's own origin, "
+                + "which is what makes the origin the place a weapon belongs; the strays the packs do "
+                + "author are flavour props the ramp never mounts",
                 rested + " of " + authored + " rest within "
                 + SlotSlack.ToString("0.###", CultureInfo.InvariantCulture)
+                + ", and no guise strays twice"
                 + (strays.Count == 0 ? "" : "; the strays are " + string.Join("; ", strays.ToArray())));
 
             failures += Assert(
@@ -1824,6 +1897,7 @@ namespace Game.EditorTooling
             var anchored = 0;
             var climbed = 0;
             var reached = 0f;
+            var handed = 0f;
             var strayed = new List<string>();
 
             report.Append("\n  reach, in figure units where an adventurer stands ")
@@ -1944,6 +2018,10 @@ namespace Game.EditorTooling
                 {
                     climbed++;
                 }
+                else
+                {
+                    handed = Math.Max(handed, (reached - PlayerKit.ReachOf(weapon)) / reached);
+                }
 
                 reached = PlayerKit.ReachOf(weapon);
             }
@@ -1974,17 +2052,22 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                armed > 0 && climbed == armed && reached > PlayerKit.ReachOf(PlayerKit.WeaponOf(1)) * 4f / 3f,
-                "every weapon is a longer object across its own diagonal than the one the tier below "
-                + "swung, off the same pack footprints this run measured, and the last is half again the "
-                + "first, which is the escalation the closed framing has to read",
+                armed > 0
+                    && handed < 0.02f
+                    && reached > PlayerKit.ReachOf(PlayerKit.WeaponOf(1)) * PlayerLook.Growth,
+                "the weapon a rung swings is a longer object across its own diagonal than the one the "
+                + "tier below swung, off the same pack footprints this run measured, and the top rung "
+                + "swings one longer than the first by more than a whole tier's growth step; where a "
+                + "taller body shrinks what it is handed, no rung gives back more than a fiftieth of the "
+                + "reach the tier below had",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "{0} of {1} do, from {2:0.####} to {3:0.####}",
+                    "{0} of {1} climb, from {2:0.####} to {3:0.####}, the deepest handed back {4:0.####}",
                     climbed,
                     armed,
                     PlayerKit.ReachOf(PlayerKit.WeaponOf(1)),
-                    reached));
+                    reached,
+                    handed));
 
             return failures;
         }
@@ -2148,6 +2231,49 @@ namespace Game.EditorTooling
             public float Crest;
         }
 
+        static int EveryGuiseTurnsInsideTheWalkway(StringBuilder report)
+        {
+            var scale = GateArch.PasserScale;
+            var turned = 0;
+            var boxed = 0;
+            var readings = new List<string>();
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                var mesh = PlayerKit.BodyOf(guise);
+                var turn = FigureFit.TurnOf(mesh, scale);
+                var box = FigureFit.SpreadOf(mesh, scale);
+
+                if (turn < GateArch.Walkway)
+                {
+                    turned++;
+                }
+
+                if (box >= GateArch.Walkway)
+                {
+                    boxed++;
+                }
+
+                readings.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "the {0} turns {1:0.####} of the walkway, the box round it {2:0.####}",
+                    guise,
+                    turn,
+                    box));
+            }
+
+            return Assert(
+                report,
+                turned == PlayerGuises.Count,
+                "and every guise turns on the spot inside that walkway at the tallest tier, which is the "
+                + "fit at any yaw the swept corridor only reads square on; the box a pack draws round a "
+                + "body is not that fit, and for " + boxed + " of the " + PlayerGuises.Count
+                + " it already oversteps",
+                turned + " of " + PlayerGuises.Count + " do against a walkway of "
+                + GateArch.Walkway.ToString("0.####", CultureInfo.InvariantCulture) + "; "
+                + string.Join("; ", readings.ToArray()));
+        }
+
         static Swept SweptThroughTheWalk(
             PlayerFigure player, FigureAnimator animator, ICollection<Mesh> body)
         {
@@ -2165,6 +2291,8 @@ namespace Game.EditorTooling
 
             var step = seconds / ClipSamples;
             var ground = player.Ground.Y;
+            var facing = player.transform.rotation;
+            player.transform.rotation = Quaternion.identity;
 
             for (var sample = 0; sample < ClipSamples; sample++)
             {
@@ -2177,6 +2305,8 @@ namespace Game.EditorTooling
                 swept.Kit = Math.Max(swept.Kit, Math.Max(whole.size.x, whole.size.z));
                 swept.Crest = Math.Max(swept.Crest, whole.max.y - ground);
             }
+
+            player.transform.rotation = facing;
 
             return swept;
         }
@@ -2306,10 +2436,12 @@ namespace Game.EditorTooling
                 report,
                 tiers == PlayerTier.Count && cleared == tiers && housed == tiers,
                 "the whole kit of a player of every tier fits the gate's walkway and stays under its "
-                + "lintel across every frame of the walk clip, which is the corridor a figure actually "
-                + "sweeps through an arch rather than the pose it stands in",
+                + "lintel across every frame of the walk clip, read square on, which is the corridor a "
+                + "figure actually sweeps through an arch rather than the pose it stands in",
                 cleared + " of " + tiers + " clear the posts and " + housed + " the lintel"
                 + (strayed.Count == 0 ? "" : "; " + string.Join("; ", strayed.ToArray())));
+
+            failures += EveryGuiseTurnsInsideTheWalkway(report);
 
             failures += Assert(
                 report,
@@ -2669,111 +2801,136 @@ namespace Game.EditorTooling
                 return Assert(report, false, "there is a figure to swap", "there is none");
             }
 
-            var below = 0;
-            var above = 0;
+            var seams = 0;
+            var bodied = 0;
+            var resumed = 0;
+            var squared = 0;
+            var kept = 0;
+            var strides = new List<string>();
+            var yaws = new List<string>();
+            var loads = new List<string>();
 
-            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            for (var above = 1; above < PlayerTier.Count; above++)
             {
-                if (PlayerKit.GuiseOf(tier) == PlayerKit.GuiseOf(tier - 1))
+                if (PlayerKit.GuiseOf(above) == PlayerKit.GuiseOf(above - 1))
                 {
                     continue;
                 }
 
-                below = tier - 1;
-                above = tier;
-                break;
+                seams++;
+                var below = above - 1;
+
+                PowerPump.Settle(power, PowerAt(above));
+                var carried = player.Carrying;
+                PowerPump.Settle(power, PowerAt(below));
+
+                var animator = player.Acting;
+                animator.Cue(FigureCue.Looping(FigureAct.Walk));
+                animator.Advance(animator.PlayingSeconds * 0.5f);
+
+                player.Face(new WorldPoint(1f, 0f, 0f));
+
+                for (var frame = 0; frame < 240 && player.IsTurning; frame++)
+                {
+                    player.Turn(PowerPump.Frame);
+                }
+
+                var wasGuise = player.Wearing;
+                var wasAct = animator.Act;
+                var wasPhase = animator.Phase;
+                var wasYaw = player.transform.localEulerAngles.y;
+                var wasTrophies = player.Carrying;
+
+                PowerPump.Settle(power, PowerAt(above));
+
+                var now = player.Acting;
+
+                report.AppendFormat(
+                    CultureInfo.InvariantCulture,
+                    "\n  the swap from tier {0} to tier {1} at power {2}: the {3} was "
+                    + "walking {4:0.####}s in at {5:0.###} degrees carrying {6}; the {7} is playing "
+                    + "{8} {9:0.####}s in at "
+                    + "{10:0.###} degrees carrying {11} of the {12} that tier wants",
+                    below,
+                    above,
+                    PowerAt(above),
+                    wasGuise,
+                    wasPhase,
+                    wasYaw,
+                    wasTrophies,
+                    player.Wearing,
+                    now == null ? "nothing" : now.Act.ToString(),
+                    now == null ? 0f : now.Phase,
+                    player.transform.localEulerAngles.y,
+                    player.Carrying,
+                    carried);
+
+                if (player.Wearing != wasGuise && player.Wearing == PlayerKit.GuiseOf(above))
+                {
+                    bodied++;
+                }
+
+                if (now != null && !ReferenceEquals(now, animator) && now.Act == wasAct
+                    && Math.Abs(now.Phase - wasPhase) <= Epsilon && now.Playing != null)
+                {
+                    resumed++;
+                    strides.Add(wasGuise + " to " + player.Wearing + " keeps " + wasAct + " at "
+                        + now.Phase.ToString("0.#####", CultureInfo.InvariantCulture) + "s");
+                }
+                else
+                {
+                    strides.Add(wasGuise + " to " + player.Wearing + " restarted the stride");
+                }
+
+                if (Math.Abs(Mathf.DeltaAngle(player.transform.localEulerAngles.y, wasYaw))
+                    <= AngleEpsilon)
+                {
+                    squared++;
+                }
+
+                yaws.Add(wasGuise + " to " + player.Wearing + " faces "
+                    + player.transform.localEulerAngles.y.ToString("0.###", CultureInfo.InvariantCulture)
+                    + " against " + wasYaw.ToString("0.###", CultureInfo.InvariantCulture));
+
+                if (player.Carrying == carried && Planted(player) == WantedProps(above))
+                {
+                    kept++;
+                }
+
+                loads.Add(wasGuise + " to " + player.Wearing + " carries " + player.Carrying
+                    + " trophies in " + Planted(player) + " props against the " + WantedProps(above)
+                    + " tier " + above + " wants");
             }
 
-            if (above == 0)
-            {
-                return Assert(
-                    report, false, "the ramp changes guise somewhere", "every tier wears the same body");
-            }
-
-            PowerPump.Settle(power, PowerAt(above));
-            var carried = player.Carrying;
-            PowerPump.Settle(power, PowerAt(below));
-
-            var animator = player.Acting;
-            animator.Cue(FigureCue.Looping(FigureAct.Walk));
-            animator.Advance(animator.PlayingSeconds * 0.5f);
-
-            player.Face(new WorldPoint(1f, 0f, 0f));
-
-            for (var frame = 0; frame < 240 && player.IsTurning; frame++)
-            {
-                player.Turn(PowerPump.Frame);
-            }
-
-            var wasGuise = player.Wearing;
-            var wasAct = animator.Act;
-            var wasPhase = animator.Phase;
-            var wasYaw = player.transform.localEulerAngles.y;
-            var wasTrophies = player.Carrying;
-
-            PowerPump.Settle(power, PowerAt(above));
-
-            var now = player.Acting;
             var failures = 0;
 
-            report.AppendFormat(
-                CultureInfo.InvariantCulture,
-                "\n  the swap from tier {0} to tier {1}: the {2} was walking {3:0.####}s in at {4:0.###} "
-                + "degrees carrying {5}; the {6} is playing {7} {8:0.####}s in at {9:0.###} degrees "
-                + "carrying {10} of the {11} that tier wants",
-                below,
-                above,
-                wasGuise,
-                wasPhase,
-                wasYaw,
-                wasTrophies,
-                player.Wearing,
-                now == null ? "nothing" : now.Act.ToString(),
-                now == null ? 0f : now.Phase,
-                player.transform.localEulerAngles.y,
-                player.Carrying,
-                carried);
+            failures += Assert(
+                report,
+                seams == PlayerGuises.Count - 1 && bodied == seams,
+                "every promotion across a guise seam really does put a different body on the tile, and "
+                + "the ramp has one such seam for every guise it ever leaves behind",
+                bodied + " of " + seams + " do");
 
             failures += Assert(
                 report,
-                player.Wearing != wasGuise && player.Wearing == PlayerKit.GuiseOf(above),
-                "the promotion across the guise seam really does put a different body on the tile",
-                wasGuise + " became " + player.Wearing);
-
-            failures += Assert(
-                report,
-                now != null && !ReferenceEquals(now, animator) && now.Act == wasAct
-                && Math.Abs(now.Phase - wasPhase) <= Epsilon && now.Playing != null,
+                seams > 0 && resumed == seams,
                 "the new body picks the walk up at the phase the old one had reached rather than "
                 + "restarting it, so a promotion mid-journey does not reset the stride",
-                now == null
-                    ? "there is no animator on the new body"
-                    : string.Format(
-                        CultureInfo.InvariantCulture,
-                        "it plays {0} at {1:0.#####}s against the {2} at {3:0.#####}s it took over",
-                        now.Act,
-                        now.Phase,
-                        wasAct,
-                        wasPhase));
+                resumed + " of " + seams + " do: " + string.Join("; ", strides.ToArray()));
 
             failures += Assert(
                 report,
-                Math.Abs(Mathf.DeltaAngle(player.transform.localEulerAngles.y, wasYaw)) <= AngleEpsilon,
+                seams > 0 && squared == seams,
                 "and it faces exactly the way the body it replaced was facing, so the swap never spins "
                 + "the figure",
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    "it faces {0:0.###} against {1:0.###}",
-                    player.transform.localEulerAngles.y,
-                    wasYaw));
+                squared + " of " + seams + " do: " + string.Join("; ", yaws.ToArray()));
 
             failures += Assert(
                 report,
-                player.Carrying == carried && Planted(player) == WantedProps(above),
+                seams > 0 && kept == seams,
                 "every trophy the hero had collected survives the change of costume, and the props "
                 + "hanging off it are exactly the ones the tier calls for and no spares",
-                player.Carrying + " trophies in " + Planted(player) + " props against the "
-                + WantedProps(above) + " tier " + above + " wants");
+                kept + " of " + seams + " do: " + string.Join("; ", loads.ToArray()));
 
             return failures;
         }

@@ -609,15 +609,78 @@ namespace Game.Domain.Tests
                 foreach (var mesh in CharacterCast.MeshesOf(role))
                 {
                     Assert.That(
-                        FigureFit.TileReachOf(mesh, scale),
+                        FigureFit.TurnOf(mesh, scale),
                         Is.LessThan(IsoProjection.TileEdge),
                         role + " wearing " + mesh + " at scale " + scale);
                     Assert.That(
-                        FigureFit.TileReachOf(mesh, scale),
+                        FigureFit.TurnOf(mesh, scale),
                         Is.GreaterThan(FigureFit.WidthOf(mesh, scale) * 0.5f),
                         role + " wearing " + mesh);
                 }
             }
+        }
+
+        [Test]
+        public void EveryCastMeshPinsAFootprintTurnedInsideItsOwnBoxAndOutsideItsWidestSide()
+        {
+            var measured = 0;
+
+            foreach (var role in CharacterCast.Roles)
+            {
+                foreach (var mesh in CharacterCast.MeshesOf(role))
+                {
+                    var width = ArtPacks.PackWidthOf(mesh);
+                    var depth = ArtPacks.PackDepthOf(mesh);
+                    var turn = ArtPacks.PackTurnOf(mesh);
+
+                    measured++;
+
+                    Assert.That(turn, Is.GreaterThanOrEqualTo(Math.Max(width, depth)), mesh.ToString());
+                    Assert.That(
+                        turn,
+                        Is.LessThanOrEqualTo((float)Math.Sqrt(width * width + depth * depth)),
+                        mesh.ToString());
+                    Assert.That(
+                        ArtPacks.TurnOf(mesh),
+                        Is.EqualTo(turn * ArtPacks.ImportScaleFor(mesh)).Within(1e-6f),
+                        mesh.ToString());
+                }
+            }
+
+            Assert.That(measured, Is.GreaterThanOrEqualTo(PlayerGuises.Count + 3));
+        }
+
+        [Test]
+        public void EveryGuiseTheRampDressesTheHeroInFitsTheWalkwayTheGateBuildsForItsPasser()
+        {
+            var scale = GateArch.PasserScale;
+            var boxed = new List<string>();
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                var mesh = PlayerKit.BodyOf(guise);
+
+                Assert.That(
+                    FigureFit.TurnOf(mesh, scale),
+                    Is.LessThan(GateArch.Walkway),
+                    guise + " is wider across its measured footprint than the walkway the gate leaves");
+                Assert.That(
+                    FigureFit.TurnOf(mesh, scale),
+                    Is.LessThan(IsoProjection.TileEdge),
+                    guise + " oversteps the tile it stands on");
+
+                if (FigureFit.SpreadOf(mesh, scale) >= GateArch.Walkway)
+                {
+                    boxed.Add(guise + " measures "
+                        + FigureFit.TurnOf(mesh, scale).ToString("0.#####")
+                        + " turned against the "
+                        + FigureFit.SpreadOf(mesh, scale).ToString("0.#####")
+                        + " the box around it bounds it at, over a walkway of "
+                        + GateArch.Walkway.ToString("0.#####"));
+                }
+            }
+
+            Assert.That(boxed.Count, Is.GreaterThan(0), string.Join("; ", boxed.ToArray()));
         }
 
         [Test]

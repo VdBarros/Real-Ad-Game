@@ -66,9 +66,9 @@ namespace Game.Presentation.Pure
                 case FigureAct.Kick:
                 case FigureAct.Slice:
                 case FigureAct.Cleave:
-                case FigureAct.Sweep:
                     return CombatMelee;
                 case FigureAct.Loose:
+                case FigureAct.Cast:
                     return CombatRanged;
                 default:
                     throw new ArgumentOutOfRangeException(

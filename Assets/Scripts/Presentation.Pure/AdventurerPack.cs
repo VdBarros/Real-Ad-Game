@@ -22,6 +22,8 @@ namespace Game.Presentation.Pure
 
         public const string RogueCloakNode = "Rogue" + CloakSuffix;
 
+        public const string MageCloakNode = "Mage" + CloakSuffix;
+
         public const float KnightPackHeight = 2.63436f;
 
         public const float KnightPackWidth = 1.94251f;
@@ -45,6 +47,22 @@ namespace Game.Presentation.Pure
         public const float RoguePackDepth = 1.01551f;
 
         public const float RoguePackBase = -0.18471f;
+
+        public const float MagePackHeight = 2.90035f;
+
+        public const float MagePackWidth = 2.09291f;
+
+        public const float MagePackDepth = 2.03961f;
+
+        public const float MagePackBase = -0.18471f;
+
+        public const float KnightPackTurn = 1.94385f;
+
+        public const float BarbarianPackTurn = 1.94398f;
+
+        public const float RoguePackTurn = 1.94385f;
+
+        public const float MagePackTurn = 2.16179f;
 
         public const float Sword1HandedPackHeight = 1.77526f;
 
@@ -90,6 +108,7 @@ namespace Game.Presentation.Pure
             return model == PartModel.Knight
                 || model == PartModel.Barbarian
                 || model == PartModel.Rogue
+                || model == PartModel.Mage
                 || Wields(model);
         }
 
@@ -117,6 +136,8 @@ namespace Game.Presentation.Pure
                     return BarbarianPackHeight;
                 case PartModel.Rogue:
                     return RoguePackHeight;
+                case PartModel.Mage:
+                    return MagePackHeight;
                 case PartModel.Sword1Handed:
                     return Sword1HandedPackHeight;
                 case PartModel.Axe2Handed:
@@ -140,6 +161,8 @@ namespace Game.Presentation.Pure
                     return BarbarianPackWidth;
                 case PartModel.Rogue:
                     return RoguePackWidth;
+                case PartModel.Mage:
+                    return MagePackWidth;
                 case PartModel.Sword1Handed:
                     return Sword1HandedPackWidth;
                 case PartModel.Axe2Handed:
@@ -163,6 +186,8 @@ namespace Game.Presentation.Pure
                     return BarbarianPackDepth;
                 case PartModel.Rogue:
                     return RoguePackDepth;
+                case PartModel.Mage:
+                    return MagePackDepth;
                 case PartModel.Sword1Handed:
                     return Sword1HandedPackDepth;
                 case PartModel.Axe2Handed:
@@ -186,6 +211,8 @@ namespace Game.Presentation.Pure
                     return BarbarianPackBase;
                 case PartModel.Rogue:
                     return RoguePackBase;
+                case PartModel.Mage:
+                    return MagePackBase;
                 case PartModel.Sword1Handed:
                     return Sword1HandedPackBase;
                 case PartModel.Axe2Handed:
@@ -194,6 +221,23 @@ namespace Game.Presentation.Pure
                     return StaffPackBase;
                 case PartModel.Sword2Handed:
                     return Sword2HandedPackBase;
+                default:
+                    throw Stranger(model);
+            }
+        }
+
+        public static float PackTurnOf(PartModel model)
+        {
+            switch (model)
+            {
+                case PartModel.Knight:
+                    return KnightPackTurn;
+                case PartModel.Barbarian:
+                    return BarbarianPackTurn;
+                case PartModel.Rogue:
+                    return RoguePackTurn;
+                case PartModel.Mage:
+                    return MagePackTurn;
                 default:
                     throw Stranger(model);
             }
