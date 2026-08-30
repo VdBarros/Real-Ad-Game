@@ -206,6 +206,64 @@ namespace Game.Presentation.Pure
             }
         }
 
+        public static float MountRollOf(PartModel model)
+        {
+            return Of(model) == ArtPack.Weapons ? WeaponsPack.MountRollOf(model) : 0f;
+        }
+
+        public static float MountTurnOf(PartModel model)
+        {
+            return Of(model) == ArtPack.Weapons ? WeaponsPack.MountTurnOf(model) : 0f;
+        }
+
+        public static float MountedPackWidthOf(PartModel model)
+        {
+            return Of(model) == ArtPack.Weapons
+                ? WeaponsPack.MountedPackWidthOf(model)
+                : PackWidthOf(model);
+        }
+
+        public static float MountedPackHeightOf(PartModel model)
+        {
+            return Of(model) == ArtPack.Weapons
+                ? WeaponsPack.MountedPackHeightOf(model)
+                : PackHeightOf(model);
+        }
+
+        public static float MountedPackDepthOf(PartModel model)
+        {
+            return Of(model) == ArtPack.Weapons
+                ? WeaponsPack.MountedPackDepthOf(model)
+                : PackDepthOf(model);
+        }
+
+        public static float MountedPackBaseOf(PartModel model)
+        {
+            return Of(model) == ArtPack.Weapons
+                ? WeaponsPack.MountedPackBaseOf(model)
+                : PackBaseOf(model);
+        }
+
+        public static float MountedWidthOf(PartModel model)
+        {
+            return MountedPackWidthOf(model) * ImportScaleFor(model);
+        }
+
+        public static float MountedHeightOf(PartModel model)
+        {
+            return MountedPackHeightOf(model) * ImportScaleFor(model);
+        }
+
+        public static float MountedDepthOf(PartModel model)
+        {
+            return MountedPackDepthOf(model) * ImportScaleFor(model);
+        }
+
+        public static float MountedBaseOf(PartModel model)
+        {
+            return MountedPackBaseOf(model) * ImportScaleFor(model);
+        }
+
         public static float HeightOf(PartModel model)
         {
             return PackHeightOf(model) * ImportScaleFor(model);

@@ -17,7 +17,7 @@ namespace Game.Presentation.Pure
             FigureAct.Kick,
             FigureAct.Slice,
             FigureAct.Cleave,
-            FigureAct.Thrust,
+            FigureAct.Loose,
             FigureAct.Sweep,
             FigureAct.Fall
         };

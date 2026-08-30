@@ -498,10 +498,15 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EveryCastFigureHidesLessGroundThanTheCapsuleItReplacesAtEveryBand()
+        public void EveryAdversaryHidesLessGroundThanTheCapsuleItReplacesAtEveryBand()
         {
             foreach (var role in CharacterCast.Roles)
             {
+                if (role == PartStyle.Start)
+                {
+                    continue;
+                }
+
                 var basis = role == PartStyle.Boss
                     ? LevelBlueprintBuilder.BossScale
                     : LevelBlueprintBuilder.FigureScale;
@@ -523,6 +528,50 @@ namespace Game.Domain.Tests
                                 IsoProjection.SightReach(FigureFit.StandingHeight(PartModel.None, scale))),
                             where);
                     }
+                }
+            }
+        }
+
+        [Test]
+        public void TheCapsuleOcclusionBudgetIsAnAdversaryPropertyTheHeroAlreadyStandsOutsideOf()
+        {
+            var scale = LevelBlueprintBuilder.FigureScale;
+            var capsule = FigureFit.HiddenGroundOf(PartModel.None, scale);
+            var square = new List<string>();
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                var mesh = PlayerKit.BodyOf(guise);
+                var turned = FigureFit.TileReachOf(mesh, scale)
+                    * IsoProjection.SightReach(FigureFit.StandingHeight(mesh, scale));
+
+                Assert.That(
+                    turned,
+                    Is.GreaterThan(capsule),
+                    guise + " stands inside the budget its adversaries answer to, so the hero could be "
+                    + "held to it after all");
+
+                square.Add(guise + " hides " + FigureFit.HiddenGroundOf(mesh, scale).ToString("0.#####")
+                    + " squared on, " + turned.ToString("0.#####") + " turned, against the capsule's "
+                    + capsule.ToString("0.#####"));
+            }
+
+            Assert.That(square.Count, Is.EqualTo(PlayerGuises.Count), string.Join("; ", square.ToArray()));
+
+            foreach (var role in CharacterCast.Roles)
+            {
+                if (role == PartStyle.Start)
+                {
+                    continue;
+                }
+
+                foreach (var mesh in CharacterCast.MeshesOf(role))
+                {
+                    Assert.That(
+                        FigureFit.TileReachOf(mesh, scale)
+                            * IsoProjection.SightReach(FigureFit.StandingHeight(mesh, scale)),
+                        Is.LessThan(capsule),
+                        role + " wearing " + mesh);
                 }
             }
         }

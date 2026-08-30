@@ -15,7 +15,10 @@ namespace Game.Presentation.Pure
 
         public const string CombatMelee = "Rig_Medium_CombatMelee";
 
-        static readonly string[] assets = { General, MovementBasic, MovementAdvanced, CombatMelee };
+        public const string CombatRanged = "Rig_Medium_CombatRanged";
+
+        static readonly string[] assets =
+            { General, MovementBasic, MovementAdvanced, CombatMelee, CombatRanged };
 
         public static IReadOnlyList<string> Assets
         {
@@ -63,9 +66,10 @@ namespace Game.Presentation.Pure
                 case FigureAct.Kick:
                 case FigureAct.Slice:
                 case FigureAct.Cleave:
-                case FigureAct.Thrust:
                 case FigureAct.Sweep:
                     return CombatMelee;
+                case FigureAct.Loose:
+                    return CombatRanged;
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(act), act, "No animation set carries a clip for that act.");
