@@ -939,8 +939,8 @@ namespace Game.EditorTooling
                 Debug.LogError("A tap on node " + second + " mid-walk stopped the walker dead.");
             }
 
-            var predicted = ActionResolver.Along(
-                breakingOff, NavigationMap.Of(breakingOff).RouteTo(second)).State;
+            var predicted = Journey.LeftAlone(
+                ActionResolver.Along(breakingOff, NavigationMap.Of(breakingOff).RouteTo(second)));
 
             Ran(rig, builder, walker, lens);
             walker.Finished -= once;
@@ -1008,8 +1008,8 @@ namespace Game.EditorTooling
 
             walker.WalkTo(away);
 
-            var predicted = ActionResolver.Along(
-                breakingOff, NavigationMap.Of(breakingOff).RouteTo(away)).State;
+            var predicted = Journey.LeftAlone(
+                ActionResolver.Along(breakingOff, NavigationMap.Of(breakingOff).RouteTo(away)));
 
             Ran(rig, builder, walker, lens);
             walker.Finished -= once;
@@ -1152,8 +1152,9 @@ namespace Game.EditorTooling
                 Debug.LogError(
                     "Breaking off toward node " + target + " ended on node " + walker.Run.PositionNodeId
                     + " at power " + walker.Run.Power + " where setting out from node "
-                    + breakingOff.PositionNodeId + " at power " + breakingOff.Power + " gives node "
-                    + predicted.PositionNodeId + " at power " + predicted.Power + ".");
+                    + breakingOff.PositionNodeId + " at power " + breakingOff.Power
+                    + " and letting it run gives node " + predicted.PositionNodeId
+                    + " at power " + predicted.Power + ".");
             }
         }
 
@@ -1484,19 +1485,25 @@ namespace Game.EditorTooling
                 }
             }
 
-            if (!state.Equals(predicted.State))
+            var settling = Journey.LeftAlone(predicted);
+
+            if (!state.Equals(settling))
             {
                 Debug.LogError(
                     "The walk arrived at power " + state.Power + " on node " + state.PositionNodeId
-                    + " where the resolver predicted power " + predicted.State.Power
-                    + " on node " + predicted.State.PositionNodeId + ".");
+                    + " where a walk nothing breaks off ends at power " + settling.Power
+                    + " on node " + settling.PositionNodeId + ".");
             }
 
             return string.Format(
                 CultureInfo.InvariantCulture,
-                " ({0} resolved, ending {1})",
+                " ({0} resolved, ending {1}{2})",
                 arrivals.Count,
-                predicted.Outcome);
+                predicted.Outcome,
+                settling.Power < predicted.State.Power
+                    ? ", drained from " + predicted.State.Power.ToString(CultureInfo.InvariantCulture)
+                        + " to " + settling.Power.ToString(CultureInfo.InvariantCulture)
+                    : string.Empty);
         }
 
         static string Photograph(Camera lens, string path, string leg, WorldBuilder builder, Walker walker)
