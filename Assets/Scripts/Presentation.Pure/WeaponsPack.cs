@@ -26,14 +26,6 @@ namespace Game.Presentation.Pure
 
         public const float AxeBPackBase = -0.41285f;
 
-        public const float StaffAPackHeight = 2.14938f;
-
-        public const float StaffAPackWidth = 0.12486f;
-
-        public const float StaffAPackDepth = 0.11146f;
-
-        public const float StaffAPackBase = -1.07469f;
-
         public const float StaffBPackHeight = 2.31593f;
 
         public const float StaffBPackWidth = 0.61694f;
@@ -68,7 +60,6 @@ namespace Game.Presentation.Pure
             {
                 case PartModel.SwordA:
                 case PartModel.AxeB:
-                case PartModel.StaffA:
                 case PartModel.StaffB:
                 case PartModel.BowA:
                     return true;
@@ -131,8 +122,6 @@ namespace Game.Presentation.Pure
                     return SwordAPackHeight;
                 case PartModel.AxeB:
                     return AxeBPackHeight;
-                case PartModel.StaffA:
-                    return StaffAPackHeight;
                 case PartModel.StaffB:
                     return StaffBPackHeight;
                 case PartModel.BowA:
@@ -150,8 +139,6 @@ namespace Game.Presentation.Pure
                     return SwordAPackWidth;
                 case PartModel.AxeB:
                     return AxeBPackWidth;
-                case PartModel.StaffA:
-                    return StaffAPackWidth;
                 case PartModel.StaffB:
                     return StaffBPackWidth;
                 case PartModel.BowA:
@@ -169,8 +156,6 @@ namespace Game.Presentation.Pure
                     return SwordAPackDepth;
                 case PartModel.AxeB:
                     return AxeBPackDepth;
-                case PartModel.StaffA:
-                    return StaffAPackDepth;
                 case PartModel.StaffB:
                     return StaffBPackDepth;
                 case PartModel.BowA:
@@ -188,8 +173,6 @@ namespace Game.Presentation.Pure
                     return SwordAPackBase;
                 case PartModel.AxeB:
                     return AxeBPackBase;
-                case PartModel.StaffA:
-                    return StaffAPackBase;
                 case PartModel.StaffB:
                     return StaffBPackBase;
                 case PartModel.BowA:

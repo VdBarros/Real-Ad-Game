@@ -445,7 +445,7 @@ namespace Game.Domain.Tests
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (!AdventurerPack.Wields(model) && !WeaponsPack.Wields(model))
+                if (!WeaponsPack.Wields(model))
                 {
                     continue;
                 }
@@ -467,17 +467,14 @@ namespace Game.Domain.Tests
             {
                 var mounted = PlayerKit.ModelOf(PlayerKit.WeaponOf(tier));
 
-                Assert.That(
-                    AdventurerPack.Wields(mounted) || WeaponsPack.Wields(mounted),
-                    Is.True,
-                    mounted.ToString());
+                Assert.That(WeaponsPack.Wields(mounted), Is.True, mounted.ToString());
             }
 
             foreach (var role in CharacterCast.Roles)
             {
                 foreach (var mesh in CharacterCast.MeshesOf(role))
                 {
-                    Assert.That(AdventurerPack.Wields(mesh), Is.False, role + " wears " + mesh);
+                    Assert.That(WeaponsPack.Wields(mesh), Is.False, role + " wears " + mesh);
                     Assert.That(ArtPacks.ShipsWithTheCast(mesh), Is.True, role + " wears " + mesh);
                     Assert.That(ArtPacks.IsRiggedCharacter(mesh), Is.True, role + " wears " + mesh);
                 }

@@ -57,7 +57,6 @@ namespace Game.Presentation.Pure
             switch (Of(model))
             {
                 case ArtPack.Adventurers:
-                    return !AdventurerPack.Wields(model);
                 case ArtPack.Skeletons:
                     return true;
                 default:

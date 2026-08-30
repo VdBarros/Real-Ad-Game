@@ -1490,7 +1490,7 @@ namespace Game.EditorTooling
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (!AdventurerPack.Wields(model) && !WeaponsPack.Wields(model))
+                if (!WeaponsPack.Wields(model))
                 {
                     continue;
                 }

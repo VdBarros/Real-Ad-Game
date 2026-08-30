@@ -24,13 +24,8 @@ namespace Game.Presentation.Pure
         SkeletonRogue,
         SkeletonWarrior,
         SkeletonMage,
-        Sword1Handed,
-        Axe2Handed,
-        Staff,
-        Sword2Handed,
         SwordA,
         AxeB,
-        StaffA,
         StaffB,
         BowA
     }
