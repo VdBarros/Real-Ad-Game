@@ -41,8 +41,6 @@ namespace Game.EditorTooling
 
         static readonly int[] Ladder = { 9, 47, 615, 4200 };
 
-        static bool lit;
-
         public static void Check()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -333,11 +331,7 @@ namespace Game.EditorTooling
 
         static void Film(WorldPoint centre, string path)
         {
-            if (!lit)
-            {
-                PreviewFilm.Sun();
-                lit = true;
-            }
+            PreviewFilm.Sun();
 
             var camera = PreviewFilm.Rig(
                 new Vector3(centre.X, centre.Y, centre.Z), IsoProjection.CameraBack, LevelFraming.PlaySize);

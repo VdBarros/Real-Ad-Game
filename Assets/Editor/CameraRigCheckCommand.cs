@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Game.Domain;
+using Game.Flow;
 using Game.Presentation;
 using Game.Presentation.Pure;
 using UnityEditor.SceneManagement;
@@ -38,6 +39,8 @@ namespace Game.EditorTooling
         const float ProbeTolerance = 0.03f;
 
         const float LeastVoidShare = 0.1f;
+
+        const float SunAngleTolerance = 0.01f;
 
         public static void Check()
         {
@@ -354,10 +357,44 @@ namespace Game.EditorTooling
             rig.Skip();
             report.Append("\n  a tap leaves the rig ").Append(rig.IsBusy ? "busy" : "free");
 
+            TheHarnessPhotographsUnderTheOneSunTheBuildRaises(report);
+
             Debug.Log(report.ToString());
 
             WorldObjects.Destroy(root);
             builder.Dispose();
+        }
+
+        static void TheHarnessPhotographsUnderTheOneSunTheBuildRaises(StringBuilder report)
+        {
+            var sun = PreviewFilm.Sunlight();
+            var risen = PreviewFilm.SunsUp();
+            var apart = Quaternion.Angle(sun.transform.rotation, GameBoot.SunAngle);
+            var lighting = risen + (risen == 1 ? " directional light" : " directional lights");
+
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  a second call for the sun leaves the frame lit by {0},"
+                + " at {1:0.###} against the build's {2:0.###}, {3:0.###} degrees off its angle",
+                lighting,
+                sun.intensity,
+                GameBoot.SunStrength,
+                apart);
+
+            if (risen != 1)
+            {
+                Debug.LogError(
+                    "The harness photographs under " + risen
+                    + " directional lights where the build raises one, so every tone it measures is"
+                    + " measured under lighting the game never ships.");
+            }
+
+            if (!Mathf.Approximately(sun.intensity, GameBoot.SunStrength) || apart > SunAngleTolerance)
+            {
+                Debug.LogError(
+                    "The harness sun burns at " + sun.intensity + " and sits " + apart
+                    + " degrees off the " + GameBoot.SunStrength + " the build raises.");
+            }
         }
 
         static void TheRigStandsTheWorldInARoomOfItsOwn(CameraRig rig, Camera lens, StringBuilder report)

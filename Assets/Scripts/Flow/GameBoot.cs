@@ -9,9 +9,9 @@ namespace Game.Flow
     {
         public const string SunName = "GameSun";
 
-        static readonly Quaternion SunAngle = Quaternion.Euler(50f, 200f, 0f);
+        public static readonly Quaternion SunAngle = Quaternion.Euler(50f, 200f, 0f);
 
-        const float SunStrength = 1.6f;
+        public const float SunStrength = 1.6f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         public static void Open()
