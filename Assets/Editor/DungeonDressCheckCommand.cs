@@ -201,7 +201,7 @@ namespace Game.EditorTooling
 
                 var shipsWithTheCast = ArtPacks.ShipsWithTheCast(model);
                 var settled = importer.materialImportMode == ModelImporterMaterialImportMode.None
-                    && importer.importAnimation == shipsWithTheCast
+                    && importer.importAnimation == CharacterArtPostprocessor.Animated(path)
                     && importer.animationType == (shipsWithTheCast
                         ? CharacterArtPostprocessor.Rig
                         : ModelImporterAnimationType.None)

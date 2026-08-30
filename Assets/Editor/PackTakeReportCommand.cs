@@ -71,6 +71,7 @@ namespace Game.EditorTooling
 
         static void Takes(ModelImporter importer, StringBuilder report)
         {
+            var table = CharacterArtPostprocessor.TableFor(importer.assetPath);
             var takes = importer.importedTakeInfos;
             if (takes == null || takes.Length == 0)
             {
@@ -90,7 +91,7 @@ namespace Game.EditorTooling
                     take.sampleRate,
                     Math.Round(take.startTime * take.sampleRate),
                     Math.Round(take.stopTime * take.sampleRate),
-                    AdventurerClips.Wants(take.name)));
+                    table != null && table.Wants(take.name)));
             }
         }
 
