@@ -8,6 +8,8 @@ namespace Game.Presentation.Pure
 
         public const float UprightRoll = 90f;
 
+        public const float UprightTurn = 90f;
+
         public const float SwordAPackHeight = 1.77386f;
 
         public const float SwordAPackWidth = 0.60775f;
@@ -48,6 +50,8 @@ namespace Game.Presentation.Pure
 
         public const float BowAPackBase = -0.04582f;
 
+        public const float BowAPackLeft = -0.97873f;
+
         public static float ImportScale
         {
             get { return IsoProjection.TileEdge / GridUnits; }
@@ -81,6 +85,42 @@ namespace Game.Presentation.Pure
         public static float MountRollOf(PartModel model)
         {
             return LiesFlat(model) ? UprightRoll : 0f;
+        }
+
+        public static float MountTurnOf(PartModel model)
+        {
+            return LiesFlat(model) ? UprightTurn : 0f;
+        }
+
+        public static float PackLeftOf(PartModel model)
+        {
+            switch (model)
+            {
+                case PartModel.BowA:
+                    return BowAPackLeft;
+                default:
+                    throw Upright(model);
+            }
+        }
+
+        public static float MountedPackWidthOf(PartModel model)
+        {
+            return LiesFlat(model) ? PackDepthOf(model) : PackWidthOf(model);
+        }
+
+        public static float MountedPackHeightOf(PartModel model)
+        {
+            return LiesFlat(model) ? PackWidthOf(model) : PackHeightOf(model);
+        }
+
+        public static float MountedPackDepthOf(PartModel model)
+        {
+            return LiesFlat(model) ? PackHeightOf(model) : PackDepthOf(model);
+        }
+
+        public static float MountedPackBaseOf(PartModel model)
+        {
+            return LiesFlat(model) ? PackLeftOf(model) : PackBaseOf(model);
         }
 
         public static float PackHeightOf(PartModel model)
@@ -183,6 +223,13 @@ namespace Game.Presentation.Pure
         {
             return new ArgumentOutOfRangeException(
                 nameof(model), model, "The weapons pack carries no mesh for that part model.");
+        }
+
+        static ArgumentOutOfRangeException Upright(PartModel model)
+        {
+            return new ArgumentOutOfRangeException(
+                nameof(model), model, "Only a mesh the pack authors lying flat is measured from its left "
+                + "edge, because only a rolled mount stands that edge up.");
         }
     }
 }

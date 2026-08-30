@@ -183,25 +183,91 @@ namespace Game.Domain.Tests
                 }
 
                 var authored = ArtPacks.WidthOf(model) * PlayerKit.StandingPerImportUnit;
-                var upright = ArtPacks.HeightOf(model) * PlayerKit.StandingPerImportUnit;
+                var mounted = ArtPacks.MountedWidthOf(model) * PlayerKit.StandingPerImportUnit;
 
                 if (!WeaponsPack.LiesFlat(model))
                 {
                     Assert.That(WeaponsPack.MountRollOf(model), Is.EqualTo(0f), model.ToString());
+                    Assert.That(WeaponsPack.MountTurnOf(model), Is.EqualTo(0f), model.ToString());
                     Assert.That(authored, Is.LessThan(WeaponStow.Shoulders), model.ToString());
+                    Assert.That(
+                        ArtPacks.MountedWidthOf(model),
+                        Is.EqualTo(ArtPacks.WidthOf(model)),
+                        model.ToString());
+                    Assert.That(
+                        ArtPacks.MountedHeightOf(model),
+                        Is.EqualTo(ArtPacks.HeightOf(model)),
+                        model.ToString());
+                    Assert.That(
+                        ArtPacks.MountedDepthOf(model),
+                        Is.EqualTo(ArtPacks.DepthOf(model)),
+                        model.ToString());
+                    Assert.That(
+                        ArtPacks.MountedBaseOf(model),
+                        Is.EqualTo(ArtPacks.BaseOf(model)),
+                        model.ToString());
+                    Assert.That(
+                        () => WeaponsPack.PackLeftOf(model),
+                        Throws.InstanceOf<ArgumentOutOfRangeException>(),
+                        model.ToString());
                     continue;
                 }
 
                 flat++;
 
                 Assert.That(WeaponsPack.MountRollOf(model), Is.EqualTo(WeaponsPack.UprightRoll));
+                Assert.That(WeaponsPack.MountTurnOf(model), Is.EqualTo(WeaponsPack.UprightTurn));
                 Assert.That(authored, Is.GreaterThan(WeaponStow.Shoulders), model.ToString());
-                Assert.That(upright, Is.LessThan(WeaponStow.Shoulders), model.ToString());
+                Assert.That(mounted, Is.LessThan(WeaponStow.Shoulders), model.ToString());
                 Assert.That(
                     ArtPacks.HeightOf(model), Is.LessThan(ArtPacks.WidthOf(model)), model.ToString());
+
+                Assert.That(ArtPacks.MountedHeightOf(model), Is.EqualTo(ArtPacks.WidthOf(model)));
+                Assert.That(ArtPacks.MountedWidthOf(model), Is.EqualTo(ArtPacks.DepthOf(model)));
+                Assert.That(ArtPacks.MountedDepthOf(model), Is.EqualTo(ArtPacks.HeightOf(model)));
+                Assert.That(
+                    ArtPacks.MountedBaseOf(model),
+                    Is.EqualTo(WeaponsPack.PackLeftOf(model) * WeaponsPack.ImportScale).Within(1e-6f));
             }
 
             Assert.That(flat, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TheMeshThePackAuthorsLyingFlatIsTheOnlyOneAMountTurnsAtAll()
+        {
+            var turned = 0;
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (model == PartModel.None || !ArtPacks.ShipsWithTheCast(model))
+                {
+                    continue;
+                }
+
+                if (ArtPacks.MountRollOf(model) == 0f && ArtPacks.MountTurnOf(model) == 0f)
+                {
+                    continue;
+                }
+
+                turned++;
+                Assert.That(WeaponsPack.LiesFlat(model), Is.True, model.ToString());
+            }
+
+            Assert.That(turned, Is.EqualTo(1));
+
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            {
+                var model = PlayerKit.ModelOf(PlayerKit.WeaponOf(tier));
+                var diagonal = ArtPacks.MountedWidthOf(model) * ArtPacks.MountedWidthOf(model)
+                    + ArtPacks.MountedHeightOf(model) * ArtPacks.MountedHeightOf(model)
+                    + ArtPacks.MountedDepthOf(model) * ArtPacks.MountedDepthOf(model);
+                var authored = ArtPacks.WidthOf(model) * ArtPacks.WidthOf(model)
+                    + ArtPacks.HeightOf(model) * ArtPacks.HeightOf(model)
+                    + ArtPacks.DepthOf(model) * ArtPacks.DepthOf(model);
+
+                Assert.That(diagonal, Is.EqualTo(authored).Within(1e-6f), model.ToString());
+            }
         }
 
         [Test]

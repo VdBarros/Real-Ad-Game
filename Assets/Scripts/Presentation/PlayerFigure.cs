@@ -309,11 +309,15 @@ namespace Game.Presentation
                 return;
             }
 
+            var mesh = PlayerKit.ModelOf(gripped);
+            var roll = ArtPacks.MountRollOf(mesh);
+            var turn = ArtPacks.MountTurnOf(mesh);
+
             if (!stowed)
             {
                 held.transform.SetParent(Grip(), worldPositionStays: false);
                 held.transform.localPosition = Vector3.zero;
-                held.transform.localRotation = Quaternion.identity;
+                held.transform.localEulerAngles = new Vector3(0f, turn, roll);
                 held.transform.localScale = Vector3.one;
                 return;
             }
@@ -321,7 +325,8 @@ namespace Game.Presentation
             held.transform.SetParent(transform, worldPositionStays: true);
             held.transform.localPosition =
                 Vector(WeaponStow.PoseOf(guise, gripped, RestYaw)) * CapsuleUnit;
-            held.transform.localEulerAngles = new Vector3(0f, WeaponStow.LocalYaw(RestYaw), 0f);
+            held.transform.localEulerAngles =
+                new Vector3(0f, WeaponStow.LocalYaw(RestYaw) + turn, roll);
         }
 
         Transform Grip()

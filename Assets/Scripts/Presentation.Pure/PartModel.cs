@@ -18,6 +18,7 @@ namespace Game.Presentation.Pure
         SwordShield,
         Knight,
         Barbarian,
+        Rogue,
         SkeletonMinion,
         SkeletonRogue,
         SkeletonWarrior,

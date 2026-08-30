@@ -12,7 +12,7 @@ namespace Game.Presentation.Pure
         Kick,
         Slice,
         Cleave,
-        Thrust,
+        Loose,
         Sweep,
         Fall
     }

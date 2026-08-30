@@ -36,7 +36,7 @@ namespace Game.EditorTooling
 
         public override uint GetVersion()
         {
-            return 8;
+            return 10;
         }
 
         public static bool IsAnimationSet(string path)
