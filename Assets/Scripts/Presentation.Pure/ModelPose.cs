@@ -33,13 +33,8 @@ namespace Game.Presentation.Pure
                 case PartModel.SkeletonWarrior:
                 case PartModel.SkeletonMage:
                     return Standing(part);
-                case PartModel.Sword1Handed:
-                case PartModel.Axe2Handed:
-                case PartModel.Staff:
-                case PartModel.Sword2Handed:
                 case PartModel.SwordA:
                 case PartModel.AxeB:
-                case PartModel.StaffA:
                 case PartModel.StaffB:
                 case PartModel.BowA:
                 case PartModel.None:
@@ -71,13 +66,8 @@ namespace Game.Presentation.Pure
                         part.Rotation.X,
                         part.Rotation.Y + ArtPacks.FacingOf(part.Model),
                         part.Rotation.Z);
-                case PartModel.Sword1Handed:
-                case PartModel.Axe2Handed:
-                case PartModel.Staff:
-                case PartModel.Sword2Handed:
                 case PartModel.SwordA:
                 case PartModel.AxeB:
-                case PartModel.StaffA:
                 case PartModel.StaffB:
                 case PartModel.BowA:
                 case PartModel.None:
@@ -129,13 +119,8 @@ namespace Game.Presentation.Pure
                 case PartModel.SkeletonWarrior:
                 case PartModel.SkeletonMage:
                     return Sized(part);
-                case PartModel.Sword1Handed:
-                case PartModel.Axe2Handed:
-                case PartModel.Staff:
-                case PartModel.Sword2Handed:
                 case PartModel.SwordA:
                 case PartModel.AxeB:
-                case PartModel.StaffA:
                 case PartModel.StaffB:
                 case PartModel.BowA:
                 case PartModel.None:

@@ -64,38 +64,6 @@ namespace Game.Presentation.Pure
 
         public const float MagePackTurn = 2.16179f;
 
-        public const float Sword1HandedPackHeight = 1.77526f;
-
-        public const float Sword1HandedPackWidth = 0.50344f;
-
-        public const float Sword1HandedPackDepth = 0.13063f;
-
-        public const float Sword1HandedPackBase = -0.36577f;
-
-        public const float Axe2HandedPackHeight = 1.72463f;
-
-        public const float Axe2HandedPackWidth = 1.23955f;
-
-        public const float Axe2HandedPackDepth = 0.2618f;
-
-        public const float Axe2HandedPackBase = -0.43298f;
-
-        public const float StaffPackHeight = 2.1547f;
-
-        public const float StaffPackWidth = 0.57621f;
-
-        public const float StaffPackDepth = 0.29235f;
-
-        public const float StaffPackBase = -0.90045f;
-
-        public const float Sword2HandedPackHeight = 2.3658f;
-
-        public const float Sword2HandedPackWidth = 0.83903f;
-
-        public const float Sword2HandedPackDepth = 0.24802f;
-
-        public const float Sword2HandedPackBase = -0.40136f;
-
         public const float StandingPerPackUnit = StandingScales / KnightPackHeight;
 
         public static float ImportScale
@@ -108,22 +76,7 @@ namespace Game.Presentation.Pure
             return model == PartModel.Knight
                 || model == PartModel.Barbarian
                 || model == PartModel.Rogue
-                || model == PartModel.Mage
-                || Wields(model);
-        }
-
-        public static bool Wields(PartModel model)
-        {
-            switch (model)
-            {
-                case PartModel.Sword1Handed:
-                case PartModel.Axe2Handed:
-                case PartModel.Staff:
-                case PartModel.Sword2Handed:
-                    return true;
-                default:
-                    return false;
-            }
+                || model == PartModel.Mage;
         }
 
         public static float PackHeightOf(PartModel model)
@@ -138,14 +91,6 @@ namespace Game.Presentation.Pure
                     return RoguePackHeight;
                 case PartModel.Mage:
                     return MagePackHeight;
-                case PartModel.Sword1Handed:
-                    return Sword1HandedPackHeight;
-                case PartModel.Axe2Handed:
-                    return Axe2HandedPackHeight;
-                case PartModel.Staff:
-                    return StaffPackHeight;
-                case PartModel.Sword2Handed:
-                    return Sword2HandedPackHeight;
                 default:
                     throw Stranger(model);
             }
@@ -163,14 +108,6 @@ namespace Game.Presentation.Pure
                     return RoguePackWidth;
                 case PartModel.Mage:
                     return MagePackWidth;
-                case PartModel.Sword1Handed:
-                    return Sword1HandedPackWidth;
-                case PartModel.Axe2Handed:
-                    return Axe2HandedPackWidth;
-                case PartModel.Staff:
-                    return StaffPackWidth;
-                case PartModel.Sword2Handed:
-                    return Sword2HandedPackWidth;
                 default:
                     throw Stranger(model);
             }
@@ -188,14 +125,6 @@ namespace Game.Presentation.Pure
                     return RoguePackDepth;
                 case PartModel.Mage:
                     return MagePackDepth;
-                case PartModel.Sword1Handed:
-                    return Sword1HandedPackDepth;
-                case PartModel.Axe2Handed:
-                    return Axe2HandedPackDepth;
-                case PartModel.Staff:
-                    return StaffPackDepth;
-                case PartModel.Sword2Handed:
-                    return Sword2HandedPackDepth;
                 default:
                     throw Stranger(model);
             }
@@ -213,14 +142,6 @@ namespace Game.Presentation.Pure
                     return RoguePackBase;
                 case PartModel.Mage:
                     return MagePackBase;
-                case PartModel.Sword1Handed:
-                    return Sword1HandedPackBase;
-                case PartModel.Axe2Handed:
-                    return Axe2HandedPackBase;
-                case PartModel.Staff:
-                    return StaffPackBase;
-                case PartModel.Sword2Handed:
-                    return Sword2HandedPackBase;
                 default:
                     throw Stranger(model);
             }

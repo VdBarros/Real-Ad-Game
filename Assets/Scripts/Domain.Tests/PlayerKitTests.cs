@@ -354,10 +354,7 @@ namespace Game.Domain.Tests
             {
                 var mounted = PlayerKit.ModelOf(PlayerKit.WeaponOf(tier));
 
-                Assert.That(
-                    AdventurerPack.Wields(mounted) || WeaponsPack.Wields(mounted),
-                    Is.True,
-                    mounted.ToString());
+                Assert.That(WeaponsPack.Wields(mounted), Is.True, mounted.ToString());
             }
 
             Assert.That(PlayerKit.CapeOf(PlayerKit.CloakFrom), Is.Not.Empty);
