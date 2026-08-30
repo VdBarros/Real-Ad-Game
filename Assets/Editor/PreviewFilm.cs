@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.IO;
 using Game.Flow;
+using Game.Presentation;
 using Game.Presentation.Pure;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -9,6 +11,8 @@ namespace Game.EditorTooling
     public static class PreviewFilm
     {
         public const string SunName = "PreviewSun";
+
+        const float BandTolerance = 0.001f;
 
         public static void Shoot(Camera camera, string path)
         {
@@ -88,8 +92,83 @@ namespace Game.EditorTooling
         public static void Sun()
         {
             Sunlight();
-            RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.34f, 0.34f, 0.34f);
+            Room();
+        }
+
+        public static void Room()
+        {
+            WorldBackdrop.Room();
+        }
+
+        public static string RoomAsPhotographed()
+        {
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} ambient from {1} sky through {2} to {3} ground, reflection {4:0.###} off {5}, fog {6}",
+                RenderSettings.ambientMode,
+                Lit(RenderSettings.ambientSkyColor),
+                Lit(RenderSettings.ambientEquatorColor),
+                Lit(RenderSettings.ambientGroundColor),
+                RenderSettings.reflectionIntensity,
+                RenderSettings.skybox == null ? "no skybox" : RenderSettings.skybox.name,
+                RenderSettings.fog ? "on" : "off");
+        }
+
+        public static string RoomApartFromTheBuild()
+        {
+            if (RenderSettings.skybox != null)
+            {
+                return "the scene still carries the skybox " + RenderSettings.skybox.name
+                    + ", which lights and reflects off every pack material";
+            }
+
+            if (RenderSettings.customReflectionTexture != null)
+            {
+                return "the scene reflects off a cubemap the dungeon never stood in";
+            }
+
+            if (RenderSettings.reflectionIntensity > Backdrop.ReflectionStrength)
+            {
+                return "a reflection probe still washes the pack materials at "
+                    + RenderSettings.reflectionIntensity.ToString("0.###", CultureInfo.InvariantCulture)
+                    + " strength";
+            }
+
+            if (RenderSettings.fog)
+            {
+                return "fog stands between the camera and everything it photographs";
+            }
+
+            if (RenderSettings.ambientMode != AmbientMode.Trilight)
+            {
+                return "ambient runs on " + RenderSettings.ambientMode
+                    + " rather than the three-band room the rig sets, so unlit faces read flat";
+            }
+
+            return BandApart("sky", RenderSettings.ambientSkyColor, Backdrop.AmbientSky)
+                ?? BandApart("equator", RenderSettings.ambientEquatorColor, Backdrop.AmbientEquator)
+                ?? BandApart("ground", RenderSettings.ambientGroundColor, Backdrop.AmbientGround);
+        }
+
+        static string BandApart(string band, Color live, Tint wanted)
+        {
+            var lit = Lit(live);
+            var apart = Mathf.Max(
+                Mathf.Abs(lit.Red - wanted.Red),
+                Mathf.Max(Mathf.Abs(lit.Green - wanted.Green), Mathf.Abs(lit.Blue - wanted.Blue)));
+
+            if (apart <= BandTolerance)
+            {
+                return null;
+            }
+
+            return "the " + band + " ambient lights the frame at " + lit + " rather than the "
+                + wanted + " the build ships";
+        }
+
+        static Tint Lit(Color colour)
+        {
+            return new Tint(colour.r, colour.g, colour.b);
         }
 
         public static Light Sunlight()
