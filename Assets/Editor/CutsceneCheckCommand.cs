@@ -41,6 +41,7 @@ namespace Game.EditorTooling
             public int Carriers;
             public int BadgeTextures;
             public int WorldMaterials;
+            public List<string> WorldMaterialNames = new List<string>();
             public int Samples;
             public int PackWorn;
             public int PackParts;
@@ -846,11 +847,14 @@ namespace Game.EditorTooling
                     + first.BadgeTextures + ".");
             }
 
-            if (first.WorldMaterials > Enum.GetValues(typeof(PartStyle)).Length)
+            var strays = MintedAssets.StraysAmong(first.WorldMaterialNames);
+
+            if (strays.Length != 0)
             {
                 Fail(
                     "A handoff settles on " + first.WorldMaterials
-                    + " world materials where a style is coloured at most once.");
+                    + " world materials, and a style is coloured at most once, but it holds " + strays
+                    + ".");
             }
         }
 
@@ -871,7 +875,8 @@ namespace Game.EditorTooling
         {
             run.Carriers = Live().Count;
             run.BadgeTextures = Counted<Texture2D>(BadgeAssets.NamePrefix);
-            run.WorldMaterials = Counted<Material>(Presentation.WorldMaterials.NamePrefix);
+            run.WorldMaterialNames = MintedAssets.WorldMaterialNames();
+            run.WorldMaterials = run.WorldMaterialNames.Count;
         }
 
         static string Report(List<Run> runs)

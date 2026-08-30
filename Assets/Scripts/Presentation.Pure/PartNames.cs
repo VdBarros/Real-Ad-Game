@@ -29,6 +29,20 @@ namespace Game.Presentation.Pure
             return name != null && name.StartsWith(WorldPrefix, StringComparison.Ordinal);
         }
 
+        public const string GhostPrefix = "Ghost_";
+
+        public const string FadingPrefix = "Fading_";
+
+        public static string Ghosted(string worn)
+        {
+            return GhostPrefix + worn;
+        }
+
+        public static string Fading(string solid)
+        {
+            return FadingPrefix + solid;
+        }
+
         public const string TrailGroup = "Trail";
 
         public const string OrbGroup = "Orbs";

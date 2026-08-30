@@ -5,11 +5,12 @@ using UnityEngine.Rendering;
 
 namespace Game.Presentation
 {
+    [ExecuteAlways]
     public sealed class PickupProp : MonoBehaviour
     {
         public const string LidNode = "chest_lid";
 
-        public const string FadingSuffix = "_Fading";
+        public const string FadingPrefix = PartNames.FadingPrefix;
 
         const float HingeSense = -1f;
 
@@ -202,7 +203,7 @@ namespace Game.Presentation
         {
             var copy = new Material(solid)
             {
-                name = solid.name + FadingSuffix,
+                name = PartNames.Fading(solid.name),
                 hideFlags = HideFlags.HideAndDontSave
             };
 

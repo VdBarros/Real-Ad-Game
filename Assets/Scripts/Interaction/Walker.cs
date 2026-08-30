@@ -6,6 +6,7 @@ using UnityEngine;
 
 namespace Game.Interaction
 {
+    [ExecuteAlways]
     public sealed class Walker : MonoBehaviour
     {
         CameraRig rig;
@@ -477,6 +478,11 @@ namespace Game.Interaction
 
         void Update()
         {
+            if (!Application.isPlaying)
+            {
+                return;
+            }
+
             Advance(Time.deltaTime);
         }
 

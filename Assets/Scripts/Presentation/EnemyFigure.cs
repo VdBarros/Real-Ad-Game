@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace Game.Presentation
 {
+    [ExecuteAlways]
     public sealed class EnemyFigure : Figure
     {
         PowerBadge power;

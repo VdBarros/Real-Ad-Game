@@ -48,6 +48,50 @@ namespace Game.Domain.Tests
             }
         }
 
+        [Test]
+        public void NoNameDerivedFromAWorldMaterialAnswersToTheWorldPrefix()
+        {
+            foreach (var derivation in Derivations())
+            {
+                foreach (PartStyle style in Enum.GetValues(typeof(PartStyle)))
+                {
+                    var worn = PartNames.WorldPrefix + style;
+                    var derived = (string)derivation.Invoke(null, new object[] { worn });
+
+                    Assert.That(
+                        PartNames.IsWorldPrefixed(derived),
+                        Is.False,
+                        derivation.Name + " turns \"" + worn + "\" into \"" + derived
+                        + "\", which still answers to the world-material prefix, so every check that "
+                        + "counts world materials by prefix would tally the copy as a part style");
+                }
+            }
+        }
+
+        static IEnumerable<MethodInfo> Derivations()
+        {
+            var derivations = new List<MethodInfo>();
+
+            foreach (var method in typeof(PartNames).GetMethods(BindingFlags.Public | BindingFlags.Static))
+            {
+                var taken = method.GetParameters();
+
+                if (method.ReturnType == typeof(string)
+                    && taken.Length == 1
+                    && taken[0].ParameterType == typeof(string))
+                {
+                    derivations.Add(method);
+                }
+            }
+
+            Assert.That(
+                derivations.Count,
+                Is.GreaterThan(0),
+                "no name is minted out of another, so the naming authority went missing");
+
+            return derivations;
+        }
+
         static IEnumerable<KeyValuePair<string, string>> Minted()
         {
             var minted = new List<KeyValuePair<string, string>>();

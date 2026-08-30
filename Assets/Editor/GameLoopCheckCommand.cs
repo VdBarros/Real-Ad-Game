@@ -53,6 +53,7 @@ namespace Game.EditorTooling
             public int BadgeMaterials;
             public int BadgeSprites;
             public int WorldMaterials;
+            public List<string> WorldMaterialNames = new List<string>();
         }
 
         static int findings;
@@ -64,6 +65,8 @@ namespace Game.EditorTooling
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             TheRuntimeBootstrapStayedOutOfEditMode();
             PreviewFilm.Sun();
+
+            EveryReleaseIsOneTheEditorReaches();
 
             var loop = GameLoop.Raise(Seed, MazePreset.Ship, null);
             var persistent = Identified(Live());
@@ -129,6 +132,24 @@ namespace Game.EditorTooling
             Debug.Log(findings == 0
                 ? "t-17: the loop turned " + Cycles + " times clean."
                 : "t-17: " + findings + " findings across " + Cycles + " turns.");
+        }
+
+        static void EveryReleaseIsOneTheEditorReaches()
+        {
+            var unreached = MintedAssets.ReleasesTheEditorNeverReaches();
+
+            if (unreached.Count == 0)
+            {
+                return;
+            }
+
+            Fail(
+                unreached.Count + " components release what they hold from OnDestroy without carrying "
+                + "[ExecuteAlways], and Unity hands a plain MonoBehaviour no OnDestroy outside play "
+                + "mode, so every headless check tears them down and keeps what they minted: "
+                + string.Join(", ", unreached.ToArray())
+                + ". A component whose Update or OnEnable must stay out of edit mode takes the "
+                + "attribute and guards those on Application.isPlaying, the way FigureAnimator does.");
         }
 
         static void TheLoopIsNeverCaughtGenerating(List<GamePhase> announced)
@@ -602,11 +623,14 @@ namespace Game.EditorTooling
                     + " badge sprites alive where a shape is cut at most once.");
             }
 
-            if (turn.WorldMaterials > Enum.GetValues(typeof(PartStyle)).Length)
+            var strays = MintedAssets.StraysAmong(turn.WorldMaterialNames);
+
+            if (strays.Length != 0)
             {
                 Fail(
                     "Turn " + turn.Number + " left " + turn.WorldMaterials
-                    + " world materials alive where a style is coloured at most once.");
+                    + " world materials alive, and a style is coloured at most once, but it held "
+                    + strays + ".");
             }
 
             if (turn.Number == 1)
@@ -631,7 +655,8 @@ namespace Game.EditorTooling
             turn.BadgeTextures = Counted<Texture2D>(BadgeAssets.NamePrefix);
             turn.BadgeMaterials = Counted<Material>(BadgeAssets.NamePrefix);
             turn.BadgeSprites = Counted<Sprite>(BadgeAssets.NamePrefix);
-            turn.WorldMaterials = Counted<Material>(Presentation.WorldMaterials.NamePrefix);
+            turn.WorldMaterialNames = MintedAssets.WorldMaterialNames();
+            turn.WorldMaterials = turn.WorldMaterialNames.Count;
         }
 
         static int NextMove(RunState run)
