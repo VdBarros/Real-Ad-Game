@@ -1894,6 +1894,7 @@ namespace Game.EditorTooling
             GameObject root, LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
             PreviewFilm.Sun();
+            var failures = PhotographedUnderTheBuildsLighting("the reward props are", report);
             var badges = Unbadge(root);
             Unmark(root);
 
@@ -1921,7 +1922,7 @@ namespace Game.EditorTooling
                 group.SetActive(true);
             }
 
-            var failures = Assert(
+            failures += Assert(
                 report,
                 repainted.Count > 0,
                 "the world offers a cleared floor to photograph a prop against as well as a cursed one",
@@ -1956,6 +1957,7 @@ namespace Game.EditorTooling
             GameObject root, LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
         {
             PreviewFilm.Sun();
+            var lighting = PhotographedUnderTheBuildsLighting("the cast is", report);
             var badges = Unbadge(root);
             Unmark(root);
 
@@ -1988,7 +1990,7 @@ namespace Game.EditorTooling
                 group.SetActive(true);
             }
 
-            var failures = 0;
+            var failures = lighting;
             var photographed = 0;
 
             for (var slot = 0; slot < cast.Count; slot++)
@@ -2012,6 +2014,19 @@ namespace Game.EditorTooling
             failures += TheTableSeparatesFigureFromSurface(report);
 
             return failures;
+        }
+
+        static int PhotographedUnderTheBuildsLighting(string subject, StringBuilder report)
+        {
+            var risen = PreviewFilm.SunsUp();
+
+            return Assert(
+                report,
+                risen == 1,
+                subject + " photographed under the one sun the build raises, so the tone measured below"
+                + " is the tone that ships",
+                "the frame is lit by " + risen
+                + (risen == 1 ? " directional light" : " directional lights"));
         }
 
         static int CastReadsAgainstTheFloor(StringBuilder report, Reading[] rounds)

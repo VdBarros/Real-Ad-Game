@@ -1,4 +1,5 @@
 using System.IO;
+using Game.Flow;
 using Game.Presentation.Pure;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -7,6 +8,8 @@ namespace Game.EditorTooling
 {
     public static class PreviewFilm
     {
+        public const string SunName = "PreviewSun";
+
         public static void Shoot(Camera camera, string path)
         {
             var frame = Frame(camera);
@@ -91,12 +94,46 @@ namespace Game.EditorTooling
 
         public static Light Sunlight()
         {
-            var light = new GameObject("PreviewSun").AddComponent<Light>();
+            var risen = TheSunAlreadyUp();
+            if (risen != null)
+            {
+                return risen;
+            }
+
+            var light = new GameObject(SunName).AddComponent<Light>();
             light.type = LightType.Directional;
-            light.transform.rotation = Quaternion.Euler(50f, 200f, 0f);
-            light.intensity = 1.6f;
+            light.transform.rotation = GameBoot.SunAngle;
+            light.intensity = GameBoot.SunStrength;
 
             return light;
+        }
+
+        public static Light TheSunAlreadyUp()
+        {
+            foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            {
+                if (light.type == LightType.Directional)
+                {
+                    return light;
+                }
+            }
+
+            return null;
+        }
+
+        public static int SunsUp()
+        {
+            var risen = 0;
+
+            foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            {
+                if (light.type == LightType.Directional)
+                {
+                    risen++;
+                }
+            }
+
+            return risen;
         }
 
         static void Render(Camera camera, RenderTexture target)
