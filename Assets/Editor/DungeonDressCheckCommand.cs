@@ -649,6 +649,8 @@ namespace Game.EditorTooling
                 && Math.Abs(one.b - other.b) <= ColourTolerance;
         }
 
+        const int GateWalkSamples = 16;
+
         static int TheGateWalkwayStaysClear(
             WorldBuilder builder,
             LevelGraph graph,
@@ -669,11 +671,17 @@ namespace Game.EditorTooling
                     + (player == null ? "no player" : "a player"));
             }
 
+            var animator = player.GetComponent<FigureAnimator>();
+
+            if (animator == null)
+            {
+                return Assert(
+                    report, false, "the player it walks through carries its own clips", "it carries none");
+            }
+
             var triangles = new List<Vector3[]>();
             GateClearance.Gather(gate, gate, triangles);
 
-            var pack = PackMesh.Of(
-                Resources.Load<GameObject>(WorldModels.AssetPathOf(GateArch.Passer)));
             var opening = power.Power;
             var clear = 0;
             var tiers = 0;
@@ -684,22 +692,23 @@ namespace Game.EditorTooling
             for (var tier = 0; tier < PlayerTier.Count; tier++)
             {
                 PowerPump.Settle(power, PowerAt(tier));
+                player.Sling(true);
                 tiers++;
 
-                var body = PackMesh.Wearing(player.transform, pack);
-                var kit = World(player.transform);
-                var across = Math.Max(body.size.x, body.size.z);
-                var half = new Vector3(across * 0.5f, body.size.y * 0.5f, GateArch.Depth);
-                var centre = new Vector3(0f, -GateArch.Height * 0.5f + body.size.y * 0.5f, 0f);
+                var kit = SweptThroughTheWalk(player, animator);
+                var ground = player.Ground.Y;
+                var across = Math.Max(kit.size.x, kit.size.z);
+                var low = kit.min.y - ground;
+                var high = kit.max.y - ground;
+                var half = new Vector3(across * 0.5f, (high - low) * 0.5f, GateArch.Depth);
+                var centre = new Vector3(0f, -GateArch.Height * 0.5f + (high + low) * 0.5f, 0f);
 
                 readings.Add(string.Format(
                     CultureInfo.InvariantCulture,
-                    "tier {0} stands {1:0.###} across and {2:0.###} tall, kit and all {3:0.###} by {4:0.###}",
+                    "tier {0} sweeps {1:0.###} across and reaches {2:0.###} up",
                     tier,
                     across,
-                    body.size.y,
-                    Math.Max(kit.size.x, kit.size.z),
-                    kit.size.y));
+                    high));
 
                 narrowest = Math.Min(narrowest, GateArch.Walkway - across);
 
@@ -713,14 +722,15 @@ namespace Game.EditorTooling
                 }
             }
 
+            player.Sling(false);
             PowerPump.Settle(power, opening);
 
             return Assert(
                 report,
                 tiers > 0 && clear == tiers,
-                "the body of a player of every tier sweeps through the gate's walkway without touching a "
-                + "single triangle of its posts or its lintel, the raised weapon it carries above its own "
-                + "head excepted",
+                "the whole kit of a player of every tier sweeps through the gate's walkway across every "
+                + "frame of the walk clip without touching a single triangle of its posts or its lintel, "
+                + "the weapon it is carrying counted in rather than excused",
                 string.Format(
                     CultureInfo.InvariantCulture,
                     "{0} of {1} tiers pass through the arch's {2} triangles; the widest leaves {3:0.###} "
@@ -732,6 +742,30 @@ namespace Game.EditorTooling
                     GateArch.Walkway,
                     string.Join(", ", readings.ToArray()),
                     clipping.Count == 0 ? "" : "; " + string.Join(", ", clipping.ToArray())));
+        }
+
+        static Bounds SweptThroughTheWalk(PlayerFigure player, FigureAnimator animator)
+        {
+            animator.Cue(FigureCue.Looping(FigureAct.Walk));
+            animator.Advance(0f);
+
+            var swept = World(player.transform);
+            var seconds = animator.PlayingSeconds;
+
+            if (animator.Playing == null || seconds <= 0f)
+            {
+                return swept;
+            }
+
+            var step = seconds / GateWalkSamples;
+
+            for (var sample = 0; sample < GateWalkSamples; sample++)
+            {
+                animator.Advance(step);
+                swept.Encapsulate(World(player.transform));
+            }
+
+            return swept;
         }
 
         static int PowerAt(int tier)

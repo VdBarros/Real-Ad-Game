@@ -187,6 +187,7 @@ namespace Game.EditorTooling
 
             report.Append(Disengaged(graph));
             report.Append(Faced(graph));
+            report.Append(Stowed(graph));
 
             Debug.Log(report.ToString());
         }
@@ -667,6 +668,151 @@ namespace Game.EditorTooling
         static float TurnedTo(Figure figure)
         {
             return FigureFacing.Normalised(figure.transform.localEulerAngles.y);
+        }
+
+        static string Stowed(LevelGraph graph)
+        {
+            var rig = CameraRig.Raise();
+            var builder = new WorldBuilder();
+            var root = builder.Build(graph);
+
+            rig.Begin(graph);
+            rig.Skip();
+
+            var opening = RunState.Begin(graph, PlayerTier.Thresholds[PlayerTier.Count - 2]);
+            var input = TapInput.Raise(rig, builder.Targets, opening);
+            var walker = Walker.Raise(rig, builder, input, opening);
+            var figure = builder.Player;
+
+            var agreed = 0;
+            var strayed = 0;
+            var away = 0;
+            var drawn = 0;
+            var fought = 0;
+            var armedInAFight = 0;
+
+            for (var move = 0; move < Moves && figure != null && !walker.Run.IsLevelComplete; move++)
+            {
+                var target = Gated(walker.Run);
+
+                if (target == TapAim.Nothing)
+                {
+                    target = Furthest(walker.Run);
+                }
+
+                if (target == TapAim.Nothing)
+                {
+                    break;
+                }
+
+                walker.WalkTo(target);
+
+                for (var frame = 0; frame < FrameCap && walker.IsWalking; frame++)
+                {
+                    Step(rig, builder, walker);
+
+                    var wanted = WeaponStow.Away(graph, walker.Walk, walker.Fight);
+
+                    if (figure.IsStowed == wanted)
+                    {
+                        agreed++;
+                    }
+                    else
+                    {
+                        strayed++;
+                    }
+
+                    if (figure.IsStowed)
+                    {
+                        away++;
+                    }
+                    else
+                    {
+                        drawn++;
+                    }
+
+                    if (!walker.Fight.IsJoined)
+                    {
+                        continue;
+                    }
+
+                    fought++;
+
+                    if (!figure.IsStowed
+                        && (figure.Gripping == PlayerWeapon.None
+                            || (figure.Wielding != null
+                                && ReferenceEquals(
+                                    figure.Wielding.parent,
+                                    CharacterDress.Hand(figure.gameObject)))))
+                    {
+                        armedInAFight++;
+                    }
+                }
+
+                Finished(rig, builder, walker);
+            }
+
+            WorldObjects.Destroy(root);
+            WorldObjects.Destroy(rig.gameObject);
+            builder.Dispose();
+
+            if (strayed > 0)
+            {
+                Debug.LogError(
+                    "The weapon was stowed against what the gate distance asked for on " + strayed
+                    + " of " + (agreed + strayed) + " frames.");
+            }
+
+            if (away == 0)
+            {
+                Debug.LogError(
+                    "No frame of the run put the weapon away, so the gate approach was never exercised.");
+            }
+
+            if (drawn == 0)
+            {
+                Debug.LogError("The weapon never came back out of its stow.");
+            }
+
+            if (fought > 0 && armedInAFight != fought)
+            {
+                Debug.LogError(
+                    "A fight opened with the weapon still stowed on " + (fought - armedInAFight)
+                    + " of " + fought + " fighting frames.");
+            }
+
+            if (fought == 0)
+            {
+                Debug.LogWarning("No fight opened on this seed to draw the weapon back for.");
+            }
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "\n  the weapon went away for {0} frames within {1} tile of a gate and rode the hand for "
+                + "{2}, agreeing with the gate distance on {3} of {4}, and every one of {5} fighting "
+                + "frames had it back in the hand",
+                away,
+                WeaponStow.Tiles.ToString("0.#", CultureInfo.InvariantCulture),
+                drawn,
+                agreed,
+                agreed + strayed,
+                fought);
+        }
+
+        static int Gated(RunState state)
+        {
+            foreach (var node in state.Level.Decisions.Nodes)
+            {
+                if (node.Type == NodeType.Multiplier
+                    && !state.IsConsumed(node.Id)
+                    && node.Id != state.PositionNodeId
+                    && state.IsReachable(node.Id))
+                {
+                    return node.Id;
+                }
+            }
+
+            return TapAim.Nothing;
         }
 
         static string Disengaged(LevelGraph graph)

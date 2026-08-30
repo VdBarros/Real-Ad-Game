@@ -366,6 +366,7 @@ namespace Game.Interaction
             if (figure != null)
             {
                 figure.StandOn(journey.Walk.Position);
+                figure.Sling(WeaponStow.Away(journey));
 
                 if (!journey.Walk.IsRetreating)
                 {
