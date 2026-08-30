@@ -370,6 +370,7 @@ namespace Game.EditorTooling
             failures += TheCastReadsAgainstTheDungeon(root, graph, byName, report);
             failures += TheMaterialsStayFlat(root, report);
             failures += TheGatesAreCutFromPackMeshes(models, graph, byName, report);
+            failures += TheArchKeepsItsFootprintOnOneTile(graph, byName, report);
             failures += TheGateWalkwayStaysClear(builder, graph, byName, report);
 
             WorldObjects.Destroy(root);
@@ -625,6 +626,66 @@ namespace Game.EditorTooling
                 "every gate still washes and dims to the unreachable mark rather than holding its plain "
                 + "colour",
                 dimmed + " of " + gates + " do");
+        }
+
+        static int TheArchKeepsItsFootprintOnOneTile(
+            LevelGraph graph, IDictionary<string, Transform> byName, StringBuilder report)
+        {
+            var gates = 0;
+            var kept = 0;
+            var widest = 0f;
+            var spilling = new List<string>();
+
+            foreach (var node in graph.Decisions.Nodes)
+            {
+                Transform instance;
+
+                if (node.Type != NodeType.Multiplier
+                    || !byName.TryGetValue(PartNames.Node(node.Id), out instance))
+                {
+                    continue;
+                }
+
+                gates++;
+                var box = World(instance);
+                var centre = IsoProjection.Of(node.Position);
+                var covered = 2f * Math.Max(
+                    Math.Max(box.max.x - centre.X, centre.X - box.min.x),
+                    Math.Max(box.max.z - centre.Z, centre.Z - box.min.z));
+
+                widest = Math.Max(widest, covered);
+
+                if (covered <= IsoProjection.TileEdge + Epsilon)
+                {
+                    kept++;
+                }
+                else
+                {
+                    spilling.Add(instance.name + " covers " + covered.ToString(
+                        "0.####", CultureInfo.InvariantCulture));
+                }
+            }
+
+            return Assert(
+                report,
+                gates > 0 && kept == gates && GateArch.TileFootprint <= IsoProjection.TileEdge,
+                "every arch keeps the whole of its footprint on the single tile it is placed on, standing "
+                + "on that tile's diagonal at " + GateArch.Yaw.ToString(
+                    "0.#", CultureInfo.InvariantCulture)
+                + " degrees, measured off the meshes it is cut from rather than off the span they were "
+                + "cut to",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0} of {1} do; the widest covers {2:0.####} of a {3:0.####} tile against the "
+                    + "{4:0.####} the span and depth plan for, a walkway of {5:0.####} cut for the {6}{7}",
+                    kept,
+                    gates,
+                    widest,
+                    IsoProjection.TileEdge,
+                    GateArch.TileFootprint,
+                    GateArch.Walkway,
+                    GateArch.WidestPasser,
+                    spilling.Count == 0 ? "" : "; " + string.Join(", ", spilling.ToArray())));
         }
 
         static int PipsUnder(Transform instance)
@@ -1123,7 +1184,7 @@ namespace Game.EditorTooling
                 aimed + " of " + builder.Targets.Targets.Count + " targets name a node of the "
                 + graph.Decisions.Nodes.Count + " this level has");
 
-            var figure = FigureFit.SpreadOf(
+            var figure = FigureFit.BoxSpreadOf(
                 CharacterCast.MeshOf(PartStyle.Start), LevelBlueprintBuilder.FigureScale) * 0.5f;
             var tightest = float.MaxValue;
             var blocking = new List<string>();
