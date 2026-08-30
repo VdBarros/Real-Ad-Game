@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using Game.Presentation;
 using Game.Presentation.Pure;
 using UnityEditor;
+using UnityEngine;
 
 namespace Game.EditorTooling
 {
     public sealed class CharacterArtPostprocessor : AssetPostprocessor
     {
         public const string ModelFolder = "Assets/Resources/" + WorldModels.CharacterFolder + "/";
+
+        public const string ModelExtension = ".fbx";
 
         public const ModelImporterMeshCompression Compression = ModelImporterMeshCompression.Off;
 
@@ -27,9 +30,38 @@ namespace Game.EditorTooling
 
         public const int AtlasMaxSize = 1024;
 
+        static readonly HashSet<string> sets = SetAssets();
+
+        static readonly HashSet<string> skeletons = SkeletonAssets();
+
         public override uint GetVersion()
         {
-            return 6;
+            return 8;
+        }
+
+        public static bool IsAnimationSet(string path)
+        {
+            return path != null && sets.Contains(path);
+        }
+
+        public static bool KeepsItsOwnTakes(string path)
+        {
+            return path != null && skeletons.Contains(path);
+        }
+
+        public static bool Animated(string path)
+        {
+            return IsAnimationSet(path) || KeepsItsOwnTakes(path);
+        }
+
+        public static ClipTable TableFor(string path)
+        {
+            if (IsAnimationSet(path))
+            {
+                return AdventurerClips.Table;
+            }
+
+            return KeepsItsOwnTakes(path) ? SkeletonClips.Table : null;
         }
 
         void OnPreprocessModel()
@@ -44,7 +76,7 @@ namespace Game.EditorTooling
             importer.animationType = Rig;
             importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
             importer.skinWeights = SkinWeights;
-            importer.importAnimation = true;
+            importer.importAnimation = Animated(importer.assetPath);
             importer.animationCompression = AnimationCompression;
             importer.animationRotationError = RotationError;
             importer.animationPositionError = PositionError;
@@ -65,17 +97,33 @@ namespace Game.EditorTooling
             importer.meshCompression = Compression;
             importer.useFileScale = true;
             importer.globalScale = ImportScaleOf(importer.assetPath);
+
+            if (!importer.importAnimation)
+            {
+                importer.clipAnimations = new ModelImporterClipAnimation[0];
+            }
         }
 
         void OnPreprocessAnimation()
         {
             var importer = assetImporter as ModelImporter;
-            if (importer == null || !Ours(importer.assetPath))
+            if (importer == null || !Animated(importer.assetPath))
             {
                 return;
             }
 
-            importer.clipAnimations = Narrowed(importer);
+            importer.clipAnimations = Narrowed(importer, TableFor(importer.assetPath));
+        }
+
+        void OnPostprocessAnimation(GameObject root, AnimationClip clip)
+        {
+            var importer = assetImporter as ModelImporter;
+            if (importer == null || clip == null || !IsAnimationSet(importer.assetPath))
+            {
+                return;
+            }
+
+            Rebound(clip);
         }
 
         void OnPreprocessTexture()
@@ -103,25 +151,70 @@ namespace Game.EditorTooling
             importer.SetPlatformTextureSettings(android);
         }
 
-        static ModelImporterClipAnimation[] Narrowed(ModelImporter importer)
+        public static int Rebound(AnimationClip clip)
         {
-            var takes = importer.importedTakeInfos;
-
-            if (takes == null || takes.Length == 0)
+            var bindings = AnimationUtility.GetCurveBindings(clip);
+            if (bindings == null || bindings.Length == 0)
             {
-                return importer.clipAnimations;
+                return 0;
             }
 
-            var kept = new List<ModelImporterClipAnimation>(AdventurerClips.Count);
+            var curves = new AnimationCurve[bindings.Length];
+            var rebound = new EditorCurveBinding[bindings.Length];
+            var moved = 0;
 
-            foreach (var take in takes)
+            for (var slot = 0; slot < bindings.Length; slot++)
             {
-                if (!AdventurerClips.Wants(take.name))
+                curves[slot] = AnimationUtility.GetEditorCurve(clip, bindings[slot]);
+                rebound[slot] = bindings[slot];
+
+                var path = AnimationSets.Rebound(bindings[slot].path);
+                if (string.Equals(path, bindings[slot].path, StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                var loops = AdventurerClips.LoopsOf(take.name);
+                rebound[slot].path = path;
+                moved++;
+            }
+
+            if (moved == 0)
+            {
+                return 0;
+            }
+
+            for (var slot = 0; slot < bindings.Length; slot++)
+            {
+                AnimationUtility.SetEditorCurve(clip, bindings[slot], null);
+            }
+
+            for (var slot = 0; slot < bindings.Length; slot++)
+            {
+                AnimationUtility.SetEditorCurve(clip, rebound[slot], curves[slot]);
+            }
+
+            return moved;
+        }
+
+        static ModelImporterClipAnimation[] Narrowed(ModelImporter importer, ClipTable table)
+        {
+            var takes = importer.importedTakeInfos;
+
+            if (table == null || takes == null || takes.Length == 0)
+            {
+                return importer.clipAnimations;
+            }
+
+            var kept = new List<ModelImporterClipAnimation>(table.Count);
+
+            foreach (var take in takes)
+            {
+                if (!table.Wants(take.name))
+                {
+                    continue;
+                }
+
+                var loops = table.LoopsOf(take.name);
 
                 kept.Add(new ModelImporterClipAnimation
                 {
@@ -171,6 +264,35 @@ namespace Game.EditorTooling
             }
 
             return PartModel.None;
+        }
+
+        static HashSet<string> SetAssets()
+        {
+            var named = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var set in AnimationSets.Assets)
+            {
+                named.Add(ModelFolder + set + ModelExtension);
+            }
+
+            return named;
+        }
+
+        static HashSet<string> SkeletonAssets()
+        {
+            var named = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (model == PartModel.None || ArtPacks.Of(model) != ArtPack.Skeletons)
+                {
+                    continue;
+                }
+
+                named.Add("Assets/Resources/" + WorldModels.AssetPathOf(model) + ModelExtension);
+            }
+
+            return named;
         }
 
         static bool Ours(string path)

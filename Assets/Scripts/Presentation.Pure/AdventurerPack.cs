@@ -12,6 +12,8 @@ namespace Game.Presentation.Pure
 
         public const string SlotNode = "handslot";
 
+        public const string RigNode = "Rig";
+
         public const string CloakNode = "Knight_Cape";
 
         public const float KnightPackHeight = 2.63436f;
