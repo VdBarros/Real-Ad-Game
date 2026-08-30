@@ -24,7 +24,7 @@ namespace Game.Presentation.Pure
 
         public const string Cleave = "Melee_2H_Attack_Chop";
 
-        public const string Thrust = "Melee_2H_Attack_Stab";
+        public const string Loose = "Ranged_Bow_Draw";
 
         public const string Sweep = "Melee_2H_Attack_Spin";
 
@@ -32,7 +32,7 @@ namespace Game.Presentation.Pure
 
         static readonly ClipTable table = new ClipTable(new[]
         {
-            Idle, Walk, Retreat, Strike, Clash, Recoil, Take, Kick, Slice, Cleave, Thrust, Sweep, Fall
+            Idle, Walk, Retreat, Strike, Clash, Recoil, Take, Kick, Slice, Cleave, Loose, Sweep, Fall
         });
 
         public static ClipTable Table

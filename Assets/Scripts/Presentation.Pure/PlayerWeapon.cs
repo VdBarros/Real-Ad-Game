@@ -5,7 +5,7 @@ namespace Game.Presentation.Pure
         None,
         Shortsword,
         Axe,
-        Spear,
+        Bow,
         Greatsword
     }
 }

@@ -974,21 +974,52 @@ namespace Game.EditorTooling
                 held + " weapons: " + string.Join(", ", Named(carried)));
 
             var steady = 0;
+            var bare = 0;
+            var opening = new Dictionary<PlayerGuise, int>();
+            var layered = new List<string>();
 
-            for (var tier = 1; tier < states.Count; tier++)
+            for (var tier = 0; tier < states.Count; tier++)
             {
-                if (states[tier].Dressed == states[0].Dressed)
+                var guise = PlayerKit.GuiseOf(tier);
+
+                if (!opening.ContainsKey(guise))
+                {
+                    opening.Add(guise, states[tier].Dressed);
+
+                    if (states[tier].Dressed > 0)
+                    {
+                        bare++;
+                    }
+                }
+
+                if (states[tier].Dressed == opening[guise])
                 {
                     steady++;
                 }
+                else
+                {
+                    layered.Add("tier " + tier + " stands " + states[tier].Dressed + " meshes as the "
+                        + guise + " against the " + opening[guise] + " it first stood in");
+                }
+            }
+
+            var census = new List<string>();
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                census.Add(guise + " " + (opening.ContainsKey(guise) ? opening[guise] : 0));
             }
 
             failures += Assert(
                 report,
-                states.Count > 1 && steady == states.Count - 1 && states[0].Dressed > 0,
+                states.Count > 1 && steady == states.Count && bare == opening.Count && opening.Count > 1,
                 "swapping a prop adds no renderer to the body itself, so the count of meshes wearing the "
-                + "pack material is the same at every tier and nothing is layered over the figure",
-                steady + " of " + (states.Count - 1) + " tiers keep the opening " + states[0].Dressed);
+                + "pack material is the same at every tier a guise holds and nothing is layered over the "
+                + "figure; a change of body is the only thing that may change it, because each guise is "
+                + "cut from a different number of pieces",
+                steady + " of " + states.Count + " tiers keep the count their guise opened on ("
+                + string.Join(", ", census.ToArray()) + ")"
+                + (layered.Count == 0 ? "" : "; " + string.Join("; ", layered.ToArray())));
 
             return failures;
         }
@@ -1679,8 +1710,40 @@ namespace Game.EditorTooling
                 WorldObjects.Destroy(sample);
             }
 
-            PowerPump.Settle(power, PowerAt(PlayerTier.Count - 1));
-            var held = player.Wielding;
+            var seated = 0;
+            var armed = 0;
+            var loose = new List<string>();
+
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                PowerPump.Settle(power, PowerAt(tier));
+
+                var weapon = PlayerKit.WeaponOf(tier);
+
+                if (weapon == PlayerWeapon.None)
+                {
+                    continue;
+                }
+
+                armed++;
+                var mounted = player.Wielding;
+                var mesh = PlayerKit.ModelOf(weapon);
+                var declared = Quaternion.Euler(
+                    0f, ArtPacks.MountTurnOf(mesh), ArtPacks.MountRollOf(mesh));
+
+                if (mounted != null && Seated(mounted, declared))
+                {
+                    seated++;
+                }
+                else
+                {
+                    loose.Add(mounted == null
+                        ? "tier " + tier + " hangs nothing"
+                        : "tier " + tier + "'s " + Posed(mounted) + " against a declared "
+                            + Quaternion.Angle(declared, Quaternion.identity).ToString(
+                                "0.###", CultureInfo.InvariantCulture) + " degree mount");
+                }
+            }
 
             var failures = 0;
 
@@ -1702,17 +1765,23 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                held != null && Rested(held),
-                "so the weapon the tier ramp hangs there sits at the same origin, which is what makes the "
+                armed == PlayerTier.Count - 1 && seated == armed,
+                "so every weapon the tier ramp hangs there sits at the same origin unscaled, turned by "
+                + "exactly the mount its own pack declares and by nothing else, which is what makes the "
                 + "grip read as a grip rather than a mesh floating beside a hand",
-                held == null ? "no weapon hangs at the top tier" : Posed(held));
+                seated + " of " + armed + " sit there"
+                + (loose.Count == 0 ? "" : "; " + string.Join("; ", loose.ToArray())));
 
             return failures;
         }
 
-        static bool Rested(Transform node)
+        static bool Seated(Transform node, Quaternion mount)
         {
-            return Squared(node) && node.localPosition.magnitude <= Epsilon;
+            return Quaternion.Angle(node.localRotation, mount) <= AngleEpsilon
+                && Math.Abs(node.localScale.x - 1f) <= Epsilon
+                && Math.Abs(node.localScale.y - 1f) <= Epsilon
+                && Math.Abs(node.localScale.z - 1f) <= Epsilon
+                && node.localPosition.magnitude <= Epsilon;
         }
 
         static bool Squared(Transform node)
@@ -2517,7 +2586,10 @@ namespace Game.EditorTooling
                         && hand != null
                         && hand.name.StartsWith(ArtPacks.CastSlotNode, StringComparison.Ordinal)
                         && ReferenceEquals(hand, CharacterDress.Hand(player.gameObject))
-                        && Rested(held))
+                        && Seated(held, Quaternion.Euler(
+                            0f,
+                            ArtPacks.MountTurnOf(PlayerKit.ModelOf(weapon)),
+                            ArtPacks.MountRollOf(PlayerKit.ModelOf(weapon)))))
                 {
                     slotted++;
                 }
@@ -2563,8 +2635,9 @@ namespace Game.EditorTooling
             failures += Assert(
                 report,
                 tiers == PlayerTier.Count && slotted == tiers,
-                "the weapon hangs off the rig's own hand slot at an identity local transform at every "
-                + "tier, so a change of body never leaves the grip behind",
+                "the weapon hangs off the rig's own hand slot at the slot's own origin, unscaled, turned "
+                + "only by the mount its pack declares, at every tier, so a change of body never leaves "
+                + "the grip behind",
                 slotted + " of " + tiers + " tiers do");
 
             return failures;

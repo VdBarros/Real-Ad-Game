@@ -104,7 +104,7 @@ namespace Game.Presentation.Pure
             }
 
             var model = PlayerKit.ModelOf(weapon);
-            var middle = ArtPacks.BaseOf(model) + ArtPacks.HeightOf(model) * 0.5f;
+            var middle = ArtPacks.MountedBaseOf(model) + ArtPacks.MountedHeightOf(model) * 0.5f;
 
             return Ride - Standing(guise, middle);
         }
@@ -124,7 +124,7 @@ namespace Game.Presentation.Pure
             var model = PlayerKit.ModelOf(weapon);
 
             return LiftOf(guise, weapon)
-                + Standing(guise, ArtPacks.BaseOf(model) + ArtPacks.HeightOf(model));
+                + Standing(guise, ArtPacks.MountedBaseOf(model) + ArtPacks.MountedHeightOf(model));
         }
 
         public static float FootOf(PlayerWeapon weapon)
@@ -140,7 +140,7 @@ namespace Game.Presentation.Pure
             }
 
             return LiftOf(guise, weapon)
-                + Standing(guise, ArtPacks.BaseOf(PlayerKit.ModelOf(weapon)));
+                + Standing(guise, ArtPacks.MountedBaseOf(PlayerKit.ModelOf(weapon)));
         }
 
         public static float AcrossOf(PlayerWeapon weapon)
@@ -155,7 +155,7 @@ namespace Game.Presentation.Pure
                 return 0f;
             }
 
-            return Standing(guise, ArtPacks.WidthOf(PlayerKit.ModelOf(weapon)));
+            return Standing(guise, ArtPacks.MountedWidthOf(PlayerKit.ModelOf(weapon)));
         }
 
         public static float BehindOf(PlayerWeapon weapon)
@@ -170,7 +170,7 @@ namespace Game.Presentation.Pure
                 return 0f;
             }
 
-            return Back + Standing(guise, ArtPacks.DepthOf(PlayerKit.ModelOf(weapon))) * 0.5f;
+            return Back + Standing(guise, ArtPacks.MountedDepthOf(PlayerKit.ModelOf(weapon))) * 0.5f;
         }
 
         public static float Lintel

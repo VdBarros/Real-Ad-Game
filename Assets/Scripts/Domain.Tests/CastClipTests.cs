@@ -51,7 +51,7 @@ namespace Game.Domain.Tests
             Assert.That(AdventurerClips.Kick, Is.EqualTo("Melee_Unarmed_Attack_Kick"));
             Assert.That(AdventurerClips.Slice, Is.EqualTo("Melee_1H_Attack_Slice_Diagonal"));
             Assert.That(AdventurerClips.Cleave, Is.EqualTo("Melee_2H_Attack_Chop"));
-            Assert.That(AdventurerClips.Thrust, Is.EqualTo("Melee_2H_Attack_Stab"));
+            Assert.That(AdventurerClips.Loose, Is.EqualTo("Ranged_Bow_Draw"));
             Assert.That(AdventurerClips.Sweep, Is.EqualTo("Melee_2H_Attack_Spin"));
             Assert.That(AdventurerClips.Fall, Is.EqualTo("Death_A"));
         }
@@ -69,7 +69,7 @@ namespace Game.Domain.Tests
             Assert.That(SkeletonClips.Kick, Is.EqualTo("Unarmed_Melee_Attack_Kick"));
             Assert.That(SkeletonClips.Slice, Is.EqualTo("1H_Melee_Attack_Slice_Diagonal"));
             Assert.That(SkeletonClips.Cleave, Is.EqualTo("2H_Melee_Attack_Chop"));
-            Assert.That(SkeletonClips.Thrust, Is.EqualTo("2H_Melee_Attack_Stab"));
+            Assert.That(SkeletonClips.Loose, Is.EqualTo("2H_Ranged_Shoot"));
             Assert.That(SkeletonClips.Sweep, Is.EqualTo("2H_Melee_Attack_Spin"));
             Assert.That(SkeletonClips.Fall, Is.EqualTo("Death_A"));
         }
@@ -142,7 +142,7 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EveryActIsCarriedByOneOfTheFourSetsCopiedIntoResources()
+        public void EveryActIsCarriedByOneOfTheFiveSetsCopiedIntoResources()
         {
             var carried = new List<string>();
 
@@ -154,8 +154,8 @@ namespace Game.Domain.Tests
                 carried.Add(AdventurerClips.NameOf(act));
             }
 
-            Assert.That(AnimationSets.Count, Is.EqualTo(4));
-            Assert.That(AnimationSets.Assets.Distinct().Count(), Is.EqualTo(4));
+            Assert.That(AnimationSets.Count, Is.EqualTo(5));
+            Assert.That(AnimationSets.Assets.Distinct().Count(), Is.EqualTo(5));
 
             Assert.That(AnimationSets.SetOf(FigureAct.Idle), Is.EqualTo(AnimationSets.General));
             Assert.That(AnimationSets.SetOf(FigureAct.Recoil), Is.EqualTo(AnimationSets.General));
@@ -167,7 +167,9 @@ namespace Game.Domain.Tests
             Assert.That(AnimationSets.ActsOf(AnimationSets.General).Count, Is.EqualTo(4));
             Assert.That(AnimationSets.ActsOf(AnimationSets.MovementBasic).Count, Is.EqualTo(1));
             Assert.That(AnimationSets.ActsOf(AnimationSets.MovementAdvanced).Count, Is.EqualTo(1));
-            Assert.That(AnimationSets.ActsOf(AnimationSets.CombatMelee).Count, Is.EqualTo(7));
+            Assert.That(AnimationSets.ActsOf(AnimationSets.CombatMelee).Count, Is.EqualTo(6));
+            Assert.That(AnimationSets.ActsOf(AnimationSets.CombatRanged).Count, Is.EqualTo(1));
+            Assert.That(AnimationSets.SetOf(FigureAct.Loose), Is.EqualTo(AnimationSets.CombatRanged));
             Assert.That(carried.Count, Is.EqualTo(13));
         }
 

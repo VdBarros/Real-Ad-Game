@@ -69,14 +69,7 @@ namespace Game.EditorTooling
             ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss
         };
 
-        static readonly PlayerWeapon[] Grips =
-        {
-            PlayerWeapon.None,
-            PlayerWeapon.Shortsword,
-            PlayerWeapon.Axe,
-            PlayerWeapon.Spear,
-            PlayerWeapon.Greatsword
-        };
+        static readonly PlayerWeapon[] Grips = Handed();
 
         public static void Check()
         {
@@ -372,19 +365,29 @@ namespace Game.EditorTooling
 
         static int BoundToTheHero(WorldModels models, StringBuilder report)
         {
-            var worn = CharacterCast.MeshOf(PartStyle.Start);
-            var prefab = models.Of(worn);
+            var bodies = CharacterCast.MeshesOf(PartStyle.Start);
+            var unloadable = new List<string>();
 
-            if (prefab == null)
+            foreach (var body in bodies)
+            {
+                if (models.Of(body) == null)
+                {
+                    unloadable.Add(body + " resolves to nothing loadable");
+                }
+            }
+
+            if (bodies.Count == 0 || unloadable.Count > 0)
             {
                 return Assert(
                     report,
                     false,
-                    "the hero's mesh loads out of the resources tree so its rig can be bound against",
-                    worn + " resolves to nothing loadable");
+                    "every mesh the ramp dresses the hero in loads out of the resources tree so its rig can "
+                    + "be bound against",
+                    unloadable.Count == 0
+                        ? "the ramp names no body at all"
+                        : string.Join("; ", unloadable.ToArray()));
             }
 
-            var figure = UnityEngine.Object.Instantiate(prefab);
             var acts = 0;
             var sourced = 0;
             var bound = 0;
@@ -399,129 +402,137 @@ namespace Game.EditorTooling
             var weightless = new List<string>();
             var rows = new List<string>();
 
-            try
+            foreach (var worn in bodies)
             {
-                var skeleton = Skinning(figure, weightless);
-                skinning = skeleton.Count;
+                var figure = UnityEngine.Object.Instantiate(models.Of(worn));
 
-                foreach (var act in FigureActs.All)
+                try
                 {
-                    acts++;
+                    var skeleton = Skinning(figure, weightless);
+                    skinning += skeleton.Count;
 
-                    var clip = models.ClipOf(worn, act);
-                    if (clip == null)
+                    foreach (var act in FigureActs.All)
                     {
-                        strayed.Add(act + " resolves to no clip at all");
-                        continue;
-                    }
+                        acts++;
 
-                    var wanted = CharacterArtPostprocessor.ModelFolder + AnimationSets.SetOf(act)
-                        + CharacterArtPostprocessor.ModelExtension;
-                    var from = AssetDatabase.GetAssetPath(clip);
-
-                    if (string.Equals(from, wanted, StringComparison.Ordinal))
-                    {
-                        sourced++;
-                    }
-                    else if (strayed.Count < 6)
-                    {
-                        strayed.Add(act + " on " + clip.name + " comes out of " + from + " rather than "
-                            + wanted);
-                    }
-
-                    if (clip.isLooping == FigureActs.Loops(act))
-                    {
-                        looped++;
-                    }
-                    else if (mislooped.Count < 6)
-                    {
-                        mislooped.Add(act + " is marked looping " + clip.isLooping);
-                    }
-
-                    var bindings = AnimationUtility.GetCurveBindings(clip);
-                    var references = AnimationUtility.GetObjectReferenceCurveBindings(clip);
-                    var unresolved = new List<string>();
-                    var keyed = new HashSet<string>(StringComparer.Ordinal);
-
-                    foreach (var binding in bindings)
-                    {
-                        curves++;
-                        keyed.Add(binding.path);
-
-                        if (AnimationUtility.GetAnimatedObject(figure, binding) == null && unresolved.Count < 4)
+                        var clip = models.ClipOf(worn, act);
+                        if (clip == null)
                         {
-                            unresolved.Add(binding.path + "." + binding.propertyName);
+                            strayed.Add(worn + "'s " + act + " resolves to no clip at all");
+                            continue;
                         }
-                    }
 
-                    var missed = new List<string>();
+                        var wanted = CharacterArtPostprocessor.ModelFolder + AnimationSets.SetOf(act)
+                            + CharacterArtPostprocessor.ModelExtension;
+                        var from = AssetDatabase.GetAssetPath(clip);
 
-                    foreach (var bone in skeleton)
-                    {
-                        if (!keyed.Contains(bone))
+                        if (string.Equals(from, wanted, StringComparison.Ordinal))
                         {
-                            missed.Add(bone);
+                            sourced++;
                         }
-                    }
-
-                    if (missed.Count == 0)
-                    {
-                        posed++;
-                    }
-                    else if (unkeyed.Count < 6)
-                    {
-                        unkeyed.Add(clip.name + " keys none of " + string.Join(", ", missed.ToArray()));
-                    }
-
-                    foreach (var binding in references)
-                    {
-                        curves++;
-
-                        if (AnimationUtility.GetAnimatedObject(figure, binding) == null && unresolved.Count < 4)
+                        else if (strayed.Count < 6)
                         {
-                            unresolved.Add(binding.path + "." + binding.propertyName);
+                            strayed.Add(worn + "'s " + act + " on " + clip.name + " comes out of " + from
+                                + " rather than " + wanted);
                         }
-                    }
 
-                    if (unresolved.Count == 0)
-                    {
-                        bound++;
-                    }
-                    else if (loose.Count < 6)
-                    {
-                        loose.Add(clip.name + " binds nothing on " + worn + " at "
-                            + string.Join(", ", unresolved.ToArray()));
-                    }
+                        if (clip.isLooping == FigureActs.Loops(act))
+                        {
+                            looped++;
+                        }
+                        else if (mislooped.Count < 6)
+                        {
+                            mislooped.Add(worn + "'s " + act + " is marked looping " + clip.isLooping);
+                        }
 
-                    rows.Add(string.Format(
-                        CultureInfo.InvariantCulture,
-                        "{0} plays {1} out of {2}, {3:0.###}s over {4} curves, looping {5}",
-                        act,
-                        clip.name,
-                        AnimationSets.SetOf(act),
-                        clip.length,
-                        bindings.Length + references.Length,
-                        clip.isLooping));
+                        var bindings = AnimationUtility.GetCurveBindings(clip);
+                        var references = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+                        var unresolved = new List<string>();
+                        var keyed = new HashSet<string>(StringComparer.Ordinal);
+
+                        foreach (var binding in bindings)
+                        {
+                            curves++;
+                            keyed.Add(binding.path);
+
+                            if (AnimationUtility.GetAnimatedObject(figure, binding) == null && unresolved.Count < 4)
+                            {
+                                unresolved.Add(binding.path + "." + binding.propertyName);
+                            }
+                        }
+
+                        var missed = new List<string>();
+
+                        foreach (var bone in skeleton)
+                        {
+                            if (!keyed.Contains(bone))
+                            {
+                                missed.Add(bone);
+                            }
+                        }
+
+                        if (missed.Count == 0)
+                        {
+                            posed++;
+                        }
+                        else if (unkeyed.Count < 6)
+                        {
+                            unkeyed.Add(worn + "'s " + clip.name + " keys none of "
+                                + string.Join(", ", missed.ToArray()));
+                        }
+
+                        foreach (var binding in references)
+                        {
+                            curves++;
+
+                            if (AnimationUtility.GetAnimatedObject(figure, binding) == null && unresolved.Count < 4)
+                            {
+                                unresolved.Add(binding.path + "." + binding.propertyName);
+                            }
+                        }
+
+                        if (unresolved.Count == 0)
+                        {
+                            bound++;
+                        }
+                        else if (loose.Count < 6)
+                        {
+                            loose.Add(clip.name + " binds nothing on " + worn + " at "
+                                + string.Join(", ", unresolved.ToArray()));
+                        }
+
+                        rows.Add(string.Format(
+                            CultureInfo.InvariantCulture,
+                            "{6} {0} plays {1} out of {2}, {3:0.###}s over {4} curves, looping {5}",
+                            act,
+                            clip.name,
+                            AnimationSets.SetOf(act),
+                            clip.length,
+                            bindings.Length + references.Length,
+                            clip.isLooping,
+                            worn));
+                    }
                 }
-            }
-            finally
-            {
-                WorldObjects.Destroy(figure);
+                finally
+                {
+                    WorldObjects.Destroy(figure);
+                }
             }
 
             var failures = Assert(
                 report,
-                acts > 0 && sourced == acts,
+                acts == bodies.Count * FigureActs.Count && sourced == acts,
                 "every act the hero can be cued into resolves to a clip out of the animation set that carries "
-                + "it, so not one frame the hero plays comes out of a character mesh any more",
+                + "it, on every one of the " + bodies.Count + " bodies the ramp dresses him in, so not one "
+                + "frame the hero plays comes out of a character mesh any more",
                 sourced + " of " + acts + " do"
                 + (strayed.Count == 0 ? string.Empty : "; " + string.Join("; ", strayed.ToArray())));
 
             failures += Assert(
                 report,
                 curves > 0 && bound == acts,
-                "and every curve in every one of those clips binds to a real node of the hero's own rig, which "
-                + "is the whole bet this ticket was written to settle",
+                "and every curve in every one of those clips binds to a real node of the rig of every body "
+                + "the ramp puts them on, which is the whole bet this ticket was written to settle",
                 bound + " of " + acts + " clips bind clean over " + curves + " curves"
                 + (loose.Count == 0 ? string.Empty : "; " + string.Join("; ", loose.ToArray())));
 
@@ -539,8 +550,9 @@ namespace Game.EditorTooling
                 "and every bone the hero's skinned meshes actually carry weight on is keyed by every one of "
                 + "those clips, so the nodes a set does not key deform nothing and the figure the player sees "
                 + "is posed entirely by the set",
-                posed + " of " + acts + " clips key all " + skinning + " weighted bones, the rig's other "
-                + weightless.Count + " carrying no vertex weight at all"
+                posed + " of " + acts + " clips key all " + skinning + " weighted bones across "
+                + bodies.Count + " bodies, the rigs' other " + weightless.Count
+                + " carrying no vertex weight at all"
                 + (unkeyed.Count == 0 ? string.Empty : "; " + string.Join("; ", unkeyed.ToArray())));
 
             report.Append("\n  weightless: ").Append(string.Join(", ", weightless.ToArray()));
@@ -1325,6 +1337,21 @@ namespace Game.EditorTooling
             }
 
             return names;
+        }
+
+        static PlayerWeapon[] Handed()
+        {
+            var carried = new List<PlayerWeapon>();
+
+            foreach (var weapon in PlayerKit.Weapons)
+            {
+                if (!carried.Contains(weapon))
+                {
+                    carried.Add(weapon);
+                }
+            }
+
+            return carried.ToArray();
         }
 
         static List<PartModel> Rigged()

@@ -315,6 +315,8 @@ namespace Game.Presentation
                     return "Knight";
                 case PartModel.Barbarian:
                     return "Barbarian";
+                case PartModel.Rogue:
+                    return "Rogue";
                 case PartModel.SkeletonMinion:
                     return "Skeleton_Minion";
                 case PartModel.SkeletonRogue:

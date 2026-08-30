@@ -11,6 +11,8 @@ namespace Game.Presentation.Pure
 
         public const float BarbarianGripHeight = 0.65008f;
 
+        public const float RogueGripHeight = 0.70786f;
+
         readonly struct Rung
         {
             public Rung(PlayerGuise guise, PlayerWeapon weapon)
@@ -45,8 +47,8 @@ namespace Game.Presentation.Pure
             new Rung(PlayerGuise.Knight, PlayerWeapon.None),
             new Rung(PlayerGuise.Knight, PlayerWeapon.Shortsword),
             new Rung(PlayerGuise.Barbarian, PlayerWeapon.Axe),
-            new Rung(PlayerGuise.Barbarian, PlayerWeapon.Spear),
-            new Rung(PlayerGuise.Barbarian, PlayerWeapon.Greatsword)
+            new Rung(PlayerGuise.Rogue, PlayerWeapon.Bow),
+            new Rung(PlayerGuise.Rogue, PlayerWeapon.Greatsword)
         };
 
         public static PlayerWeapon WeaponOf(int tier)
@@ -148,6 +150,8 @@ namespace Game.Presentation.Pure
                     return KnightGripHeight;
                 case PlayerGuise.Barbarian:
                     return BarbarianGripHeight;
+                case PlayerGuise.Rogue:
+                    return RogueGripHeight;
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(guise), guise, "No guise grips its weapon at that height.");
@@ -200,10 +204,10 @@ namespace Game.Presentation.Pure
                     return new Wielded(PartModel.SwordA, 0.67635f, 1.02282f);
                 case PlayerWeapon.Axe:
                     return new Wielded(PartModel.AxeB, 0.72764f, 1.23311f);
-                case PlayerWeapon.Spear:
-                    return new Wielded(PartModel.StaffA, 0.68668f, 0.99633f);
+                case PlayerWeapon.Bow:
+                    return new Wielded(PartModel.BowA, 0.73877f, 1.12256f);
                 case PlayerWeapon.Greatsword:
-                    return new Wielded(PartModel.Sword2Handed, 0.72691f, 1.40402f);
+                    return new Wielded(PartModel.Sword2Handed, 0.79152f, 1.52881f);
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(weapon), weapon, "The kit hangs no mesh on an empty hand.");

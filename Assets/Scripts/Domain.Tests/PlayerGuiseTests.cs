@@ -133,12 +133,14 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheRampChangesGuiseAtOnePowerAndTheKnightOpensTheRun()
+        public void TheRampChangesGuiseAtTwoPowersAndTheKnightOpensTheRun()
         {
             Assert.That(PlayerKit.GuiseOf(0), Is.EqualTo(PlayerGuise.Knight));
             Assert.That(PlayerKit.GuiseOf(1), Is.EqualTo(PlayerGuise.Knight));
             Assert.That(PlayerKit.GuiseOf(2), Is.EqualTo(PlayerGuise.Barbarian));
             Assert.That(PlayerKit.WeaponOf(2), Is.EqualTo(PlayerWeapon.Axe));
+            Assert.That(PlayerKit.GuiseOf(3), Is.EqualTo(PlayerGuise.Rogue));
+            Assert.That(PlayerKit.WeaponOf(3), Is.EqualTo(PlayerWeapon.Bow));
             Assert.That(PlayerKit.Body, Is.EqualTo(PlayerGuises.MeshOf(PlayerGuise.Knight)));
 
             var swaps = new List<int>();
@@ -151,9 +153,76 @@ namespace Game.Domain.Tests
                 }
             }
 
-            Assert.That(swaps.Count, Is.EqualTo(1));
+            Assert.That(swaps.Count, Is.EqualTo(2));
             Assert.That(swaps[0], Is.EqualTo(PlayerTier.Thresholds[1]));
             Assert.That(swaps[0], Is.EqualTo(30));
+            Assert.That(swaps[1], Is.EqualTo(PlayerTier.Thresholds[2]));
+            Assert.That(swaps[1], Is.EqualTo(100));
+        }
+
+        [Test]
+        public void NoPromotionEverPutsTheHeroBackIntoABodyItHasAlreadyLeft()
+        {
+            var worn = new List<PlayerGuise>();
+
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                var guise = PlayerKit.GuiseOf(tier);
+
+                if (tier > 0 && guise == PlayerKit.GuiseOf(tier - 1))
+                {
+                    continue;
+                }
+
+                Assert.That(worn, Has.No.Member(guise), "tier " + tier);
+                worn.Add(guise);
+            }
+
+            Assert.That(worn.Count, Is.EqualTo(PlayerGuises.Count));
+        }
+
+        [Test]
+        public void TheRogueFinishesWithARangedActNoOtherGuiseSwingsAndNoArrowEverLeavesTheBow()
+        {
+            Assert.That(PlayerGuises.FinisherOf(PlayerGuise.Rogue), Is.EqualTo(FigureAct.Loose));
+            Assert.That(AdventurerClips.NameOf(FigureAct.Loose), Is.EqualTo(AdventurerClips.Loose));
+            Assert.That(
+                AnimationSets.SetOf(FigureAct.Loose), Is.EqualTo(AnimationSets.CombatRanged));
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                if (guise == PlayerGuise.Rogue)
+                {
+                    continue;
+                }
+
+                Assert.That(
+                    PlayerGuises.FinisherOf(guise),
+                    Is.Not.EqualTo(FigureAct.Loose),
+                    guise.ToString());
+                Assert.That(
+                    AnimationSets.SetOf(PlayerGuises.FinisherOf(guise)),
+                    Is.EqualTo(AnimationSets.CombatMelee),
+                    guise.ToString());
+            }
+
+            foreach (var outcome in new[] { ActionOutcome.Win, ActionOutcome.Tie, ActionOutcome.Loss })
+            {
+                var fight = Fight.Of(outcome).Advanced(Fight.Of(outcome).ContactAt);
+                var loosed = FigureCues.Striking(fight, PlayerWeapon.Bow);
+                var chopped = FigureCues.Striking(fight, PlayerWeapon.Axe);
+
+                Assert.That(loosed.Beat, Is.EqualTo(chopped.Beat), outcome.ToString());
+                Assert.That(loosed.Loops, Is.EqualTo(chopped.Loops), outcome.ToString());
+                Assert.That(fight.Seconds, Is.EqualTo(Fight.Of(outcome).Seconds), outcome.ToString());
+            }
+
+            Assert.That(
+                SourceTree.Read("Presentation.Pure", "FigureCues.cs"),
+                Does.Not.Contain("Flight"));
+            Assert.That(
+                SourceTree.Read("Presentation.Pure", "PlayerGuises.cs"),
+                Does.Not.Contain("Flight"));
         }
 
         [Test]

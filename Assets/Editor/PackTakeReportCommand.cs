@@ -240,11 +240,14 @@ namespace Game.EditorTooling
 
             report.AppendLine(string.Format(
                 CultureInfo.InvariantCulture,
-                "  PACK width {0:0.#####} height {1:0.#####} depth {2:0.#####} base {3:0.#####}",
+                "  PACK width {0:0.#####} height {1:0.#####} depth {2:0.#####} base {3:0.#####} "
+                + "left {4:0.#####} front {5:0.#####}",
                 box.size.x / scale,
                 box.size.y / scale,
                 box.size.z / scale,
-                box.min.y / scale));
+                box.min.y / scale,
+                box.min.x / scale,
+                box.min.z / scale));
 
             report.AppendLine("  NODES " + named.Count);
 

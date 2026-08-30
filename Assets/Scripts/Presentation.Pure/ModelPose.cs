@@ -26,6 +26,7 @@ namespace Game.Presentation.Pure
                     return Crested(part);
                 case PartModel.Knight:
                 case PartModel.Barbarian:
+                case PartModel.Rogue:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:
@@ -59,6 +60,7 @@ namespace Game.Presentation.Pure
                     return new WorldPoint(part.Rotation.X, part.Rotation.Y + ChestFacing, part.Rotation.Z);
                 case PartModel.Knight:
                 case PartModel.Barbarian:
+                case PartModel.Rogue:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:
@@ -118,6 +120,7 @@ namespace Game.Presentation.Pure
                     return Boxed(part);
                 case PartModel.Knight:
                 case PartModel.Barbarian:
+                case PartModel.Rogue:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:
