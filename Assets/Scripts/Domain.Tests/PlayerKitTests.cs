@@ -78,7 +78,7 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void AnEmptyHandHangsNoMeshAndEveryWeaponNamesOneTheAdventurersPackShips()
+        public void AnEmptyHandHangsNoMeshAndEveryWeaponNamesOneAPackShipsWithTheCast()
         {
             Assert.That(
                 () => PlayerKit.ModelOf(PlayerWeapon.None),
@@ -95,8 +95,8 @@ namespace Game.Domain.Tests
 
                 var model = PlayerKit.ModelOf(weapon);
 
-                Assert.That(AdventurerPack.Wields(model), Is.True, weapon.ToString());
-                Assert.That(ArtPacks.Of(model), Is.EqualTo(ArtPack.Adventurers), weapon.ToString());
+                Assert.That(ArtPacks.ShipsWithTheCast(model), Is.True, weapon.ToString());
+                Assert.That(ArtPacks.IsRiggedCharacter(model), Is.False, weapon.ToString());
                 Assert.That(mounted, Has.No.Member(model));
                 mounted.Add(model);
             }
@@ -112,7 +112,7 @@ namespace Game.Domain.Tests
                 Assert.That(PlayerKit.ModelOf(PlayerKit.WeaponOf(tier)), Is.Not.EqualTo(body));
             }
 
-            Assert.That(AdventurerPack.Wields(body), Is.False);
+            Assert.That(ArtPacks.IsRiggedCharacter(body), Is.True);
             Assert.That(AdventurerPack.Carries(body), Is.True);
         }
 
@@ -143,15 +143,20 @@ namespace Game.Domain.Tests
             {
                 var weapon = PlayerKit.WeaponOf(tier);
                 var model = PlayerKit.ModelOf(weapon);
-                var width = AdventurerPack.PackWidthOf(model);
-                var height = AdventurerPack.PackHeightOf(model);
-                var depth = AdventurerPack.PackDepthOf(model);
+                var width = ArtPacks.WidthOf(model);
+                var height = ArtPacks.HeightOf(model);
+                var depth = ArtPacks.DepthOf(model);
 
                 Assert.That(
                     PlayerKit.ReachOf(weapon),
-                    Is.EqualTo(AdventurerPack.StandingPerPackUnit
+                    Is.EqualTo(PlayerKit.StandingPerImportUnit
                         * (float)Math.Sqrt(width * width + height * height + depth * depth))
                         .Within(1e-5f),
+                    weapon.ToString());
+                Assert.That(
+                    width,
+                    Is.EqualTo(ArtPacks.PackWidthOf(model)
+                        * ArtPacks.ImportScaleOf(ArtPacks.Of(model))).Within(1e-6f),
                     weapon.ToString());
             }
         }
@@ -237,7 +242,12 @@ namespace Game.Domain.Tests
         {
             for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
-                Assert.That(AdventurerPack.Wields(PlayerKit.ModelOf(PlayerKit.WeaponOf(tier))), Is.True);
+                var mounted = PlayerKit.ModelOf(PlayerKit.WeaponOf(tier));
+
+                Assert.That(
+                    AdventurerPack.Wields(mounted) || WeaponsPack.Wields(mounted),
+                    Is.True,
+                    mounted.ToString());
             }
 
             Assert.That(PlayerKit.CloakNode, Does.StartWith(PartModel.Knight.ToString()));

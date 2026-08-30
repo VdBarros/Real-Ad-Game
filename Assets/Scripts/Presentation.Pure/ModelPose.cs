@@ -34,6 +34,11 @@ namespace Game.Presentation.Pure
                 case PartModel.Axe2Handed:
                 case PartModel.Staff:
                 case PartModel.Sword2Handed:
+                case PartModel.SwordA:
+                case PartModel.AxeB:
+                case PartModel.StaffA:
+                case PartModel.StaffB:
+                case PartModel.BowA:
                 case PartModel.None:
                 case PartModel.FloorTile:
                     return part.Position;
@@ -64,6 +69,11 @@ namespace Game.Presentation.Pure
                 case PartModel.Axe2Handed:
                 case PartModel.Staff:
                 case PartModel.Sword2Handed:
+                case PartModel.SwordA:
+                case PartModel.AxeB:
+                case PartModel.StaffA:
+                case PartModel.StaffB:
+                case PartModel.BowA:
                 case PartModel.None:
                 case PartModel.WallPanel:
                 case PartModel.CoinStack:
@@ -114,6 +124,11 @@ namespace Game.Presentation.Pure
                 case PartModel.Axe2Handed:
                 case PartModel.Staff:
                 case PartModel.Sword2Handed:
+                case PartModel.SwordA:
+                case PartModel.AxeB:
+                case PartModel.StaffA:
+                case PartModel.StaffB:
+                case PartModel.BowA:
                 case PartModel.None:
                     return part.Scale;
                 default:

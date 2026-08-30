@@ -4,6 +4,7 @@ namespace Game.Presentation.Pure
     {
         Dungeon,
         Adventurers,
-        Skeletons
+        Skeletons,
+        Weapons
     }
 }

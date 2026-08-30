@@ -24,6 +24,11 @@ namespace Game.Presentation.Pure
         Sword1Handed,
         Axe2Handed,
         Staff,
-        Sword2Handed
+        Sword2Handed,
+        SwordA,
+        AxeB,
+        StaffA,
+        StaffB,
+        BowA
     }
 }

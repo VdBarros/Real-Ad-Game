@@ -63,6 +63,16 @@ namespace Game.Presentation.Pure
             get { return AdventurerPack.CloakNode; }
         }
 
+        public static PartModel Body
+        {
+            get { return CharacterCast.MeshOf(PartStyle.Start); }
+        }
+
+        public static float StandingPerImportUnit
+        {
+            get { return FigureFit.ScaleOf(Body); }
+        }
+
         public static float TipOf(PlayerWeapon weapon)
         {
             return weapon == PlayerWeapon.None ? 0f : Held(weapon).Tip;
@@ -81,11 +91,11 @@ namespace Game.Presentation.Pure
             }
 
             var model = Held(weapon).Model;
-            var width = AdventurerPack.PackWidthOf(model);
-            var height = AdventurerPack.PackHeightOf(model);
-            var depth = AdventurerPack.PackDepthOf(model);
+            var width = ArtPacks.WidthOf(model);
+            var height = ArtPacks.HeightOf(model);
+            var depth = ArtPacks.DepthOf(model);
 
-            return AdventurerPack.StandingPerPackUnit
+            return StandingPerImportUnit
                 * (float)Math.Sqrt(width * width + height * height + depth * depth);
         }
 
@@ -94,11 +104,11 @@ namespace Game.Presentation.Pure
             switch (weapon)
             {
                 case PlayerWeapon.Shortsword:
-                    return new Wielded(PartModel.Sword1Handed, 0.67695f, 0.97863f);
+                    return new Wielded(PartModel.SwordA, 0.67635f, 1.02282f);
                 case PlayerWeapon.Axe:
-                    return new Wielded(PartModel.Axe2Handed, 0.71678f, 1.27302f);
+                    return new Wielded(PartModel.AxeB, 0.71331f, 1.20882f);
                 case PlayerWeapon.Spear:
-                    return new Wielded(PartModel.Staff, 0.72606f, 1.17284f);
+                    return new Wielded(PartModel.StaffA, 0.67315f, 0.97671f);
                 case PlayerWeapon.Greatsword:
                     return new Wielded(PartModel.Sword2Handed, 0.7126f, 1.37637f);
                 default:

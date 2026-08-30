@@ -17,6 +17,8 @@ namespace Game.Presentation
 
         public const string SkeletonAtlasAsset = "skeleton_texture";
 
+        public const string WeaponAtlasAsset = "weapons_bits_texture";
+
         readonly GameObject[] byModel;
 
         readonly bool[] looked;
@@ -92,6 +94,8 @@ namespace Game.Presentation
                     return CharacterFolder + "/" + CharacterAtlasAsset;
                 case ArtPack.Skeletons:
                     return CharacterFolder + "/" + SkeletonAtlasAsset;
+                case ArtPack.Weapons:
+                    return CharacterFolder + "/" + WeaponAtlasAsset;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(pack), pack, "No atlas for that pack.");
             }
@@ -247,7 +251,7 @@ namespace Game.Presentation
             return path == null ? null : Resources.Load<GameObject>(path);
         }
 
-        static string AssetNameOf(PartModel model)
+        public static string AssetNameOf(PartModel model)
         {
             switch (model)
             {
@@ -297,6 +301,16 @@ namespace Game.Presentation
                     return "staff";
                 case PartModel.Sword2Handed:
                     return "sword_2handed";
+                case PartModel.SwordA:
+                    return "sword_A";
+                case PartModel.AxeB:
+                    return "axe_B";
+                case PartModel.StaffA:
+                    return "staff_A";
+                case PartModel.StaffB:
+                    return "staff_B";
+                case PartModel.BowA:
+                    return "bow_A_withString";
                 default:
                     throw new ArgumentOutOfRangeException(nameof(model), model, "No asset name for that part model.");
             }

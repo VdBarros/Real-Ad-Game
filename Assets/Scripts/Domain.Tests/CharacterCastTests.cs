@@ -318,6 +318,83 @@ namespace Game.Domain.Tests
         }
 
         [Test]
+        public void TheWeaponsPackHangsOnTheCastWithoutBeingOneOfTheRiggedPacks()
+        {
+            Assert.That(ArtPacks.IsCastPack(ArtPack.Weapons), Is.False);
+            Assert.That(ArtPacks.HangsOnTheCast(ArtPack.Weapons), Is.True);
+            Assert.That(ArtPacks.HangsOnTheCast(ArtPack.Adventurers), Is.False);
+            Assert.That(ArtPacks.HangsOnTheCast(ArtPack.Skeletons), Is.False);
+            Assert.That(ArtPacks.ImportScaleOf(ArtPack.Weapons), Is.GreaterThan(0f));
+
+            var measured = 0;
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (!WeaponsPack.Carries(model))
+                {
+                    Assert.That(
+                        () => WeaponsPack.PackHeightOf(model),
+                        Throws.InstanceOf<ArgumentOutOfRangeException>(),
+                        model.ToString());
+                    continue;
+                }
+
+                measured++;
+
+                Assert.That(ArtPacks.Of(model), Is.EqualTo(ArtPack.Weapons), model.ToString());
+                Assert.That(ArtPacks.ShipsWithTheCast(model), Is.True, model.ToString());
+                Assert.That(ArtPacks.IsRiggedCharacter(model), Is.False, model.ToString());
+                Assert.That(AdventurerPack.Carries(model), Is.False, model.ToString());
+                Assert.That(SkeletonPack.Carries(model), Is.False, model.ToString());
+                Assert.That(WeaponsPack.PackHeightOf(model), Is.GreaterThan(0f), model.ToString());
+                Assert.That(WeaponsPack.PackWidthOf(model), Is.GreaterThan(0f), model.ToString());
+                Assert.That(WeaponsPack.PackDepthOf(model), Is.GreaterThan(0f), model.ToString());
+                Assert.That(WeaponsPack.PackBaseOf(model), Is.LessThanOrEqualTo(0f), model.ToString());
+                Assert.That(
+                    ArtPacks.PackWidthOf(model),
+                    Is.EqualTo(WeaponsPack.PackWidthOf(model)).Within(Tolerance),
+                    model.ToString());
+                Assert.That(
+                    ArtPacks.HeightOf(model),
+                    Is.EqualTo(WeaponsPack.PackHeightOf(model) * WeaponsPack.ImportScale)
+                        .Within(Tolerance),
+                    model.ToString());
+            }
+
+            Assert.That(measured, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void TheTwoRiggedPacksStillAgreeOnOneImportScaleAndTheWeaponsPackIsNotAskedTo()
+        {
+            Assert.That(
+                ArtPacks.CastImportScale,
+                Is.EqualTo(ArtPacks.ImportScaleOf(ArtPack.Adventurers)).Within(Tolerance));
+            Assert.That(
+                ArtPacks.CastImportScale,
+                Is.EqualTo(ArtPacks.ImportScaleOf(ArtPack.Skeletons)).Within(Tolerance));
+
+            var rigged = 0;
+
+            foreach (ArtPack pack in Enum.GetValues(typeof(ArtPack)))
+            {
+                if (!ArtPacks.IsCastPack(pack))
+                {
+                    continue;
+                }
+
+                rigged++;
+
+                Assert.That(
+                    ArtPacks.ImportScaleOf(pack),
+                    Is.EqualTo(ArtPacks.CastImportScale).Within(Tolerance),
+                    pack.ToString());
+            }
+
+            Assert.That(rigged, Is.EqualTo(2));
+        }
+
+        [Test]
         public void EveryCastMeshCarriesAMeasuredPackFootprint()
         {
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
@@ -368,14 +445,13 @@ namespace Game.Domain.Tests
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (!AdventurerPack.Wields(model))
+                if (!AdventurerPack.Wields(model) && !WeaponsPack.Wields(model))
                 {
                     continue;
                 }
 
                 wielded++;
 
-                Assert.That(ArtPacks.Of(model), Is.EqualTo(ArtPack.Adventurers), model.ToString());
                 Assert.That(ArtPacks.ShipsWithTheCast(model), Is.True, model.ToString());
                 Assert.That(ArtPacks.IsRiggedCharacter(model), Is.False, model.ToString());
                 Assert.That(ArtPacks.WidthOf(model), Is.GreaterThan(0f), model.ToString());
@@ -385,7 +461,17 @@ namespace Game.Domain.Tests
                     model.ToString());
             }
 
-            Assert.That(wielded, Is.EqualTo(PlayerKit.Weapons.Count - 1));
+            Assert.That(wielded, Is.GreaterThanOrEqualTo(PlayerKit.Weapons.Count - 1));
+
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            {
+                var mounted = PlayerKit.ModelOf(PlayerKit.WeaponOf(tier));
+
+                Assert.That(
+                    AdventurerPack.Wields(mounted) || WeaponsPack.Wields(mounted),
+                    Is.True,
+                    mounted.ToString());
+            }
 
             foreach (var role in CharacterCast.Roles)
             {
@@ -417,6 +503,10 @@ namespace Game.Domain.Tests
                 Assert.That(
                     pack == ArtPack.Adventurers,
                     Is.EqualTo(AdventurerPack.Carries(model)),
+                    model.ToString());
+                Assert.That(
+                    pack == ArtPack.Weapons,
+                    Is.EqualTo(WeaponsPack.Carries(model)),
                     model.ToString());
                 Assert.That(
                     ArtPacks.ImportScaleFor(model),

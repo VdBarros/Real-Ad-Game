@@ -17,6 +17,11 @@ namespace Game.Presentation.Pure
                 return ArtPack.Adventurers;
             }
 
+            if (WeaponsPack.Carries(model))
+            {
+                return ArtPack.Weapons;
+            }
+
             return SkeletonPack.Carries(model) ? ArtPack.Skeletons : ArtPack.Dungeon;
         }
 
@@ -25,9 +30,21 @@ namespace Game.Presentation.Pure
             return pack == ArtPack.Adventurers || pack == ArtPack.Skeletons;
         }
 
+        public static bool HangsOnTheCast(ArtPack pack)
+        {
+            return pack == ArtPack.Weapons;
+        }
+
         public static bool ShipsWithTheCast(PartModel model)
         {
-            return model != PartModel.None && IsCastPack(Of(model));
+            if (model == PartModel.None)
+            {
+                return false;
+            }
+
+            var pack = Of(model);
+
+            return IsCastPack(pack) || HangsOnTheCast(pack);
         }
 
         public static bool IsRiggedCharacter(PartModel model)
@@ -91,6 +108,8 @@ namespace Game.Presentation.Pure
                     return AdventurerPack.ImportScale;
                 case ArtPack.Skeletons:
                     return SkeletonPack.ImportScale;
+                case ArtPack.Weapons:
+                    return WeaponsPack.ImportScale;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(pack), pack, "No import scale for that pack.");
             }
@@ -109,6 +128,8 @@ namespace Game.Presentation.Pure
                     return AdventurerPack.PackHeightOf(model);
                 case ArtPack.Skeletons:
                     return SkeletonPack.PackHeightOf(model);
+                case ArtPack.Weapons:
+                    return WeaponsPack.PackHeightOf(model);
                 default:
                     return DungeonPack.PackHeightOf(model);
             }
@@ -116,12 +137,14 @@ namespace Game.Presentation.Pure
 
         public static float PackWidthOf(PartModel model)
         {
-            switch (Cast(model))
+            switch (Hung(model))
             {
                 case ArtPack.Adventurers:
                     return AdventurerPack.PackWidthOf(model);
                 case ArtPack.Skeletons:
                     return SkeletonPack.PackWidthOf(model);
+                case ArtPack.Weapons:
+                    return WeaponsPack.PackWidthOf(model);
                 default:
                     throw Unmeasured(model);
             }
@@ -129,12 +152,14 @@ namespace Game.Presentation.Pure
 
         public static float PackDepthOf(PartModel model)
         {
-            switch (Cast(model))
+            switch (Hung(model))
             {
                 case ArtPack.Adventurers:
                     return AdventurerPack.PackDepthOf(model);
                 case ArtPack.Skeletons:
                     return SkeletonPack.PackDepthOf(model);
+                case ArtPack.Weapons:
+                    return WeaponsPack.PackDepthOf(model);
                 default:
                     throw Unmeasured(model);
             }
@@ -142,12 +167,14 @@ namespace Game.Presentation.Pure
 
         public static float PackBaseOf(PartModel model)
         {
-            switch (Cast(model))
+            switch (Hung(model))
             {
                 case ArtPack.Adventurers:
                     return AdventurerPack.PackBaseOf(model);
                 case ArtPack.Skeletons:
                     return SkeletonPack.PackBaseOf(model);
+                case ArtPack.Weapons:
+                    return WeaponsPack.PackBaseOf(model);
                 default:
                     throw Unmeasured(model);
             }
@@ -202,7 +229,19 @@ namespace Game.Presentation.Pure
         static ArgumentOutOfRangeException Unmeasured(PartModel model)
         {
             return new ArgumentOutOfRangeException(
-                nameof(model), model, "That cast pack carries no measured figure footprint.");
+                nameof(model), model, "That pack carries no measured footprint.");
+        }
+
+        static ArtPack Hung(PartModel model)
+        {
+            if (!ShipsWithTheCast(model))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(model), model, "Only a mesh that ships with the cast carries a measured "
+                    + "footprint.");
+            }
+
+            return Of(model);
         }
 
         static ArtPack Cast(PartModel model)

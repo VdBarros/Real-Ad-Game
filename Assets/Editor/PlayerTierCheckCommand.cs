@@ -301,7 +301,7 @@ namespace Game.EditorTooling
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (!AdventurerPack.Carries(model))
+                if (!AdventurerPack.Carries(model) && !WeaponsPack.Carries(model))
                 {
                     continue;
                 }
@@ -317,12 +317,12 @@ namespace Game.EditorTooling
                 }
 
                 var box = PackMesh.Bare(prefab);
-                var scale = AdventurerPack.ImportScale;
+                var scale = ArtPacks.ImportScaleFor(model);
 
-                if (Math.Abs(box.size.x - AdventurerPack.WidthOf(model)) <= Epsilon
-                    && Math.Abs(box.size.z - AdventurerPack.DepthOf(model)) <= Epsilon
-                    && Math.Abs(box.size.y - AdventurerPack.HeightOf(model)) <= Epsilon
-                    && Math.Abs(box.min.y - AdventurerPack.BaseOf(model)) <= Epsilon)
+                if (Math.Abs(box.size.x - ArtPacks.WidthOf(model)) <= Epsilon
+                    && Math.Abs(box.size.z - ArtPacks.DepthOf(model)) <= Epsilon
+                    && Math.Abs(box.size.y - ArtPacks.HeightOf(model)) <= Epsilon
+                    && Math.Abs(box.min.y - ArtPacks.BaseOf(model)) <= Epsilon)
                 {
                     pinned++;
                     continue;
@@ -337,16 +337,16 @@ namespace Game.EditorTooling
                     box.size.y / scale,
                     box.size.z / scale,
                     box.min.y / scale,
-                    AdventurerPack.PackWidthOf(model),
-                    AdventurerPack.PackHeightOf(model),
-                    AdventurerPack.PackDepthOf(model),
-                    AdventurerPack.PackBaseOf(model)));
+                    ArtPacks.PackWidthOf(model),
+                    ArtPacks.PackHeightOf(model),
+                    ArtPacks.PackDepthOf(model),
+                    ArtPacks.PackBaseOf(model)));
             }
 
             failures += Assert(
                 report,
                 measured > 1 && pinned == measured,
-                "every mesh the adventurers pack ships measures the footprint its pack constants pin, "
+                "every mesh the player's own packs ship measures the footprint its pack constants pin, "
                 + "unrotated and unscaled",
                 pinned + " of " + measured + " do"
                 + (readings.Count == 0 ? "" : "; " + string.Join("; ", readings.ToArray())));
@@ -1346,7 +1346,7 @@ namespace Game.EditorTooling
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (!AdventurerPack.Wields(model))
+                if (!AdventurerPack.Wields(model) && !WeaponsPack.Wields(model))
                 {
                     continue;
                 }
@@ -1542,8 +1542,9 @@ namespace Game.EditorTooling
             failures += Assert(
                 report,
                 tiers == PlayerTier.Count && mounted == tiers,
-                "every tier that carries a weapon carries it as a mesh the adventurers pack ships, hung "
-                + "off the rig's own hand slot, and the empty-handed tier carries nothing at all",
+                "every tier that carries a weapon carries it as a mesh a pack that ships with the cast "
+                + "hands over, hung off the rig's own hand slot, and the empty-handed tier carries "
+                + "nothing at all",
                 mounted + " of " + tiers + " do"
                 + (strayed.Count == 0 ? "" : "; " + string.Join("; ", strayed.ToArray())));
 

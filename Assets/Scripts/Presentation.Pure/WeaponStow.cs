@@ -7,7 +7,10 @@ namespace Game.Presentation.Pure
     {
         public const float Tiles = 1f;
 
-        public const float Ride = AdventurerPack.StandingScales * 0.5f;
+        public static float Ride
+        {
+            get { return FigureFit.StandingScalesOf(PlayerKit.Body) * 0.5f; }
+        }
 
         public const float Back = 0.26f;
 
@@ -91,7 +94,7 @@ namespace Game.Presentation.Pure
             }
 
             var model = PlayerKit.ModelOf(weapon);
-            var middle = AdventurerPack.PackBaseOf(model) + AdventurerPack.PackHeightOf(model) * 0.5f;
+            var middle = ArtPacks.BaseOf(model) + ArtPacks.HeightOf(model) * 0.5f;
 
             return Ride - Standing(middle);
         }
@@ -106,7 +109,7 @@ namespace Game.Presentation.Pure
             var model = PlayerKit.ModelOf(weapon);
 
             return LiftOf(weapon)
-                + Standing(AdventurerPack.PackBaseOf(model) + AdventurerPack.PackHeightOf(model));
+                + Standing(ArtPacks.BaseOf(model) + ArtPacks.HeightOf(model));
         }
 
         public static float FootOf(PlayerWeapon weapon)
@@ -116,7 +119,7 @@ namespace Game.Presentation.Pure
                 return 0f;
             }
 
-            return LiftOf(weapon) + Standing(AdventurerPack.PackBaseOf(PlayerKit.ModelOf(weapon)));
+            return LiftOf(weapon) + Standing(ArtPacks.BaseOf(PlayerKit.ModelOf(weapon)));
         }
 
         public static float AcrossOf(PlayerWeapon weapon)
@@ -126,7 +129,7 @@ namespace Game.Presentation.Pure
                 return 0f;
             }
 
-            return Standing(AdventurerPack.PackWidthOf(PlayerKit.ModelOf(weapon)));
+            return Standing(ArtPacks.WidthOf(PlayerKit.ModelOf(weapon)));
         }
 
         public static float BehindOf(PlayerWeapon weapon)
@@ -136,12 +139,12 @@ namespace Game.Presentation.Pure
                 return 0f;
             }
 
-            return Back + Standing(AdventurerPack.PackDepthOf(PlayerKit.ModelOf(weapon))) * 0.5f;
+            return Back + Standing(ArtPacks.DepthOf(PlayerKit.ModelOf(weapon))) * 0.5f;
         }
 
         public static float Lintel
         {
-            get { return AdventurerPack.StandingScales * GateArch.Headroom; }
+            get { return FigureFit.StandingScalesOf(PlayerKit.Body) * GateArch.Headroom; }
         }
 
         public static float Shoulders
@@ -172,9 +175,9 @@ namespace Game.Presentation.Pure
             return Tuck < Trophy.Reach && 2f * (Tuck + Trophy.Thickness * 0.5f) < Shoulders;
         }
 
-        static float Standing(float packUnits)
+        static float Standing(float importUnits)
         {
-            return packUnits * AdventurerPack.StandingPerPackUnit;
+            return importUnits * PlayerKit.StandingPerImportUnit;
         }
     }
 }
