@@ -13,6 +13,8 @@ namespace Game.Presentation.Pure
 
         public const float RogueGripHeight = 0.70786f;
 
+        public const float MageGripHeight = 0.57883f;
+
         readonly struct Rung
         {
             public Rung(PlayerGuise guise, PlayerWeapon weapon)
@@ -48,7 +50,7 @@ namespace Game.Presentation.Pure
             new Rung(PlayerGuise.Knight, PlayerWeapon.Shortsword),
             new Rung(PlayerGuise.Barbarian, PlayerWeapon.Axe),
             new Rung(PlayerGuise.Rogue, PlayerWeapon.Bow),
-            new Rung(PlayerGuise.Rogue, PlayerWeapon.Greatsword)
+            new Rung(PlayerGuise.Mage, PlayerWeapon.Staff)
         };
 
         public static PlayerWeapon WeaponOf(int tier)
@@ -152,6 +154,8 @@ namespace Game.Presentation.Pure
                     return BarbarianGripHeight;
                 case PlayerGuise.Rogue:
                     return RogueGripHeight;
+                case PlayerGuise.Mage:
+                    return MageGripHeight;
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(guise), guise, "No guise grips its weapon at that height.");
@@ -206,8 +210,8 @@ namespace Game.Presentation.Pure
                     return new Wielded(PartModel.AxeB, 0.72764f, 1.23311f);
                 case PlayerWeapon.Bow:
                     return new Wielded(PartModel.BowA, 0.73877f, 1.12256f);
-                case PlayerWeapon.Greatsword:
-                    return new Wielded(PartModel.Sword2Handed, 0.79152f, 1.52881f);
+                case PlayerWeapon.Staff:
+                    return new Wielded(PartModel.StaffB, 0.6542f, 1.14406f);
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(weapon), weapon, "The kit hangs no mesh on an empty hand.");

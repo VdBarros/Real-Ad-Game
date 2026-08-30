@@ -51,7 +51,7 @@ namespace Game.Domain.Tests
             Assert.That(AdventurerClips.Loops(FigureAct.Slice), Is.False);
             Assert.That(AdventurerClips.Loops(FigureAct.Cleave), Is.False);
             Assert.That(AdventurerClips.Loops(FigureAct.Loose), Is.False);
-            Assert.That(AdventurerClips.Loops(FigureAct.Sweep), Is.False);
+            Assert.That(AdventurerClips.Loops(FigureAct.Cast), Is.False);
             Assert.That(AdventurerClips.Loops(FigureAct.Fall), Is.False);
         }
 

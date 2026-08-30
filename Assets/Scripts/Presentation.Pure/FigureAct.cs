@@ -13,7 +13,7 @@ namespace Game.Presentation.Pure
         Slice,
         Cleave,
         Loose,
-        Sweep,
+        Cast,
         Fall
     }
 }

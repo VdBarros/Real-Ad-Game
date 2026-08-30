@@ -26,13 +26,13 @@ namespace Game.Presentation.Pure
 
         public const string Loose = "Ranged_Bow_Draw";
 
-        public const string Sweep = "Melee_2H_Attack_Spin";
+        public const string Cast = "Ranged_Magic_Summon";
 
         public const string Fall = "Death_A";
 
         static readonly ClipTable table = new ClipTable(new[]
         {
-            Idle, Walk, Retreat, Strike, Clash, Recoil, Take, Kick, Slice, Cleave, Loose, Sweep, Fall
+            Idle, Walk, Retreat, Strike, Clash, Recoil, Take, Kick, Slice, Cleave, Loose, Cast, Fall
         });
 
         public static ClipTable Table

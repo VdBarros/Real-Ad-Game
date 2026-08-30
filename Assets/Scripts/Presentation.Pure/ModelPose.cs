@@ -27,6 +27,7 @@ namespace Game.Presentation.Pure
                 case PartModel.Knight:
                 case PartModel.Barbarian:
                 case PartModel.Rogue:
+                case PartModel.Mage:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:
@@ -61,6 +62,7 @@ namespace Game.Presentation.Pure
                 case PartModel.Knight:
                 case PartModel.Barbarian:
                 case PartModel.Rogue:
+                case PartModel.Mage:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:
@@ -121,6 +123,7 @@ namespace Game.Presentation.Pure
                 case PartModel.Knight:
                 case PartModel.Barbarian:
                 case PartModel.Rogue:
+                case PartModel.Mage:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:

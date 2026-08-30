@@ -165,6 +165,24 @@ namespace Game.Presentation.Pure
             }
         }
 
+        public static float PackTurnOf(PartModel model)
+        {
+            switch (Cast(model))
+            {
+                case ArtPack.Adventurers:
+                    return AdventurerPack.PackTurnOf(model);
+                case ArtPack.Skeletons:
+                    return SkeletonPack.PackTurnOf(model);
+                default:
+                    throw Unmeasured(model);
+            }
+        }
+
+        public static float TurnOf(PartModel model)
+        {
+            return PackTurnOf(model) * ImportScaleFor(model);
+        }
+
         public static float PackBaseOf(PartModel model)
         {
             switch (Hung(model))
