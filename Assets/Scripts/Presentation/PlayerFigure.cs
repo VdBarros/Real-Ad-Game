@@ -22,6 +22,8 @@ namespace Game.Presentation
 
         bool armed;
 
+        bool stowed;
+
         WeaponFlight flight;
 
         WorldPoint dropSite;
@@ -43,6 +45,11 @@ namespace Game.Presentation
         public PlayerWeapon Gripping
         {
             get { return gripped; }
+        }
+
+        public bool IsStowed
+        {
+            get { return stowed; }
         }
 
         public bool IsCloaked
@@ -129,6 +136,7 @@ namespace Game.Presentation
                 if (gripped != PlayerWeapon.None)
                 {
                     held = Mount(PartNames.Held(gripped), Grip(), PlayerKit.ModelOf(gripped));
+                    Hang();
                 }
             }
 
@@ -139,6 +147,44 @@ namespace Game.Presentation
             }
 
             armed = true;
+        }
+
+        public void Sling(bool away)
+        {
+            if (stowed == away)
+            {
+                return;
+            }
+
+            stowed = away;
+            Hang();
+
+            for (var slot = 0; slot < trophies.Count; slot++)
+            {
+                Seat(trophies[slot], slot);
+            }
+        }
+
+        void Hang()
+        {
+            if (held == null)
+            {
+                return;
+            }
+
+            if (!stowed)
+            {
+                held.transform.SetParent(Grip(), worldPositionStays: false);
+                held.transform.localPosition = Vector3.zero;
+                held.transform.localRotation = Quaternion.identity;
+                held.transform.localScale = Vector3.one;
+                return;
+            }
+
+            held.transform.SetParent(transform, worldPositionStays: true);
+            held.transform.localPosition =
+                Vector(WeaponStow.PoseOf(gripped, RestYaw)) * CapsuleUnit;
+            held.transform.localEulerAngles = new Vector3(0f, WeaponStow.LocalYaw(RestYaw), 0f);
         }
 
         Transform Grip()
@@ -234,6 +280,7 @@ namespace Game.Presentation
             gripped = PlayerWeapon.None;
             cloaked = false;
             armed = false;
+            stowed = false;
             trophies.Clear();
         }
 
@@ -257,10 +304,17 @@ namespace Game.Presentation
         GameObject Plant(int slot)
         {
             var trophy = Forge(PartNames.Trophy(slot), transform);
-            trophy.transform.localPosition = Vector(Trophy.PositionOf(slot)) * CapsuleUnit;
-            trophy.transform.localEulerAngles = Vector(Trophy.RotationOf(slot));
+            Seat(trophy, slot);
             trophy.transform.localScale = Vector(Trophy.Size) * CapsuleUnit;
             return trophy;
+        }
+
+        void Seat(GameObject trophy, int slot)
+        {
+            var seat = stowed ? WeaponStow.TrophyOf(slot) : Trophy.PositionOf(slot);
+
+            trophy.transform.localPosition = Vector(seat) * CapsuleUnit;
+            trophy.transform.localEulerAngles = Vector(Trophy.RotationOf(slot));
         }
 
         static GameObject Forge(string name, Transform parent)
