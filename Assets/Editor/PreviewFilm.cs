@@ -14,6 +14,8 @@ namespace Game.EditorTooling
 
         const float BandTolerance = 0.001f;
 
+        const float PlaneTolerance = 0.0001f;
+
         public static void Shoot(Camera camera, string path)
         {
             var frame = Frame(camera);
@@ -46,18 +48,88 @@ namespace Game.EditorTooling
 
         public static Camera Rig(Vector3 centre, float distance, float orthographicSize, float yaw)
         {
+            if (distance <= IsoProjection.NearPlane || distance >= Backdrop.Reach)
+            {
+                throw new System.ArgumentOutOfRangeException(
+                    nameof(distance),
+                    distance,
+                    "A preview rig stands between the build's near plane and the backdrop it hangs, or it"
+                    + " photographs its subject through a clip plane the build never puts there.");
+            }
+
             var camera = new GameObject("PreviewCamera").AddComponent<Camera>();
             camera.transform.rotation = Quaternion.Euler(
                 IsoProjection.CameraPitch, yaw, IsoProjection.CameraRoll);
             camera.transform.position = centre - camera.transform.forward * distance;
             camera.orthographic = true;
             camera.orthographicSize = orthographicSize;
-            camera.nearClipPlane = 0.03f;
-            camera.farClipPlane = distance * 3f;
-            camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = new Color(0.06f, 0.07f, 0.09f);
+            camera.nearClipPlane = IsoProjection.NearPlane;
+            camera.farClipPlane = IsoProjection.FarPlane;
+            WorldBackdrop.Hang(camera);
 
             return camera;
+        }
+
+        public static string LensAsPhotographed(Camera lens)
+        {
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "{0} lens clipping from {1:0.###} to {2:0.###}, clearing to {3} with {4}, {5}",
+                lens.orthographic ? "an orthographic" : "a perspective",
+                lens.nearClipPlane,
+                lens.farClipPlane,
+                Lit(lens.backgroundColor),
+                lens.clearFlags,
+                lens.GetComponentInChildren<WorldBackdrop>(true) == null
+                    ? "with nothing hung behind its subject"
+                    : "with the graded sheet hung behind its subject");
+        }
+
+        public static string LensApartFromTheBuild(Camera lens)
+        {
+            if (!lens.orthographic)
+            {
+                return "the lens projects in perspective where the build's is orthographic, so a subject"
+                    + " is photographed at a size the game never draws it";
+            }
+
+            if (Mathf.Abs(lens.nearClipPlane - IsoProjection.NearPlane) > PlaneTolerance)
+            {
+                return "the lens opens at " + Plane(lens.nearClipPlane) + " where the build clips near at "
+                    + Plane(IsoProjection.NearPlane);
+            }
+
+            if (Mathf.Abs(lens.farClipPlane - IsoProjection.FarPlane) > PlaneTolerance)
+            {
+                return "the lens sees out to " + Plane(lens.farClipPlane) + " where the build clips far at "
+                    + Plane(IsoProjection.FarPlane);
+            }
+
+            if (lens.clearFlags != CameraClearFlags.SolidColor)
+            {
+                return "the lens clears on " + lens.clearFlags
+                    + " rather than the solid colour the build clears to";
+            }
+
+            var clear = Lit(lens.backgroundColor);
+            if (Apart(clear, Backdrop.Clear) > BandTolerance)
+            {
+                return "the lens clears to " + clear + " rather than the " + Backdrop.Clear
+                    + " the build clears to";
+            }
+
+            if (lens.GetComponentInChildren<WorldBackdrop>(true) == null)
+            {
+                return "no graded sheet hangs on the lens, so a subject overhanging the floor is measured"
+                    + " against empty space rather than the slate the build stands behind it";
+            }
+
+            return null;
+        }
+
+        static string Plane(float depth)
+        {
+            return depth.ToString("0.###", CultureInfo.InvariantCulture);
         }
 
         public static Texture2D Frame(Camera camera)
@@ -153,11 +225,8 @@ namespace Game.EditorTooling
         static string BandApart(string band, Color live, Tint wanted)
         {
             var lit = Lit(live);
-            var apart = Mathf.Max(
-                Mathf.Abs(lit.Red - wanted.Red),
-                Mathf.Max(Mathf.Abs(lit.Green - wanted.Green), Mathf.Abs(lit.Blue - wanted.Blue)));
 
-            if (apart <= BandTolerance)
+            if (Apart(lit, wanted) <= BandTolerance)
             {
                 return null;
             }
@@ -169,6 +238,13 @@ namespace Game.EditorTooling
         static Tint Lit(Color colour)
         {
             return new Tint(colour.r, colour.g, colour.b);
+        }
+
+        static float Apart(Tint lit, Tint wanted)
+        {
+            return Mathf.Max(
+                Mathf.Abs(lit.Red - wanted.Red),
+                Mathf.Max(Mathf.Abs(lit.Green - wanted.Green), Mathf.Abs(lit.Blue - wanted.Blue)));
         }
 
         public static Light Sunlight()
