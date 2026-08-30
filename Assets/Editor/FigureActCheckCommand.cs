@@ -1145,12 +1145,24 @@ namespace Game.EditorTooling
 
             var joints = Joints(stand.transform);
             var acts = new List<FigureAct>();
+            var swingers = new List<string>();
 
             foreach (var weapon in Grips)
             {
-                acts.Add(FigureCues.FinisherOf(weapon));
+                var finisher = FigureCues.FinisherOf(weapon);
+
+                if (acts.Contains(finisher))
+                {
+                    continue;
+                }
+
+                acts.Add(finisher);
+                swingers.Add(weapon == PlayerWeapon.None
+                    ? "an empty hand"
+                    : PlayerKit.GuiseHolding(weapon).ToString());
             }
 
+            var finishers = acts.Count;
             acts.Add(FigureAct.Fall);
             acts.Add(FigureAct.Clash);
 
@@ -1224,8 +1236,9 @@ namespace Game.EditorTooling
             var failures = Assert(
                 report,
                 frozen.Count == 0,
-                "every clip either outcome plays - a finisher for each of the " + Grips.Length
-                + " grips and the loser's death - turns at least " + SwungLimbs
+                "every clip either outcome plays - a finisher for each of the " + finishers
+                + " ways the ramp swings, which is the empty hand and every guise, and the loser's "
+                + "death - turns at least " + SwungLimbs
                 + " of the rig's own bones past " + LimbTurn + " degrees rather than sliding a figure "
                 + "frozen in the pose the import gave it, measured as joint rotation off the clip's first "
                 + "frame rather than off the clip's name",
@@ -1243,9 +1256,9 @@ namespace Game.EditorTooling
             var closest = float.MaxValue;
             var nearest = string.Empty;
 
-            for (var first = 0; first < Grips.Length; first++)
+            for (var first = 0; first < finishers; first++)
             {
-                for (var second = first + 1; second < Grips.Length; second++)
+                for (var second = first + 1; second < finishers; second++)
                 {
                     var apart = Apart(poses[first], poses[second]);
 
@@ -1255,15 +1268,15 @@ namespace Game.EditorTooling
                     }
 
                     closest = apart;
-                    nearest = Grips[first] + " against " + Grips[second];
+                    nearest = swingers[first] + " against " + swingers[second];
                 }
             }
 
             failures += Assert(
                 report,
-                closest > joints.Length,
-                "the finisher differs across every pair of weapon tiers by the pose it puts the rig in "
-                + "halfway through, not only by the clip it names",
+                finishers > 1 && closest > joints.Length,
+                "the finisher differs across every pair of guises, and from the empty hand's kick, by the "
+                + "pose it puts the rig in halfway through, not only by the clip it names",
                 string.Format(
                     CultureInfo.InvariantCulture,
                     "the closest pair, {0}, still stands {1:0.#} degrees apart summed over {2} joints, "

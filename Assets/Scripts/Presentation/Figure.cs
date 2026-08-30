@@ -125,6 +125,17 @@ namespace Game.Presentation
             gameObject.SetActive(false);
         }
 
+        protected void Refit(PartModel mesh)
+        {
+            if (!stood || worn == mesh)
+            {
+                return;
+            }
+
+            worn = mesh;
+            Wear(Scale);
+        }
+
         protected void Wear(float scale)
         {
             Scale = scale;

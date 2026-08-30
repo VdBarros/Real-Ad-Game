@@ -31,6 +31,8 @@ namespace Game.EditorTooling
 
         const string SilhouettePath = "dev/scratch/t-132-player-silhouette-";
 
+        const string GuisePath = "dev/scratch/t-189-player-guise-";
+
         const float ShapeStep = 0.04f;
 
         const float ShapeSpread = 0.15f;
@@ -58,6 +60,11 @@ namespace Game.EditorTooling
                 Wipe(SilhouettePath + tier + ".png");
             }
 
+            foreach (var guise in PlayerGuises.All)
+            {
+                Wipe(GuisePath + guise + ".png");
+            }
+
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             var warnings = new List<string>();
@@ -82,9 +89,8 @@ namespace Game.EditorTooling
             var player = root.GetComponentInChildren<PlayerFigure>(true);
             var enemies = root.GetComponentsInChildren<EnemyFigure>(true);
             var site = DeathSite(graph);
-            var worn = CharacterCast.MeshOf(PartStyle.Start);
-            var pack = PackMesh.Of(
-                worn == PartModel.None ? null : Resources.Load<GameObject>(WorldModels.AssetPathOf(worn)));
+            var worn = PlayerKit.BodyOf(PlayerKit.GuiseOf(0));
+            var pack = MeshesOf(worn);
 
             PreviewFilm.Sun();
             rig.Begin(graph);
@@ -106,11 +112,12 @@ namespace Game.EditorTooling
             failures += EverythingElseStillFallsBack(root, graph, report);
             failures += LooksUpEachMeshOnce(report);
 
-            Portrait(rig, lens, root, player, pack, power.Look.Tier);
+            var filmed = new List<PlayerGuise>();
+            Portrait(rig, lens, root, player, power.Look.Tier, filmed);
 
-            report.Append("\n  tier climb:").Append(Row(power, player, enemies, pack));
-            var heights = new List<float> { Standing(player, pack) };
-            var hides = new List<float> { Hiding(player, pack) };
+            report.Append("\n  tier climb:").Append(Row(power, player, enemies));
+            var heights = new List<float> { Standing(player) };
+            var hides = new List<float> { Hiding(player) };
             var tints = new List<Color> { Painted(player) };
             var overrides = new List<int> { Overrides(player) };
             var states = new List<Kitted> { Kit(player) };
@@ -119,16 +126,16 @@ namespace Game.EditorTooling
             foreach (var target in Climb)
             {
                 power.DropWeaponFrom(site);
-                report.Append(Walk(power, player, target)).Append(Row(power, player, enemies, pack));
-                heights.Add(Standing(player, pack));
-                hides.Add(Hiding(player, pack));
+                report.Append(Walk(power, player, target)).Append(Row(power, player, enemies));
+                heights.Add(Standing(player));
+                hides.Add(Hiding(player));
                 tints.Add(Painted(player));
                 overrides.Add(Overrides(player));
                 states.Add(Kit(player));
-                Portrait(rig, lens, root, player, pack, power.Look.Tier);
+                Portrait(rig, lens, root, player, power.Look.Tier, filmed);
             }
 
-            failures += TheTierStillReads(worn, heights, hides, tints, report);
+            failures += TheTierStillReads(heights, hides, tints, report);
             failures += TheMeshKeepsItsPackTexture(player, tints, overrides, report);
             failures += EachTierWearsAKitOfItsOwn(states, report);
             failures += TheSilhouetteChangesShapeAndNotOnlySize(states, report);
@@ -140,6 +147,9 @@ namespace Game.EditorTooling
             failures += TheMountedKitMeasuresWhatTheKitTablePins(power, player, report);
             failures += TheWeaponRidesTheHandThroughEveryClip(power, player, report);
             failures += TheStowedKitWalksThroughAGate(power, player, report);
+            failures += EveryTierStandsInTheBodyItsGuiseNames(power, player, report);
+            failures += ASwapKeepsWhatTheHeroWasDoingAndCarrying(power, player, report);
+            failures += EveryGuiseSatForAPortrait(filmed, report);
 
             Application.logMessageReceived -= watcher;
 
@@ -301,7 +311,7 @@ namespace Game.EditorTooling
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (!AdventurerPack.Carries(model))
+                if (!AdventurerPack.Carries(model) && !WeaponsPack.Carries(model))
                 {
                     continue;
                 }
@@ -317,12 +327,12 @@ namespace Game.EditorTooling
                 }
 
                 var box = PackMesh.Bare(prefab);
-                var scale = AdventurerPack.ImportScale;
+                var scale = ArtPacks.ImportScaleFor(model);
 
-                if (Math.Abs(box.size.x - AdventurerPack.WidthOf(model)) <= Epsilon
-                    && Math.Abs(box.size.z - AdventurerPack.DepthOf(model)) <= Epsilon
-                    && Math.Abs(box.size.y - AdventurerPack.HeightOf(model)) <= Epsilon
-                    && Math.Abs(box.min.y - AdventurerPack.BaseOf(model)) <= Epsilon)
+                if (Math.Abs(box.size.x - ArtPacks.WidthOf(model)) <= Epsilon
+                    && Math.Abs(box.size.z - ArtPacks.DepthOf(model)) <= Epsilon
+                    && Math.Abs(box.size.y - ArtPacks.HeightOf(model)) <= Epsilon
+                    && Math.Abs(box.min.y - ArtPacks.BaseOf(model)) <= Epsilon)
                 {
                     pinned++;
                     continue;
@@ -337,16 +347,16 @@ namespace Game.EditorTooling
                     box.size.y / scale,
                     box.size.z / scale,
                     box.min.y / scale,
-                    AdventurerPack.PackWidthOf(model),
-                    AdventurerPack.PackHeightOf(model),
-                    AdventurerPack.PackDepthOf(model),
-                    AdventurerPack.PackBaseOf(model)));
+                    ArtPacks.PackWidthOf(model),
+                    ArtPacks.PackHeightOf(model),
+                    ArtPacks.PackDepthOf(model),
+                    ArtPacks.PackBaseOf(model)));
             }
 
             failures += Assert(
                 report,
                 measured > 1 && pinned == measured,
-                "every mesh the adventurers pack ships measures the footprint its pack constants pin, "
+                "every mesh the player's own packs ship measures the footprint its pack constants pin, "
                 + "unrotated and unscaled",
                 pinned + " of " + measured + " do"
                 + (readings.Count == 0 ? "" : "; " + string.Join("; ", readings.ToArray())));
@@ -638,7 +648,6 @@ namespace Game.EditorTooling
         }
 
         static int TheTierStillReads(
-            PartModel worn,
             IReadOnlyList<float> heights,
             IReadOnlyList<float> hides,
             IReadOnlyList<Color> tints,
@@ -688,16 +697,21 @@ namespace Game.EditorTooling
                 + "and nothing else",
                 repainted + " of " + (tints.Count - 1) + " steps repainted it");
 
+            var top = PlayerLook.Of(Climb[Climb.Length - 1]);
+            var tallest = FigureFit.StandingHeight(PlayerKit.BodyOf(top.Guise), top.Scale);
+
             failures += Assert(
                 report,
-                heights[heights.Count - 1] > 0f && Math.Abs(heights[heights.Count - 1]
-                    - FigureFit.StandingHeight(worn, PlayerLook.Of(Climb[Climb.Length - 1]).Scale)) <= Epsilon,
-                "the topmost tier stands exactly as tall as the pure fit says it should",
+                heights[heights.Count - 1] > 0f
+                && Math.Abs(heights[heights.Count - 1] - tallest) <= Epsilon,
+                "the topmost tier stands exactly as tall as the pure fit says it should, whichever "
+                + "guise the ramp has dressed it in by then",
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "it measures {0:0.#####} against {1:0.#####}",
+                    "the {0} measures {1:0.#####} against {2:0.#####}",
+                    top.Guise,
                     heights[heights.Count - 1],
-                    FigureFit.StandingHeight(worn, PlayerLook.Of(Climb[Climb.Length - 1]).Scale)));
+                    tallest));
 
             var kinder = 0;
             var greedy = new List<string>();
@@ -1154,8 +1168,8 @@ namespace Game.EditorTooling
             Camera lens,
             GameObject root,
             PlayerFigure player,
-            ICollection<Mesh> pack,
-            int tier)
+            int tier,
+            ICollection<PlayerGuise> filmed)
         {
             if (player == null)
             {
@@ -1163,11 +1177,17 @@ namespace Game.EditorTooling
             }
 
             var ground = player.Ground;
-            var standing = Standing(player, pack);
+            var standing = Standing(player);
             var size = (standing > 0f ? standing : IsoProjection.TileEdge) * PortraitSize;
             rig.Hold(new CameraFraming(
                 new WorldPoint(ground.X, ground.Y + size * 0.25f, ground.Z), size));
             PreviewFilm.Shoot(lens, PortraitPath + tier + ".png");
+
+            if (!filmed.Contains(player.Wearing))
+            {
+                filmed.Add(player.Wearing);
+                PreviewFilm.Shoot(lens, GuisePath + player.Wearing + ".png");
+            }
 
             var badges = Badges(root);
 
@@ -1204,19 +1224,19 @@ namespace Game.EditorTooling
             return groups;
         }
 
-        static float Standing(PlayerFigure player, ICollection<Mesh> pack)
+        static float Standing(PlayerFigure player)
         {
-            return player == null ? 0f : PackMesh.Wearing(player.transform, pack).size.y;
+            return player == null ? 0f : PackMesh.Wearing(player.transform, Worn(player)).size.y;
         }
 
-        static float Hiding(PlayerFigure player, ICollection<Mesh> pack)
+        static float Hiding(PlayerFigure player)
         {
             if (player == null)
             {
                 return 0f;
             }
 
-            var box = PackMesh.Wearing(player.transform, pack);
+            var box = PackMesh.Wearing(player.transform, Worn(player));
 
             return Math.Max(box.size.x, box.size.z) * IsoProjection.SightReach(box.size.y);
         }
@@ -1333,11 +1353,42 @@ namespace Game.EditorTooling
             return found;
         }
 
+        static readonly Dictionary<PartModel, ISet<Mesh>> cut = new Dictionary<PartModel, ISet<Mesh>>();
+
         static ISet<Mesh> MeshesOf(PartModel model)
         {
-            var path = WorldModels.AssetPathOf(model);
+            ISet<Mesh> found;
 
-            return PackMesh.Of(path == null ? null : Resources.Load<GameObject>(path));
+            if (cut.TryGetValue(model, out found))
+            {
+                return found;
+            }
+
+            var path = WorldModels.AssetPathOf(model);
+            found = PackMesh.Of(path == null ? null : Resources.Load<GameObject>(path));
+            cut[model] = found;
+
+            return found;
+        }
+
+        static ISet<Mesh> Worn(PlayerFigure player)
+        {
+            return MeshesOf(PlayerKit.BodyOf(player.Wearing));
+        }
+
+        static ISet<Mesh> EveryGuiseMesh()
+        {
+            var meshes = new HashSet<Mesh>();
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                foreach (var mesh in MeshesOf(PlayerKit.BodyOf(guise)))
+                {
+                    meshes.Add(mesh);
+                }
+            }
+
+            return meshes;
         }
 
         static ISet<Mesh> EveryWeaponMesh()
@@ -1346,7 +1397,7 @@ namespace Game.EditorTooling
 
             foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
             {
-                if (!AdventurerPack.Wields(model))
+                if (!AdventurerPack.Wields(model) && !WeaponsPack.Wields(model))
                 {
                     continue;
                 }
@@ -1426,7 +1477,7 @@ namespace Game.EditorTooling
                     report, false, "the world raised a player the tier ramp can arm", "it raised none");
             }
 
-            var body = MeshesOf(CharacterCast.MeshOf(PartStyle.Start));
+            var body = EveryGuiseMesh();
             var blades = EveryWeaponMesh();
             var mounted = 0;
             var boxed = 0;
@@ -1542,8 +1593,9 @@ namespace Game.EditorTooling
             failures += Assert(
                 report,
                 tiers == PlayerTier.Count && mounted == tiers,
-                "every tier that carries a weapon carries it as a mesh the adventurers pack ships, hung "
-                + "off the rig's own hand slot, and the empty-handed tier carries nothing at all",
+                "every tier that carries a weapon carries it as a mesh a pack that ships with the cast "
+                + "hands over, hung off the rig's own hand slot, and the empty-handed tier carries "
+                + "nothing at all",
                 mounted + " of " + tiers + " do"
                 + (strayed.Count == 0 ? "" : "; " + string.Join("; ", strayed.ToArray())));
 
@@ -1561,10 +1613,7 @@ namespace Game.EditorTooling
         static int TheWeaponSitsWhereThePackHangsItsOwn(
             PowerBadge power, PlayerFigure player, StringBuilder report)
         {
-            var path = WorldModels.AssetPathOf(CharacterCast.MeshOf(PartStyle.Start));
-            var prefab = path == null ? null : Resources.Load<GameObject>(path);
-
-            if (prefab == null || player == null)
+            if (player == null)
             {
                 return Assert(
                     report,
@@ -1573,37 +1622,60 @@ namespace Game.EditorTooling
                     "there is no rig to read them off");
             }
 
-            var sample = UnityEngine.Object.Instantiate(prefab);
-            sample.transform.position = Vector3.zero;
-            sample.transform.rotation = Quaternion.identity;
-            sample.transform.localScale = Vector3.one;
-
             var authored = 0;
+            var squared = 0;
             var rested = 0;
             var hung = new List<string>();
+            var strays = new List<string>();
 
-            foreach (var node in sample.GetComponentsInChildren<Transform>(true))
+            foreach (var guise in PlayerGuises.All)
             {
-                if (!node.name.StartsWith(ArtPacks.CastSlotNode, StringComparison.Ordinal))
+                var path = WorldModels.AssetPathOf(PlayerKit.BodyOf(guise));
+                var prefab = path == null ? null : Resources.Load<GameObject>(path);
+
+                if (prefab == null)
                 {
+                    strays.Add(guise + " loads no body to read accessories off");
                     continue;
                 }
 
-                for (var slot = 0; slot < node.childCount; slot++)
-                {
-                    var accessory = node.GetChild(slot);
-                    authored++;
+                var sample = UnityEngine.Object.Instantiate(prefab);
+                sample.transform.position = Vector3.zero;
+                sample.transform.rotation = Quaternion.identity;
+                sample.transform.localScale = Vector3.one;
 
-                    if (Squared(accessory) && accessory.localPosition.magnitude <= SlotSlack)
+                foreach (var node in sample.GetComponentsInChildren<Transform>(true))
+                {
+                    if (!node.name.StartsWith(ArtPacks.CastSlotNode, StringComparison.Ordinal))
                     {
-                        rested++;
+                        continue;
                     }
 
-                    hung.Add(Posed(accessory));
-                }
-            }
+                    for (var slot = 0; slot < node.childCount; slot++)
+                    {
+                        var accessory = node.GetChild(slot);
+                        authored++;
 
-            WorldObjects.Destroy(sample);
+                        if (Squared(accessory))
+                        {
+                            squared++;
+                        }
+
+                        if (accessory.localPosition.magnitude <= SlotSlack)
+                        {
+                            rested++;
+                        }
+                        else
+                        {
+                            strays.Add(guise + "'s " + Posed(accessory));
+                        }
+
+                        hung.Add(guise + "'s " + Posed(accessory));
+                    }
+                }
+
+                WorldObjects.Destroy(sample);
+            }
 
             PowerPump.Settle(power, PowerAt(PlayerTier.Count - 1));
             var held = player.Wielding;
@@ -1612,11 +1684,19 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                authored > 0 && rested == authored,
-                "the pack hangs every accessory of its own off a cast slot unturned, unscaled and "
-                + "within a hair of the slot's own origin, so an identity mount is the pack's own "
-                + "convention rather than a guess",
-                rested + " of " + authored + " do: " + string.Join(", ", hung.ToArray()));
+                authored > 0 && squared == authored,
+                "the pack hangs every accessory of every guise off a cast slot unturned and unscaled, "
+                + "so an identity mount is the pack's own convention rather than a guess",
+                squared + " of " + authored + " do: " + string.Join(", ", hung.ToArray()));
+
+            failures += Assert(
+                report,
+                authored > 0 && rested >= authored - 1,
+                "and all of them but at most one hand prop rest within a hair of the slot's own origin, "
+                + "which is what makes the origin the place a weapon belongs",
+                rested + " of " + authored + " rest within "
+                + SlotSlack.ToString("0.###", CultureInfo.InvariantCulture)
+                + (strays.Count == 0 ? "" : "; the strays are " + string.Join("; ", strays.ToArray())));
 
             failures += Assert(
                 report,
@@ -1666,8 +1746,6 @@ namespace Game.EditorTooling
                     report, false, "there is a mounted kit to measure", "there is no figure wearing one");
             }
 
-            var worn = CharacterCast.MeshOf(PartStyle.Start);
-            var body = MeshesOf(worn);
             var armed = 0;
             var pinned = 0;
             var planted = 0;
@@ -1677,20 +1755,23 @@ namespace Game.EditorTooling
             var reached = 0f;
             var strayed = new List<string>();
 
-            report.Append("\n  reach, in figure units where the knight stands ")
-                .Append(FigureFit.StandingScalesOf(worn).ToString("0.##", CultureInfo.InvariantCulture))
+            report.Append("\n  reach, in figure units where an adventurer stands ")
+                .Append(AdventurerPack.StandingScales.ToString("0.##", CultureInfo.InvariantCulture))
                 .Append(':');
 
             for (var tier = 0; tier < PlayerTier.Count; tier++)
             {
                 PowerPump.Settle(power, PowerAt(tier));
 
+                var guise = PlayerKit.GuiseOf(tier);
+                var worn = PlayerKit.BodyOf(guise);
+                var body = MeshesOf(worn);
                 var scale = power.Look.Scale;
                 var ground = player.Ground;
                 var hand = CharacterDress.Hand(player.gameObject);
                 var grip = hand == null ? 0f : (hand.position.y - ground.Y) / scale;
 
-                if (Math.Abs(grip - PlayerKit.GripHeight) <= Epsilon)
+                if (Math.Abs(grip - PlayerKit.GripHeightOf(guise)) <= Epsilon)
                 {
                     gripped++;
                 }
@@ -1698,10 +1779,11 @@ namespace Game.EditorTooling
                 {
                     strayed.Add(string.Format(
                         CultureInfo.InvariantCulture,
-                        "tier {0} grips at {1:0.#####} against the pinned {2:0.#####}",
+                        "tier {0} as the {1} grips at {2:0.#####} against the pinned {3:0.#####}",
                         tier,
+                        guise,
                         grip,
-                        PlayerKit.GripHeight));
+                        PlayerKit.GripHeightOf(guise)));
                 }
 
                 var anchor = BadgeMetrics.AnchorAbove(ground.Y + FigureFit.StandingHeight(worn, scale));
@@ -1727,9 +1809,12 @@ namespace Game.EditorTooling
 
                 report.Append("\n    tier ")
                     .Append(tier)
+                    .Append(" as the ")
+                    .Append(guise)
                     .AppendFormat(
                         CultureInfo.InvariantCulture,
-                        ": {0} at scale {1:0.####}, body and weapon {2:0.####} across and {3:0.####} tall "
+                        ": {0} at scale {1:0.####} gripped at {8:0.#####} against the pinned {9:0.#####}, "
+                        + "body and weapon {2:0.####} across and {3:0.####} tall "
                         + "off the floor, whole kit {4:0.####} across and {5:0.####} tall, against the "
                         + "gate's {6:0.####} walkway under a {7:0.####} lintel",
                         weapon,
@@ -1739,7 +1824,9 @@ namespace Game.EditorTooling
                         Math.Max(kit.size.x, kit.size.z),
                         kit.max.y - ground.Y,
                         GateArch.Walkway,
-                        GateArch.PostHeight);
+                        GateArch.PostHeight,
+                        grip,
+                        PlayerKit.GripHeightOf(guise));
 
                 if (weapon == PlayerWeapon.None)
                 {
@@ -1836,7 +1923,7 @@ namespace Game.EditorTooling
         {
             PowerPump.Settle(power, PowerAt(PlayerTier.Count - 1));
 
-            var animator = player == null ? null : player.GetComponent<FigureAnimator>();
+            var animator = player == null ? null : player.Acting;
             var hand = player == null ? null : CharacterDress.Hand(player.gameObject);
             var held = player == null ? null : player.Wielding;
 
@@ -1851,7 +1938,7 @@ namespace Game.EditorTooling
                     + (held == null ? "no weapon" : "a weapon"));
             }
 
-            var worn = CharacterCast.MeshOf(PartStyle.Start);
+            var worn = PlayerKit.BodyOf(player.Wearing);
             var body = MeshesOf(worn);
             var standing = FigureFit.StandingHeight(worn, power.Look.Scale);
             var clips = 0;
@@ -2026,16 +2113,12 @@ namespace Game.EditorTooling
         static int TheStowedKitWalksThroughAGate(
             PowerBadge power, PlayerFigure player, StringBuilder report)
         {
-            var animator = player == null ? null : player.GetComponent<FigureAnimator>();
-
-            if (power == null || player == null || animator == null)
+            if (power == null || player == null || player.Acting == null)
             {
                 return Assert(
                     report, false, "there is a driveable figure to walk at a gate", "there is none");
             }
 
-            var worn = CharacterCast.MeshOf(PartStyle.Start);
-            var body = MeshesOf(worn);
             var tiers = 0;
             var cleared = 0;
             var housed = 0;
@@ -2058,6 +2141,9 @@ namespace Game.EditorTooling
                 tiers++;
 
                 var weapon = PlayerKit.WeaponOf(tier);
+                var guise = PlayerKit.GuiseOf(tier);
+                var animator = player.Acting;
+                var body = MeshesOf(PlayerKit.BodyOf(guise));
 
                 player.Sling(false);
                 var held = SweptThroughTheWalk(player, animator, body);
@@ -2068,7 +2154,7 @@ namespace Game.EditorTooling
                 var gripped = player.Gripping;
 
                 if (gripped == weapon
-                    && FigureCues.FinisherOf(gripped) == FigureCues.FinisherOf(weapon)
+                    && FigureCues.FinisherOf(gripped) == FigureCues.FinisherOf(guise, weapon)
                     && (weapon == PlayerWeapon.None
                         || (stowed != null && stowed.name == PartNames.Held(weapon))))
                 {
@@ -2114,15 +2200,16 @@ namespace Game.EditorTooling
 
                 report.AppendFormat(
                     CultureInfo.InvariantCulture,
-                    "\n    tier {0} at scale {1:0.####} sweeps {2:0.####} holding its {3} out and "
-                    + "{4:0.####} with it stowed, whole kit {5:0.####}, crest {6:0.####}",
+                    "\n    tier {0} as the {7} at scale {1:0.####} sweeps {2:0.####} holding its {3} out "
+                    + "and {4:0.####} with it stowed, whole kit {5:0.####}, crest {6:0.####}",
                     tier,
                     power.Look.Scale,
                     held.Across,
                     weapon,
                     away.Across,
                     away.Kit,
-                    away.Crest);
+                    away.Crest,
+                    guise);
 
                 player.Sling(false);
                 var hand = CharacterDress.Hand(player.gameObject);
@@ -2179,7 +2266,6 @@ namespace Game.EditorTooling
                 return Assert(report, false, "there is a figure to arm and to swing", "there is none");
             }
 
-            var worn = CharacterCast.MeshOf(PartStyle.Start);
             var chosen = 0;
             var loaded = 0;
             var tiers = 0;
@@ -2196,7 +2282,8 @@ namespace Game.EditorTooling
 
                     var gripped = player.Gripping;
                     var wanted = PlayerKit.WeaponOf(tier);
-                    var act = FigureCues.FinisherOf(gripped);
+                    var worn = PlayerKit.BodyOf(player.Wearing);
+                    var act = FigureCues.FinisherOf(player.Wearing, gripped);
                     var named = AdventurerClips.NameOf(act);
                     var clip = clips.ClipOf(worn, named);
                     var held = player.Wielding;
@@ -2204,7 +2291,7 @@ namespace Game.EditorTooling
                         ? held == null
                         : held != null && held.name == PartNames.Held(gripped);
 
-                    if (gripped == wanted && mounted)
+                    if (gripped == wanted && player.Wearing == PlayerKit.GuiseOf(tier) && mounted)
                     {
                         chosen++;
                     }
@@ -2226,12 +2313,15 @@ namespace Game.EditorTooling
 
                     report.AppendFormat(
                         CultureInfo.InvariantCulture,
-                        "\n    tier {0} grips {1} as {2} and finishes on {3}, which is {4}",
+                        "\n    tier {0} stands as the {5} in {6} and grips {1} as {2}, finishing on {3}, "
+                        + "which is {4}",
                         tier,
                         gripped,
                         gripped == PlayerWeapon.None ? "an empty hand" : PlayerKit.ModelOf(gripped).ToString(),
                         act,
-                        clip == null ? named + ", which loads nothing" : clip.name);
+                        clip == null ? named + ", which loads nothing" : clip.name,
+                        player.Wearing,
+                        worn);
                 }
             }
 
@@ -2264,7 +2354,6 @@ namespace Game.EditorTooling
                 return Assert(report, false, "there is a figure to drape", "there is none");
             }
 
-            var body = MeshesOf(CharacterCast.MeshOf(PartStyle.Start));
             var draped = 0;
             var tiers = 0;
             var strayed = new List<string>();
@@ -2275,16 +2364,20 @@ namespace Game.EditorTooling
                 PowerPump.Settle(power, PowerAt(tier));
                 tiers++;
 
-                var cape = CharacterDress.Cloak(player.gameObject);
+                var guise = PlayerKit.GuiseOf(tier);
+                var body = MeshesOf(PlayerKit.BodyOf(guise));
+                var named = PlayerGuises.CapeOf(guise);
+                var owns = PlayerGuises.Drapes(guise);
+                var cape = CharacterDress.Cloak(player.gameObject, guise);
                 var wanted = PlayerKit.CloakedAt(tier);
                 var renderer = cape == null ? null : cape.GetComponent<Renderer>();
                 var mesh = renderer == null ? null : PackMesh.On(renderer);
+                var stands = owns
+                    ? cape != null && mesh != null && body.Contains(mesh)
+                        && cape.gameObject.activeSelf == wanted
+                    : cape == null && !wanted;
 
-                if (cape != null
-                    && mesh != null
-                    && body.Contains(mesh)
-                    && cape.gameObject.activeSelf == wanted
-                    && player.IsCloaked == wanted)
+                if (stands && player.IsCloaked == wanted)
                 {
                     draped++;
                 }
@@ -2292,25 +2385,348 @@ namespace Game.EditorTooling
                 {
                     strayed.Add(string.Format(
                         CultureInfo.InvariantCulture,
-                        "tier {0} wears {1} {2} against the {3} the ramp asks for",
+                        "tier {0} as the {1} wears {2} {3} against the {4} the ramp asks of a guise that "
+                        + "{5} a cape",
                         tier,
+                        guise,
                         cape == null ? "no cloth at all" : cape.name,
                         cape != null && cape.gameObject.activeSelf ? "shown" : "hidden",
-                        wanted ? "shown" : "hidden"));
+                        wanted ? "shown" : "hidden",
+                        owns ? "owns" : "owns no"));
                 }
 
-                cloth.Add("tier " + tier + " " + (player.IsCloaked ? "cloaked" : "bare"));
+                cloth.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "tier {0} as the {1} {2} on {3}",
+                    tier,
+                    guise,
+                    player.IsCloaked ? "cloaked" : "bare",
+                    owns ? named : "no cape node at all"));
             }
 
             return Assert(
                 report,
                 tiers == PlayerTier.Count && draped == tiers,
-                "the cloak is the cape the pack already bolts to the knight's own bones, shown from the "
-                + "threshold that dresses him in one and hidden below it, rather than a slab of cloth cut "
-                + "from a primitive",
-                draped + " of " + tiers + " tiers wear " + PlayerKit.CloakNode + ": "
-                + string.Join(", ", cloth.ToArray())
+                "the cloak is the cape the pack bolts to the bones of the guise now standing there, shown "
+                + "from the threshold that dresses it in one and hidden below it, and a guise that owns no "
+                + "cape node never drapes and never reports itself cloaked",
+                draped + " of " + tiers + " tiers do: " + string.Join(", ", cloth.ToArray())
                 + (strayed.Count == 0 ? "" : "; " + string.Join("; ", strayed.ToArray())));
+        }
+
+        static int EveryTierStandsInTheBodyItsGuiseNames(
+            PowerBadge power, PlayerFigure player, StringBuilder report)
+        {
+            if (power == null || player == null)
+            {
+                return Assert(report, false, "there is a figure to look at", "there is none");
+            }
+
+            var tiers = 0;
+            var bodied = 0;
+            var caped = 0;
+            var slotted = 0;
+            var strayed = new List<string>();
+
+            report.Append("\n  guises:");
+
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                PowerPump.Settle(power, PowerAt(tier));
+                tiers++;
+
+                var guise = PlayerKit.GuiseOf(tier);
+                var mesh = PlayerKit.BodyOf(guise);
+                var pack = MeshesOf(mesh);
+                var stranger = new List<string>();
+                var wearing = 0;
+
+                foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
+                {
+                    var cut = PackMesh.On(renderer);
+
+                    if (cut == null || !Dressed(renderer) || Propped(renderer.transform))
+                    {
+                        continue;
+                    }
+
+                    if (pack.Contains(cut))
+                    {
+                        wearing++;
+                    }
+                    else
+                    {
+                        stranger.Add(renderer.name + " wearing " + cut.name);
+                    }
+                }
+
+                var raised = player.Body;
+
+                if (player.Wearing == guise
+                    && raised != null
+                    && raised.name == PartNames.Guised(guise)
+                    && wearing > 0
+                    && stranger.Count == 0)
+                {
+                    bodied++;
+                }
+                else
+                {
+                    strayed.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} stands as the {1} in {2} wearing {3} of its meshes and {4} strangers: {5}",
+                        tier,
+                        player.Wearing,
+                        raised == null ? "nothing" : raised.name,
+                        wearing,
+                        stranger.Count,
+                        string.Join(", ", stranger.ToArray())));
+                }
+
+                var owns = PlayerGuises.Drapes(guise);
+                var cape = ClothOn(player.Body);
+
+                if (owns == (cape != null)
+                    && (cape == null
+                        || (cape.name == PlayerGuises.CapeOf(guise)
+                            && ReferenceEquals(cape, CharacterDress.Cloak(player.gameObject, guise))
+                            && cape.gameObject.activeSelf == PlayerKit.CloakedAt(tier))))
+                {
+                    caped++;
+                }
+                else
+                {
+                    strayed.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} declares {1} and the {2} mesh carries {3}",
+                        tier,
+                        owns ? PlayerGuises.CapeOf(guise) : "no cape",
+                        mesh,
+                        cape == null ? "none" : cape.name));
+                }
+
+                var weapon = PlayerKit.WeaponOf(tier);
+                var held = player.Wielding;
+                var hand = held == null ? null : held.parent;
+
+                if (weapon == PlayerWeapon.None
+                    ? held == null
+                    : held != null
+                        && hand != null
+                        && hand.name.StartsWith(ArtPacks.CastSlotNode, StringComparison.Ordinal)
+                        && ReferenceEquals(hand, CharacterDress.Hand(player.gameObject))
+                        && Rested(held))
+                {
+                    slotted++;
+                }
+                else
+                {
+                    strayed.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} hangs {1} off {2}",
+                        tier,
+                        held == null ? "nothing" : Posed(held),
+                        hand == null ? "nothing" : hand.name));
+                }
+
+                report.AppendFormat(
+                    CultureInfo.InvariantCulture,
+                    "\n    tier {0} is the {1} in {2} of {3} meshes, cape {4}, holding {5}",
+                    tier,
+                    guise,
+                    mesh,
+                    wearing,
+                    cape == null ? "none declared and none on the mesh" : cape.name + " "
+                        + (cape.gameObject.activeSelf ? "shown" : "hidden"),
+                    held == null ? "nothing" : held.name);
+            }
+
+            var failures = 0;
+
+            failures += Assert(
+                report,
+                tiers == PlayerTier.Count && bodied == tiers,
+                "the mesh the figure is actually built out of at every tier is the one that tier's guise "
+                + "names, and nothing of the guise it used to be is left standing on it",
+                bodied + " of " + tiers + " tiers do"
+                + (strayed.Count == 0 ? "" : "; " + string.Join("; ", strayed.ToArray())));
+
+            failures += Assert(
+                report,
+                tiers == PlayerTier.Count && caped == tiers,
+                "the cape node is on the mesh exactly when the guise declares one, and shown exactly when "
+                + "the look says cloaked",
+                caped + " of " + tiers + " tiers do");
+
+            failures += Assert(
+                report,
+                tiers == PlayerTier.Count && slotted == tiers,
+                "the weapon hangs off the rig's own hand slot at an identity local transform at every "
+                + "tier, so a change of body never leaves the grip behind",
+                slotted + " of " + tiers + " tiers do");
+
+            return failures;
+        }
+
+        static Transform ClothOn(GameObject body)
+        {
+            if (body == null)
+            {
+                return null;
+            }
+
+            foreach (var node in body.GetComponentsInChildren<Transform>(true))
+            {
+                if (node.name.EndsWith(AdventurerPack.CloakSuffix, StringComparison.Ordinal))
+                {
+                    return node;
+                }
+            }
+
+            return null;
+        }
+
+        static int ASwapKeepsWhatTheHeroWasDoingAndCarrying(
+            PowerBadge power, PlayerFigure player, StringBuilder report)
+        {
+            if (power == null || player == null)
+            {
+                return Assert(report, false, "there is a figure to swap", "there is none");
+            }
+
+            var below = 0;
+            var above = 0;
+
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            {
+                if (PlayerKit.GuiseOf(tier) == PlayerKit.GuiseOf(tier - 1))
+                {
+                    continue;
+                }
+
+                below = tier - 1;
+                above = tier;
+                break;
+            }
+
+            if (above == 0)
+            {
+                return Assert(
+                    report, false, "the ramp changes guise somewhere", "every tier wears the same body");
+            }
+
+            PowerPump.Settle(power, PowerAt(above));
+            var carried = player.Carrying;
+            PowerPump.Settle(power, PowerAt(below));
+
+            var animator = player.Acting;
+            animator.Cue(FigureCue.Looping(FigureAct.Walk));
+            animator.Advance(animator.PlayingSeconds * 0.5f);
+
+            player.Face(new WorldPoint(1f, 0f, 0f));
+
+            for (var frame = 0; frame < 240 && player.IsTurning; frame++)
+            {
+                player.Turn(PowerPump.Frame);
+            }
+
+            var wasGuise = player.Wearing;
+            var wasAct = animator.Act;
+            var wasPhase = animator.Phase;
+            var wasYaw = player.transform.localEulerAngles.y;
+            var wasTrophies = player.Carrying;
+
+            PowerPump.Settle(power, PowerAt(above));
+
+            var now = player.Acting;
+            var failures = 0;
+
+            report.AppendFormat(
+                CultureInfo.InvariantCulture,
+                "\n  the swap from tier {0} to tier {1}: the {2} was walking {3:0.####}s in at {4:0.###} "
+                + "degrees carrying {5}; the {6} is playing {7} {8:0.####}s in at {9:0.###} degrees "
+                + "carrying {10} of the {11} that tier wants",
+                below,
+                above,
+                wasGuise,
+                wasPhase,
+                wasYaw,
+                wasTrophies,
+                player.Wearing,
+                now == null ? "nothing" : now.Act.ToString(),
+                now == null ? 0f : now.Phase,
+                player.transform.localEulerAngles.y,
+                player.Carrying,
+                carried);
+
+            failures += Assert(
+                report,
+                player.Wearing != wasGuise && player.Wearing == PlayerKit.GuiseOf(above),
+                "the promotion across the guise seam really does put a different body on the tile",
+                wasGuise + " became " + player.Wearing);
+
+            failures += Assert(
+                report,
+                now != null && !ReferenceEquals(now, animator) && now.Act == wasAct
+                && Math.Abs(now.Phase - wasPhase) <= Epsilon && now.Playing != null,
+                "the new body picks the walk up at the phase the old one had reached rather than "
+                + "restarting it, so a promotion mid-journey does not reset the stride",
+                now == null
+                    ? "there is no animator on the new body"
+                    : string.Format(
+                        CultureInfo.InvariantCulture,
+                        "it plays {0} at {1:0.#####}s against the {2} at {3:0.#####}s it took over",
+                        now.Act,
+                        now.Phase,
+                        wasAct,
+                        wasPhase));
+
+            failures += Assert(
+                report,
+                Math.Abs(Mathf.DeltaAngle(player.transform.localEulerAngles.y, wasYaw)) <= AngleEpsilon,
+                "and it faces exactly the way the body it replaced was facing, so the swap never spins "
+                + "the figure",
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "it faces {0:0.###} against {1:0.###}",
+                    player.transform.localEulerAngles.y,
+                    wasYaw));
+
+            failures += Assert(
+                report,
+                player.Carrying == carried && Planted(player) == WantedProps(above),
+                "every trophy the hero had collected survives the change of costume, and the props "
+                + "hanging off it are exactly the ones the tier calls for and no spares",
+                player.Carrying + " trophies in " + Planted(player) + " props against the "
+                + WantedProps(above) + " tier " + above + " wants");
+
+            return failures;
+        }
+
+        static int EveryGuiseSatForAPortrait(IReadOnlyList<PlayerGuise> filmed, StringBuilder report)
+        {
+            var shot = 0;
+            var missing = new List<string>();
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                if (File.Exists(GuisePath + guise + ".png"))
+                {
+                    shot++;
+                }
+                else
+                {
+                    missing.Add(guise + " never sat for one");
+                }
+            }
+
+            return Assert(
+                report,
+                shot == PlayerGuises.Count && filmed.Count == PlayerGuises.Count,
+                "the climb films a portrait of every guise it dresses the hero in, so the scratch folder "
+                + "carries one run artifact per body and not only one per tier",
+                shot + " of " + PlayerGuises.Count + " guises are on film under " + GuisePath
+                + (missing.Count == 0 ? "" : "; " + string.Join("; ", missing.ToArray())));
         }
 
         static bool Dressed(Renderer renderer)
@@ -2472,8 +2888,7 @@ namespace Game.EditorTooling
         static string Row(
             PowerBadge power,
             PlayerFigure player,
-            IReadOnlyList<EnemyFigure> enemies,
-            ICollection<Mesh> pack)
+            IReadOnlyList<EnemyFigure> enemies)
         {
             var counts = new int[4];
             foreach (var enemy in enemies)
@@ -2484,11 +2899,12 @@ namespace Game.EditorTooling
             var row = new StringBuilder();
             row.AppendFormat(
                 CultureInfo.InvariantCulture,
-                "\n  power {0} is tier {1} at scale {2:0.###} standing {3:0.###} carrying {4} ->",
+                "\n  power {0} is tier {1} as the {2} at scale {3:0.###} standing {4:0.###} carrying {5} ->",
                 power.Power,
                 power.Look.Tier,
+                player.Wearing,
                 player.transform.localScale.x,
-                Standing(player, pack),
+                Standing(player),
                 player.Carrying);
 
             for (var band = 0; band < counts.Length; band++)

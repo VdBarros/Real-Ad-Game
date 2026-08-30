@@ -25,6 +25,7 @@ namespace Game.Presentation.Pure
                 case PartModel.Staircase:
                     return Crested(part);
                 case PartModel.Knight:
+                case PartModel.Barbarian:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:
@@ -34,6 +35,11 @@ namespace Game.Presentation.Pure
                 case PartModel.Axe2Handed:
                 case PartModel.Staff:
                 case PartModel.Sword2Handed:
+                case PartModel.SwordA:
+                case PartModel.AxeB:
+                case PartModel.StaffA:
+                case PartModel.StaffB:
+                case PartModel.BowA:
                 case PartModel.None:
                 case PartModel.FloorTile:
                     return part.Position;
@@ -52,6 +58,7 @@ namespace Game.Presentation.Pure
                 case PartModel.Chest:
                     return new WorldPoint(part.Rotation.X, part.Rotation.Y + ChestFacing, part.Rotation.Z);
                 case PartModel.Knight:
+                case PartModel.Barbarian:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:
@@ -64,6 +71,11 @@ namespace Game.Presentation.Pure
                 case PartModel.Axe2Handed:
                 case PartModel.Staff:
                 case PartModel.Sword2Handed:
+                case PartModel.SwordA:
+                case PartModel.AxeB:
+                case PartModel.StaffA:
+                case PartModel.StaffB:
+                case PartModel.BowA:
                 case PartModel.None:
                 case PartModel.WallPanel:
                 case PartModel.CoinStack:
@@ -105,6 +117,7 @@ namespace Game.Presentation.Pure
                 case PartModel.SwordShield:
                     return Boxed(part);
                 case PartModel.Knight:
+                case PartModel.Barbarian:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:
@@ -114,6 +127,11 @@ namespace Game.Presentation.Pure
                 case PartModel.Axe2Handed:
                 case PartModel.Staff:
                 case PartModel.Sword2Handed:
+                case PartModel.SwordA:
+                case PartModel.AxeB:
+                case PartModel.StaffA:
+                case PartModel.StaffB:
+                case PartModel.BowA:
                 case PartModel.None:
                     return part.Scale;
                 default:

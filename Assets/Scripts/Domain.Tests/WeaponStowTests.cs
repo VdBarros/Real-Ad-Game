@@ -93,7 +93,7 @@ namespace Game.Domain.Tests
                 Assert.That(WeaponStow.Away(level, walk, fight), Is.False, outcome + " kept it stowed.");
                 Assert.That(
                     FigureCues.FinisherOf(PlayerKit.WeaponOf(PlayerTier.Count - 1)),
-                    Is.EqualTo(FigureAct.Sweep));
+                    Is.EqualTo(PlayerGuises.FinisherOf(PlayerKit.GuiseOf(PlayerTier.Count - 1))));
             }
         }
 
@@ -155,6 +155,53 @@ namespace Game.Domain.Tests
             }
 
             Assert.That(hung.Count, Is.EqualTo(PlayerTier.Count - 1));
+        }
+
+        [Test]
+        public void NoWeaponTheRampHangsIsLongerThanTheHeroItHangsOn()
+        {
+            var body = ArtPacks.HeightOf(PlayerKit.Body);
+
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            {
+                var model = PlayerKit.ModelOf(PlayerKit.WeaponOf(tier));
+
+                Assert.That(ArtPacks.HeightOf(model), Is.LessThan(body), model.ToString());
+            }
+        }
+
+        [Test]
+        public void TheOneMeshThePackAuthorsLyingFlatOnlyClearsTheWalkwayStoodUpright()
+        {
+            var flat = 0;
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (!WeaponsPack.Carries(model))
+                {
+                    continue;
+                }
+
+                var authored = ArtPacks.WidthOf(model) * PlayerKit.StandingPerImportUnit;
+                var upright = ArtPacks.HeightOf(model) * PlayerKit.StandingPerImportUnit;
+
+                if (!WeaponsPack.LiesFlat(model))
+                {
+                    Assert.That(WeaponsPack.MountRollOf(model), Is.EqualTo(0f), model.ToString());
+                    Assert.That(authored, Is.LessThan(WeaponStow.Shoulders), model.ToString());
+                    continue;
+                }
+
+                flat++;
+
+                Assert.That(WeaponsPack.MountRollOf(model), Is.EqualTo(WeaponsPack.UprightRoll));
+                Assert.That(authored, Is.GreaterThan(WeaponStow.Shoulders), model.ToString());
+                Assert.That(upright, Is.LessThan(WeaponStow.Shoulders), model.ToString());
+                Assert.That(
+                    ArtPacks.HeightOf(model), Is.LessThan(ArtPacks.WidthOf(model)), model.ToString());
+            }
+
+            Assert.That(flat, Is.EqualTo(1));
         }
 
         [Test]

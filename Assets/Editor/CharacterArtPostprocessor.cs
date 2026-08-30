@@ -36,7 +36,7 @@ namespace Game.EditorTooling
 
         public override uint GetVersion()
         {
-            return 7;
+            return 8;
         }
 
         public static bool IsAnimationSet(string path)
@@ -96,7 +96,7 @@ namespace Game.EditorTooling
             importer.weldVertices = false;
             importer.meshCompression = Compression;
             importer.useFileScale = true;
-            importer.globalScale = ArtPacks.CastImportScale;
+            importer.globalScale = ImportScaleOf(importer.assetPath);
 
             if (!importer.importAnimation)
             {
@@ -235,6 +235,35 @@ namespace Game.EditorTooling
             }
 
             return kept.ToArray();
+        }
+
+        public static float ImportScaleOf(string path)
+        {
+            var named = ModelNamed(path);
+
+            return named == PartModel.None ? ArtPacks.CastImportScale : ArtPacks.ImportScaleFor(named);
+        }
+
+        public static PartModel ModelNamed(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return PartModel.None;
+            }
+
+            var asset = System.IO.Path.GetFileNameWithoutExtension(path);
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (model != PartModel.None
+                    && ArtPacks.ShipsWithTheCast(model)
+                    && string.Equals(WorldModels.AssetNameOf(model), asset, StringComparison.Ordinal))
+                {
+                    return model;
+                }
+            }
+
+            return PartModel.None;
         }
 
         static HashSet<string> SetAssets()

@@ -119,6 +119,18 @@ namespace Game.Presentation.Pure
             return "Dot_" + index.ToString(CultureInfo.InvariantCulture);
         }
 
+        public const string GuisePrefix = "Guise_";
+
+        public static string Guised(PlayerGuise guise)
+        {
+            return GuisePrefix + guise;
+        }
+
+        public static bool IsGuised(string name)
+        {
+            return name != null && name.StartsWith(GuisePrefix, StringComparison.Ordinal);
+        }
+
         public const string WornPrefix = "Worn_";
 
         public const string TrophyPrefix = WornPrefix + "Trophy_";

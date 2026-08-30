@@ -37,7 +37,7 @@ namespace Game.Presentation.Pure
             switch (role)
             {
                 case PartStyle.Start:
-                    return PartModel.Knight;
+                    return PlayerKit.Body;
                 case PartStyle.Enemy:
                     return TierMeshOf(0);
                 case PartStyle.Boss:
@@ -66,12 +66,27 @@ namespace Game.Presentation.Pure
 
         public static IReadOnlyList<PartModel> MeshesOf(PartStyle role)
         {
+            var worn = new List<PartModel>();
+
+            if (role == PartStyle.Start)
+            {
+                foreach (var guise in PlayerKit.Guises)
+                {
+                    var mesh = PlayerKit.BodyOf(guise);
+
+                    if (!worn.Contains(mesh))
+                    {
+                        worn.Add(mesh);
+                    }
+                }
+
+                return worn;
+            }
+
             if (role != PartStyle.Enemy)
             {
                 return new[] { MeshOf(role) };
             }
-
-            var worn = new List<PartModel>();
 
             for (var tier = 0; tier < enemyByTier.Length; tier++)
             {

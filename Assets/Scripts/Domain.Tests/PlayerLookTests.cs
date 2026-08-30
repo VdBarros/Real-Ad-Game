@@ -88,13 +88,73 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheLookCarriesTheWeaponAndCloakItsTierIsDressedIn()
+        public void TheLookCarriesTheGuiseWeaponAndCloakItsTierIsDressedIn()
         {
             for (var tier = 0; tier < PlayerTier.Count; tier++)
             {
+                Assert.That(Look(tier).Guise, Is.EqualTo(PlayerKit.GuiseOf(tier)));
                 Assert.That(Look(tier).Weapon, Is.EqualTo(PlayerKit.WeaponOf(tier)));
                 Assert.That(Look(tier).Cloak, Is.EqualTo(PlayerKit.CloakedAt(tier)));
             }
+        }
+
+        [Test]
+        public void TheGuiseIsAPureFunctionOfPowerAndSweepsEveryThresholdBoundary()
+        {
+            Assert.That(PlayerLook.Of(37).Guise, Is.EqualTo(PlayerLook.Of(37).Guise));
+
+            foreach (var threshold in PlayerTier.Thresholds)
+            {
+                var below = PlayerLook.Of(threshold - 1);
+                var at = PlayerLook.Of(threshold);
+
+                Assert.That(below.Guise, Is.EqualTo(PlayerKit.GuiseOf(below.Tier)));
+                Assert.That(at.Guise, Is.EqualTo(PlayerKit.GuiseOf(at.Tier)));
+                Assert.That(at.Tier, Is.EqualTo(below.Tier + 1));
+            }
+
+            for (var power = 1; power <= 490; power++)
+            {
+                Assert.That(
+                    PlayerLook.Of(power).Guise,
+                    Is.EqualTo(PlayerKit.GuiseOf(PlayerTier.Of(power))),
+                    "power " + power);
+            }
+        }
+
+        [Test]
+        public void TheGuiseTakesPartInTheLooksEqualityHashAndStringTheWayTheWeaponDoes()
+        {
+            var seen = new Dictionary<PlayerGuise, PlayerLook>();
+
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                var look = Look(tier);
+
+                Assert.That(look.ToString(), Does.Contain(look.Guise.ToString()));
+                Assert.That(look.ToString(), Does.Contain(look.Weapon.ToString()));
+                Assert.That(look.GetHashCode(), Is.EqualTo(Look(tier).GetHashCode()));
+                Assert.That(look, Is.EqualTo(Look(tier)));
+
+                seen[look.Guise] = look;
+            }
+
+            var swapped = 0;
+
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            {
+                if (Look(tier).Guise == Look(tier - 1).Guise)
+                {
+                    continue;
+                }
+
+                swapped++;
+                Assert.That(Look(tier), Is.Not.EqualTo(Look(tier - 1)));
+                Assert.That(Look(tier).GetHashCode(), Is.Not.EqualTo(Look(tier - 1).GetHashCode()));
+            }
+
+            Assert.That(swapped, Is.EqualTo(seen.Count - 1));
+            Assert.That(swapped, Is.GreaterThan(0));
         }
 
         [Test]

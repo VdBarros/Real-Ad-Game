@@ -14,7 +14,11 @@ namespace Game.Presentation.Pure
 
         public const string RigNode = "Rig";
 
-        public const string CloakNode = "Knight_Cape";
+        public const string CloakSuffix = "_Cape";
+
+        public const string KnightCloakNode = "Knight" + CloakSuffix;
+
+        public const string BarbarianCloakNode = "Barbarian" + CloakSuffix;
 
         public const float KnightPackHeight = 2.63436f;
 
@@ -23,6 +27,14 @@ namespace Game.Presentation.Pure
         public const float KnightPackDepth = 1.25362f;
 
         public const float KnightPackBase = -0.1678f;
+
+        public const float BarbarianPackHeight = 2.58248f;
+
+        public const float BarbarianPackWidth = 1.94251f;
+
+        public const float BarbarianPackDepth = 1.2639f;
+
+        public const float BarbarianPackBase = -0.18471f;
 
         public const float Sword1HandedPackHeight = 1.77526f;
 
@@ -65,7 +77,7 @@ namespace Game.Presentation.Pure
 
         public static bool Carries(PartModel model)
         {
-            return model == PartModel.Knight || Wields(model);
+            return model == PartModel.Knight || model == PartModel.Barbarian || Wields(model);
         }
 
         public static bool Wields(PartModel model)
@@ -88,6 +100,8 @@ namespace Game.Presentation.Pure
             {
                 case PartModel.Knight:
                     return KnightPackHeight;
+                case PartModel.Barbarian:
+                    return BarbarianPackHeight;
                 case PartModel.Sword1Handed:
                     return Sword1HandedPackHeight;
                 case PartModel.Axe2Handed:
@@ -107,6 +121,8 @@ namespace Game.Presentation.Pure
             {
                 case PartModel.Knight:
                     return KnightPackWidth;
+                case PartModel.Barbarian:
+                    return BarbarianPackWidth;
                 case PartModel.Sword1Handed:
                     return Sword1HandedPackWidth;
                 case PartModel.Axe2Handed:
@@ -126,6 +142,8 @@ namespace Game.Presentation.Pure
             {
                 case PartModel.Knight:
                     return KnightPackDepth;
+                case PartModel.Barbarian:
+                    return BarbarianPackDepth;
                 case PartModel.Sword1Handed:
                     return Sword1HandedPackDepth;
                 case PartModel.Axe2Handed:
@@ -145,6 +163,8 @@ namespace Game.Presentation.Pure
             {
                 case PartModel.Knight:
                     return KnightPackBase;
+                case PartModel.Barbarian:
+                    return BarbarianPackBase;
                 case PartModel.Sword1Handed:
                     return Sword1HandedPackBase;
                 case PartModel.Axe2Handed:
