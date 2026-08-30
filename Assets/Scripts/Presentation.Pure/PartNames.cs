@@ -20,6 +20,15 @@ namespace Game.Presentation.Pure
 
         public const string Backdrop = "Backdrop";
 
+        public const string WorldPrefix = "World_";
+
+        public const string BackdropSkin = Backdrop + "_Skin";
+
+        public static bool IsWorldPrefixed(string name)
+        {
+            return name != null && name.StartsWith(WorldPrefix, StringComparison.Ordinal);
+        }
+
         public const string TrailGroup = "Trail";
 
         public const string OrbGroup = "Orbs";

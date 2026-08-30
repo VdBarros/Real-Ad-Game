@@ -6,9 +6,10 @@ using UnityEngine.Rendering;
 
 namespace Game.Presentation
 {
+    [ExecuteAlways]
     public sealed class WorldBackdrop : MonoBehaviour
     {
-        public const string MaterialName = "World_Backdrop";
+        public const string MaterialName = PartNames.BackdropSkin;
 
         static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
 
