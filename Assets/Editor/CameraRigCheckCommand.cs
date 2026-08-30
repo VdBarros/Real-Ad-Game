@@ -357,7 +357,7 @@ namespace Game.EditorTooling
             rig.Skip();
             report.Append("\n  a tap leaves the rig ").Append(rig.IsBusy ? "busy" : "free");
 
-            TheHarnessPhotographsUnderTheOneSunTheBuildRaises(report);
+            TheHarnessPhotographsInTheRoomTheBuildRaises(report);
 
             Debug.Log(report.ToString());
 
@@ -365,16 +365,18 @@ namespace Game.EditorTooling
             builder.Dispose();
         }
 
-        static void TheHarnessPhotographsUnderTheOneSunTheBuildRaises(StringBuilder report)
+        static void TheHarnessPhotographsInTheRoomTheBuildRaises(StringBuilder report)
         {
-            var sun = PreviewFilm.Sunlight();
+            PreviewFilm.Sun();
+
+            var sun = PreviewFilm.TheSunAlreadyUp();
             var risen = PreviewFilm.SunsUp();
             var apart = Quaternion.Angle(sun.transform.rotation, GameBoot.SunAngle);
             var lighting = risen + (risen == 1 ? " directional light" : " directional lights");
 
             report.AppendFormat(
                 CultureInfo.InvariantCulture,
-                "\n  a second call for the sun leaves the frame lit by {0},"
+                "\n  a second call on the harness for its sun and its room leaves the frame lit by {0},"
                 + " at {1:0.###} against the build's {2:0.###}, {3:0.###} degrees off its angle",
                 lighting,
                 sun.intensity,
@@ -394,6 +396,17 @@ namespace Game.EditorTooling
                 Debug.LogError(
                     "The harness sun burns at " + sun.intensity + " and sits " + apart
                     + " degrees off the " + GameBoot.SunStrength + " the build raises.");
+            }
+
+            var elsewhere = PreviewFilm.RoomApartFromTheBuild();
+
+            report.Append("\n  and in ").Append(PreviewFilm.RoomAsPhotographed());
+
+            if (elsewhere != null)
+            {
+                Debug.LogError(
+                    "The harness photographs in an environment the build never ships: " + elsewhere
+                    + ", so every tone it measures is measured somewhere else.");
             }
         }
 
