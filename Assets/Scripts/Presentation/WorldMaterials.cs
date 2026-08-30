@@ -7,7 +7,7 @@ namespace Game.Presentation
 {
     public sealed class WorldMaterials : IDisposable
     {
-        public const string NamePrefix = "World_";
+        public const string NamePrefix = PartNames.WorldPrefix;
 
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
