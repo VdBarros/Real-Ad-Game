@@ -49,9 +49,28 @@ namespace Game.Presentation.Pure
             get { return FigureFit.StandingHeight(Passer, PasserScale); }
         }
 
-        public static float WidestPasser
+        public static PartModel WidestPasser
         {
-            get { return FigureFit.SpreadOf(Passer, PasserScale); }
+            get
+            {
+                var passers = CharacterCast.MeshesOf(PartStyle.Start);
+                var widest = passers[0];
+
+                for (var slot = 1; slot < passers.Count; slot++)
+                {
+                    if (FigureFit.TurnOf(passers[slot], PasserScale) > FigureFit.TurnOf(widest, PasserScale))
+                    {
+                        widest = passers[slot];
+                    }
+                }
+
+                return widest;
+            }
+        }
+
+        public static float WidestTurn
+        {
+            get { return FigureFit.TurnOf(WidestPasser, PasserScale); }
         }
 
         public static float PostHeight
@@ -61,7 +80,7 @@ namespace Game.Presentation.Pure
 
         public static float Walkway
         {
-            get { return WidestPasser * Headroom; }
+            get { return WidestTurn * Headroom; }
         }
 
         public static float Span

@@ -83,7 +83,7 @@ namespace Game.Presentation.Pure
             return ArtPacks.TurnOf(model) * ScaleOf(model) * figureScale;
         }
 
-        public static float SpreadOf(PartModel model, float figureScale)
+        public static float BoxSpreadOf(PartModel model, float figureScale)
         {
             var width = WidthOf(model, figureScale);
             var depth = DepthOf(model, figureScale);
@@ -113,9 +113,9 @@ namespace Game.Presentation.Pure
                 * IsoProjection.SightReach(StandingHeight(model, figureScale));
         }
 
-        public static float HiddenSpreadOf(PartModel model, float figureScale)
+        public static float HiddenBoxSpreadOf(PartModel model, float figureScale)
         {
-            return SpreadOf(model, figureScale)
+            return BoxSpreadOf(model, figureScale)
                 * IsoProjection.SightReach(StandingHeight(model, figureScale));
         }
 

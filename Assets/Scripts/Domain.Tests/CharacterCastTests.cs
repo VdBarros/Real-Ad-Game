@@ -231,10 +231,10 @@ namespace Game.Domain.Tests
                 AdventurerPack.HeightOf(mesh) * scale,
                 Is.LessThan(IsoProjection.StepHeight));
             Assert.That(
-                FigureFit.SpreadOf(mesh, LevelBlueprintBuilder.FigureScale),
+                FigureFit.BoxSpreadOf(mesh, LevelBlueprintBuilder.FigureScale),
                 Is.LessThan(IsoProjection.TileEdge));
             Assert.That(
-                FigureFit.SpreadOf(mesh, LevelBlueprintBuilder.FigureScale),
+                FigureFit.BoxSpreadOf(mesh, LevelBlueprintBuilder.FigureScale),
                 Is.GreaterThan(FigureFit.WidthOf(mesh, LevelBlueprintBuilder.FigureScale)));
         }
 
@@ -261,9 +261,9 @@ namespace Game.Domain.Tests
 
             Assert.That(IsoProjection.OcclusionBound, Is.EqualTo(0.5f));
             Assert.That(FigureFit.HiddenGroundOf(mesh, scale), Is.LessThan(bound));
-            Assert.That(FigureFit.HiddenSpreadOf(mesh, scale), Is.LessThan(bound));
+            Assert.That(FigureFit.HiddenBoxSpreadOf(mesh, scale), Is.LessThan(bound));
             Assert.That(
-                FigureFit.HiddenSpreadOf(mesh, scale),
+                FigureFit.HiddenBoxSpreadOf(mesh, scale),
                 Is.GreaterThan(FigureFit.HiddenGroundOf(mesh, scale)));
             Assert.That(
                 IsoProjection.TileEdge * IsoProjection.SightReach(DungeonPack.HeightOf(PartModel.WallPanel)),
