@@ -488,7 +488,7 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                spread <= FigureFit.SpreadOf(worn, scale) + Epsilon,
+                spread <= FigureFit.BoxSpreadOf(worn, scale) + Epsilon,
                 "the figure spreads no wider than the pinned pack footprint allows it to at any yaw",
                 string.Format(
                     CultureInfo.InvariantCulture,
@@ -497,7 +497,7 @@ namespace Game.EditorTooling
                     box.size.x,
                     box.size.z,
                     AdventurerPack.Facing,
-                    FigureFit.SpreadOf(worn, scale),
+                    FigureFit.BoxSpreadOf(worn, scale),
                     FigureFit.WidthOf(worn, scale),
                     FigureFit.DepthOf(worn, scale)));
 
@@ -528,14 +528,14 @@ namespace Game.EditorTooling
 
             failures += Assert(
                 report,
-                hidden <= FigureFit.HiddenSpreadOf(worn, scale) + Epsilon,
+                hidden <= FigureFit.HiddenBoxSpreadOf(worn, scale) + Epsilon,
                 "the measured ground the figure hides stays inside what the pure fit guarantees",
                 string.Format(
                     CultureInfo.InvariantCulture,
                     "measured {0:0.#####} against the {1:0.#####} the fit allows at any yaw and the "
                     + "{2:0.#####} it predicts face on",
                     hidden,
-                    FigureFit.HiddenSpreadOf(worn, scale),
+                    FigureFit.HiddenBoxSpreadOf(worn, scale),
                     FigureFit.HiddenGroundOf(worn, scale)));
 
             failures += Assert(
@@ -2232,7 +2232,7 @@ namespace Game.EditorTooling
         static int EveryGuiseTurnsInsideTheWalkway(StringBuilder report)
         {
             var scale = GateArch.PasserScale;
-            var turned = 0;
+            var tiled = 0;
             var boxed = 0;
             var readings = new List<string>();
 
@@ -2240,11 +2240,11 @@ namespace Game.EditorTooling
             {
                 var mesh = PlayerKit.BodyOf(guise);
                 var turn = FigureFit.TurnOf(mesh, scale);
-                var box = FigureFit.SpreadOf(mesh, scale);
+                var box = FigureFit.BoxSpreadOf(mesh, scale);
 
-                if (turn < GateArch.Walkway)
+                if (turn < IsoProjection.TileEdge)
                 {
-                    turned++;
+                    tiled++;
                 }
 
                 if (box >= GateArch.Walkway)
@@ -2262,13 +2262,16 @@ namespace Game.EditorTooling
 
             return Assert(
                 report,
-                turned == PlayerGuises.Count,
-                "and every guise turns on the spot inside that walkway at the tallest tier, which is the "
-                + "fit at any yaw the swept corridor only reads square on; the box a pack draws round a "
-                + "body is not that fit, and for " + boxed + " of the " + PlayerGuises.Count
-                + " it already oversteps",
-                turned + " of " + PlayerGuises.Count + " do against a walkway of "
-                + GateArch.Walkway.ToString("0.####", CultureInfo.InvariantCulture) + "; "
+                tiled == PlayerGuises.Count && GateArch.TileFootprint < IsoProjection.TileEdge,
+                "the walkway is cut to the ground the widest guise turns rather than to the box a pack "
+                + "draws round it, so every guise turns on the spot inside its own tile and the arch "
+                + "built for it still stands on one; the box oversteps that walkway for " + boxed
+                + " of the " + PlayerGuises.Count,
+                tiled + " of " + PlayerGuises.Count + " turn inside a tile, against a walkway of "
+                + GateArch.Walkway.ToString("0.####", CultureInfo.InvariantCulture) + " cut for the "
+                + GateArch.WidestPasser + " and an arch footprint of "
+                + GateArch.TileFootprint.ToString("0.####", CultureInfo.InvariantCulture) + " on a "
+                + IsoProjection.TileEdge.ToString("0.####", CultureInfo.InvariantCulture) + " tile; "
                 + string.Join("; ", readings.ToArray()));
         }
 
@@ -2324,7 +2327,9 @@ namespace Game.EditorTooling
             var narrowed = 0;
             var gripping = 0;
             var redrawn = 0;
+            var gripClears = 0;
             var strayed = new List<string>();
+            var gripReadings = new List<string>();
 
             report.Append("\n  the swept corridor across ")
                 .Append(AdventurerClips.Walk)
@@ -2397,10 +2402,24 @@ namespace Game.EditorTooling
                     narrowed++;
                 }
 
+                if (held.Across <= GateArch.Walkway
+                    && held.Kit <= GateArch.Walkway
+                    && held.Crest <= GateArch.PostHeight)
+                {
+                    gripClears++;
+                }
+
+                gripReadings.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "tier {0} gripped leaves {1:0.####} of the walkway spare",
+                    tier,
+                    GateArch.Walkway - Math.Max(held.Across, held.Kit)));
+
                 report.AppendFormat(
                     CultureInfo.InvariantCulture,
                     "\n    tier {0} as the {7} at scale {1:0.####} sweeps {2:0.####} holding its {3} out "
-                    + "and {4:0.####} with it stowed, whole kit {5:0.####}, crest {6:0.####}",
+                    + "and {4:0.####} with it stowed, whole kit {5:0.####}, crest {6:0.####}; gripped its "
+                    + "whole kit sweeps {8:0.####} and crests {9:0.####}",
                     tier,
                     power.Look.Scale,
                     held.Across,
@@ -2408,7 +2427,9 @@ namespace Game.EditorTooling
                     away.Across,
                     away.Kit,
                     away.Crest,
-                    guise);
+                    guise,
+                    held.Kit,
+                    held.Crest);
 
                 player.Sling(false);
                 var hand = CharacterDress.Hand(player.gameObject);
@@ -2427,6 +2448,14 @@ namespace Game.EditorTooling
             }
 
             player.Sling(false);
+
+            report.Append("\n    how much of the narrowed walkway the stow is buying, measured but not "
+                    + "acted on: ")
+                .Append(gripClears)
+                .Append(" of ")
+                .Append(tiers)
+                .Append(" tiers would already clear it gripped; ")
+                .Append(string.Join(", ", gripReadings.ToArray()));
 
             var failures = 0;
 

@@ -300,7 +300,7 @@ namespace Game.Domain.Tests
         [TestCaseSource(nameof(EveryPreset))]
         public void NoLandmarkReachesTheLineTheFigureWalksAlong(MazePreset preset)
         {
-            var figure = FigureFit.SpreadOf(
+            var figure = FigureFit.BoxSpreadOf(
                 CharacterCast.MeshOf(PartStyle.Start), LevelBlueprintBuilder.FigureScale) * 0.5f;
             var tightest = float.MaxValue;
 
@@ -335,7 +335,7 @@ namespace Game.Domain.Tests
         [Test]
         public void TheClearanceALandmarkLeavesIsWiderThanTheFigureThatWalksPastIt()
         {
-            var figure = FigureFit.SpreadOf(
+            var figure = FigureFit.BoxSpreadOf(
                 CharacterCast.MeshOf(PartStyle.Start), LevelBlueprintBuilder.FigureScale) * 0.5f;
 
             Assert.That(Landmarks.Clearance, Is.GreaterThan(figure));

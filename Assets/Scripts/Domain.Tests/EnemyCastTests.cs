@@ -585,7 +585,7 @@ namespace Game.Domain.Tests
             foreach (var mesh in CharacterCast.MeshesOf(PartStyle.Enemy))
             {
                 Assert.That(FigureFit.HiddenGroundOf(mesh, scale), Is.LessThan(bound), mesh.ToString());
-                Assert.That(FigureFit.HiddenSpreadOf(mesh, scale), Is.LessThan(bound), mesh.ToString());
+                Assert.That(FigureFit.HiddenBoxSpreadOf(mesh, scale), Is.LessThan(bound), mesh.ToString());
             }
         }
 
@@ -669,18 +669,22 @@ namespace Game.Domain.Tests
                     Is.LessThan(IsoProjection.TileEdge),
                     guise + " oversteps the tile it stands on");
 
-                if (FigureFit.SpreadOf(mesh, scale) >= GateArch.Walkway)
+                if (FigureFit.BoxSpreadOf(mesh, scale) >= GateArch.Walkway)
                 {
                     boxed.Add(guise + " measures "
                         + FigureFit.TurnOf(mesh, scale).ToString("0.#####")
                         + " turned against the "
-                        + FigureFit.SpreadOf(mesh, scale).ToString("0.#####")
+                        + FigureFit.BoxSpreadOf(mesh, scale).ToString("0.#####")
                         + " the box around it bounds it at, over a walkway of "
                         + GateArch.Walkway.ToString("0.#####"));
                 }
             }
 
-            Assert.That(boxed.Count, Is.GreaterThan(0), string.Join("; ", boxed.ToArray()));
+            Assert.That(boxed.Count, Is.EqualTo(PlayerGuises.Count), string.Join("; ", boxed.ToArray()));
+            Assert.That(
+                GateArch.TileFootprint,
+                Is.LessThan(IsoProjection.TileEdge),
+                "the arch the widest turn sizes no longer keeps its footprint on the tile it stands on");
         }
 
         [Test]

@@ -122,13 +122,35 @@ namespace Game.Domain.Tests
         {
             Assert.That(GateArch.Walkway, Is.GreaterThan(LevelBlueprintBuilder.FigureScale));
             Assert.That(GateArch.Walkway, Is.GreaterThan(LevelBlueprintBuilder.BossScale));
-            Assert.That(GateArch.Walkway, Is.GreaterThan(GateArch.WidestPasser));
+            Assert.That(GateArch.Walkway, Is.GreaterThan(GateArch.WidestTurn));
             Assert.That(GateArch.Span, Is.GreaterThan(GateArch.Walkway));
+        }
+
+        [Test]
+        public void TheArchIsSizedFromTheGroundItsWidestPasserTurnsRatherThanTheBoxAroundIt()
+        {
+            var passers = CharacterCast.MeshesOf(PartStyle.Start);
+            var scale = GateArch.PasserScale;
+            var widestTurn = 0f;
+            var widestBox = 0f;
+
+            foreach (var passer in passers)
+            {
+                widestTurn = Math.Max(widestTurn, FigureFit.TurnOf(passer, scale));
+                widestBox = Math.Max(widestBox, FigureFit.BoxSpreadOf(passer, scale));
+            }
+
+            Assert.That(GateArch.WidestPasser, Is.EqualTo(PlayerKit.BodyOf(PlayerGuise.Rogue)));
+            Assert.That(GateArch.WidestTurn, Is.EqualTo(widestTurn).Within(Tolerance));
+            Assert.That(GateArch.Walkway, Is.EqualTo(widestTurn * GateArch.Headroom).Within(Tolerance));
+            Assert.That(widestTurn, Is.LessThan(widestBox));
+            Assert.That(GateArch.Walkway, Is.LessThan(widestBox * GateArch.Headroom));
         }
 
         [Test]
         public void TheWholeArchKeepsItsFootprintOnTheTileItStandsOn()
         {
+            Assert.That(GateArch.TileFootprint, Is.EqualTo(0.92158f).Within(1e-4f));
             Assert.That(GateArch.TileFootprint, Is.LessThan(IsoProjection.TileEdge));
             Assert.That(GateArch.Span, Is.GreaterThan(IsoProjection.TileEdge));
 
@@ -156,14 +178,14 @@ namespace Game.Domain.Tests
             {
                 var power = tier == 0 ? 1 : PlayerTier.Thresholds[tier - 1];
                 var look = PlayerLook.Of(power);
-                var mesh = CharacterCast.MeshOf(PartStyle.Start);
+                var mesh = PlayerKit.BodyOf(look.Guise);
 
                 Assert.That(
                     FigureFit.StandingHeight(mesh, look.Scale),
                     Is.LessThan(GateArch.PostHeight),
                     "tier " + tier);
                 Assert.That(
-                    FigureFit.SpreadOf(mesh, look.Scale),
+                    FigureFit.TurnOf(mesh, look.Scale),
                     Is.LessThan(GateArch.Walkway),
                     "tier " + tier);
             }
