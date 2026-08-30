@@ -2,31 +2,31 @@ using System.Collections.Generic;
 
 namespace Game.Presentation.Pure
 {
-    public static class AdventurerClips
+    public static class SkeletonClips
     {
-        public const string Idle = "Idle_A";
+        public const string Idle = "Idle";
 
         public const string Walk = "Walking_A";
 
         public const string Retreat = "Walking_Backwards";
 
-        public const string Strike = "Melee_1H_Attack_Chop";
+        public const string Strike = "1H_Melee_Attack_Chop";
 
-        public const string Clash = "Melee_Block_Hit";
+        public const string Clash = "Block_Hit";
 
         public const string Recoil = "Hit_A";
 
         public const string Take = "PickUp";
 
-        public const string Kick = "Melee_Unarmed_Attack_Kick";
+        public const string Kick = "Unarmed_Melee_Attack_Kick";
 
-        public const string Slice = "Melee_1H_Attack_Slice_Diagonal";
+        public const string Slice = "1H_Melee_Attack_Slice_Diagonal";
 
-        public const string Cleave = "Melee_2H_Attack_Chop";
+        public const string Cleave = "2H_Melee_Attack_Chop";
 
-        public const string Thrust = "Melee_2H_Attack_Stab";
+        public const string Thrust = "2H_Melee_Attack_Stab";
 
-        public const string Sweep = "Melee_2H_Attack_Spin";
+        public const string Sweep = "2H_Melee_Attack_Spin";
 
         public const string Fall = "Death_A";
 

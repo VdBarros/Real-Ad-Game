@@ -127,6 +127,11 @@ namespace Game.Presentation
             return byModel[slot];
         }
 
+        public AnimationClip ClipOf(PartModel model, FigureAct act)
+        {
+            return ClipOf(model, CastClips.NameOf(model, act));
+        }
+
         public AnimationClip ClipOf(PartModel model, string clip)
         {
             var table = Table(model);
@@ -145,7 +150,8 @@ namespace Game.Presentation
             if (complaints.ShouldSay(model + "/" + clip))
             {
                 UnityEngine.Debug.LogWarning(
-                    "Animation clip " + clip + " resolves to nothing under Resources/" + AssetPathOf(model)
+                    "Animation clip " + clip + " resolves to nothing under Resources/"
+                    + string.Join(", Resources/", ClipPathsOf(model))
                     + ", where " + table.Count
                     + " clips did load, so every figure wearing that mesh holds its static pose whenever "
                     + clip + " is called for.");
@@ -219,21 +225,43 @@ namespace Game.Presentation
             return ArtPacks.ShipsWithTheCast(model) ? CharacterFolder : ResourcesFolder;
         }
 
+        public static string[] ClipPathsOf(PartModel model)
+        {
+            if (!ArtPacks.IsRiggedCharacter(model))
+            {
+                return new string[0];
+            }
+
+            if (ArtPacks.Of(model) != ArtPack.Adventurers)
+            {
+                var own = AssetPathOf(model);
+
+                return own == null ? new string[0] : new[] { own };
+            }
+
+            var sets = AnimationSets.Assets;
+            var paths = new string[sets.Count];
+
+            for (var slot = 0; slot < sets.Count; slot++)
+            {
+                paths[slot] = CharacterFolder + "/" + sets[slot];
+            }
+
+            return paths;
+        }
+
         static Dictionary<string, AnimationClip> Clips(PartModel model)
         {
             var table = new Dictionary<string, AnimationClip>(StringComparer.Ordinal);
-            var path = AssetPathOf(model);
 
-            if (path == null || !ArtPacks.IsRiggedCharacter(model))
+            foreach (var path in ClipPathsOf(model))
             {
-                return table;
-            }
-
-            foreach (var clip in Resources.LoadAll<AnimationClip>(path))
-            {
-                if (clip != null)
+                foreach (var clip in Resources.LoadAll<AnimationClip>(path))
                 {
-                    table[clip.name] = clip;
+                    if (clip != null)
+                    {
+                        table[clip.name] = clip;
+                    }
                 }
             }
 

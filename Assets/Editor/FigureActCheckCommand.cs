@@ -48,7 +48,7 @@ namespace Game.EditorTooling
 
         const float LimbTurn = 20f;
 
-        const int Limbs = 16;
+        const int Limbs = 12;
 
         const int SwungLimbs = 12;
 
@@ -90,6 +90,7 @@ namespace Game.EditorTooling
             using (var models = new WorldModels())
             {
                 failures += Imported(models, report);
+                failures += BoundToTheHero(models, report);
                 failures += TheWholeCastCarriesTheSameClips(models, report);
                 failures += Cut(models, report);
                 failures += Executed(models, report);
@@ -115,94 +116,10 @@ namespace Game.EditorTooling
         static int Imported(WorldModels models, StringBuilder report)
         {
             var worn = PartModels.Of(PartStyle.Start);
-            var path = "Assets/Resources/" + WorldModels.AssetPathOf(worn) + ".fbx";
-            var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+            var failures = TheSetsCarryTheAnimation(report);
 
-            if (importer == null)
-            {
-                return Assert(report, false, "the character mesh has a model importer", path + " has none");
-            }
-
-            var takes = importer.importedTakeInfos ?? new TakeInfo[0];
-            var baked = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var take in takes)
-            {
-                baked.Add(take.name);
-            }
-
-            var absentTakes = new List<string>();
-            foreach (var wanted in AdventurerClips.Names)
-            {
-                if (!baked.Contains(wanted))
-                {
-                    absentTakes.Add(wanted);
-                }
-            }
-
-            var failures = Assert(
-                report,
-                takes.Length > 0 && absentTakes.Count == 0,
-                "the character FBX the art library already carries holds the animation takes this ticket needs, "
-                + "so no further download is owed to anyone",
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0} takes are baked into {1}, and all {2} the pure clip table names are among them{3}",
-                    takes.Length,
-                    path,
-                    AdventurerClips.Count,
-                    absentTakes.Count == 0
-                        ? string.Empty
-                        : " except " + string.Join(", ", absentTakes.ToArray())));
-
-            failures += Assert(
-                report,
-                importer.importAnimation
-                && importer.animationType == CharacterArtPostprocessor.Rig
-                && importer.animationCompression == CharacterArtPostprocessor.AnimationCompression
-                && importer.removeConstantScaleCurves
-                && importer.resampleCurves
-                && !importer.importAnimatedCustomProperties,
-                "the character postprocessor turns animation import on from code, reversing for this pack the "
-                + "decision the dungeon postprocessor makes to leave it off",
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    "importAnimation {0}, rig {1}, compression {2}, constant scale curves removed {3}, "
-                    + "resampled {4}, animated custom properties {5}",
-                    importer.importAnimation,
-                    importer.animationType,
-                    importer.animationCompression,
-                    importer.removeConstantScaleCurves,
-                    importer.resampleCurves,
-                    importer.importAnimatedCustomProperties));
-
-            var narrowed = importer.clipAnimations ?? new ModelImporterClipAnimation[0];
-            var unwanted = new List<string>();
-            var mislooped = new List<string>();
-            foreach (var clip in narrowed)
-            {
-                if (!AdventurerClips.Wants(clip.name))
-                {
-                    unwanted.Add(clip.name);
-                }
-                else if (clip.loopTime != AdventurerClips.LoopsOf(clip.name))
-                {
-                    mislooped.Add(clip.name);
-                }
-            }
-
-            failures += Assert(
-                report,
-                narrowed.Length == AdventurerClips.Count && unwanted.Count == 0 && mislooped.Count == 0,
-                "the postprocessor narrows the import to exactly the clips the pure table names, and loops only "
-                + "the ones the table says loop, so the takes nothing plays never reach the player",
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0} of the {1} takes are imported against the {2} wanted{3}{4}",
-                    narrowed.Length,
-                    takes.Length,
-                    AdventurerClips.Count,
-                    unwanted.Count == 0 ? string.Empty : ", including unwanted " + string.Join(", ", unwanted.ToArray()),
-                    mislooped.Count == 0 ? string.Empty : ", mislooped " + string.Join(", ", mislooped.ToArray())));
+            failures += TheBodiesCarryNone(report);
+            failures += TheSkeletonsKeepTheirOwnTakes(report);
 
             var loaded = new List<string>();
             var absent = new List<string>();
@@ -282,6 +199,466 @@ namespace Game.EditorTooling
             return failures;
         }
 
+        static int TheSetsCarryTheAnimation(StringBuilder report)
+        {
+            var failures = 0;
+            var rows = new List<string>();
+
+            foreach (var set in AnimationSets.Assets)
+            {
+                var path = CharacterArtPostprocessor.ModelFolder + set + CharacterArtPostprocessor.ModelExtension;
+                var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+
+                if (importer == null)
+                {
+                    failures += Assert(
+                        report, false, "the " + set + " animation set is an imported model", path + " has none");
+                    continue;
+                }
+
+                var takes = importer.importedTakeInfos ?? new TakeInfo[0];
+                var wanted = new HashSet<string>(AnimationSets.ActsOf(set), StringComparer.Ordinal);
+                var narrowed = importer.clipAnimations ?? new ModelImporterClipAnimation[0];
+                var unwanted = new List<string>();
+                var mislooped = new List<string>();
+
+                foreach (var clip in narrowed)
+                {
+                    if (!wanted.Contains(clip.name))
+                    {
+                        unwanted.Add(clip.name);
+                    }
+                    else if (clip.loopTime != AdventurerClips.LoopsOf(clip.name))
+                    {
+                        mislooped.Add(clip.name);
+                    }
+                }
+
+                failures += Assert(
+                    report,
+                    importer.importAnimation
+                    && importer.animationType == CharacterArtPostprocessor.Rig
+                    && importer.animationCompression == CharacterArtPostprocessor.AnimationCompression
+                    && importer.resampleCurves
+                    && importer.removeConstantScaleCurves
+                    && !importer.importAnimatedCustomProperties
+                    && narrowed.Length == wanted.Count
+                    && unwanted.Count == 0
+                    && mislooped.Count == 0,
+                    "the " + set + " set imports its animation narrowed to the " + wanted.Count + " act"
+                    + (wanted.Count == 1 ? string.Empty : "s") + " no other set carries, and loops only what "
+                    + "the pure table says loops",
+                    string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} of its {1} takes are kept, against the {2} wanted{3}{4}",
+                        narrowed.Length,
+                        takes.Length,
+                        wanted.Count,
+                        unwanted.Count == 0
+                            ? string.Empty
+                            : ", including unwanted " + string.Join(", ", unwanted.ToArray()),
+                        mislooped.Count == 0
+                            ? string.Empty
+                            : ", mislooped " + string.Join(", ", mislooped.ToArray())));
+
+                rows.Add(set + " keeps " + narrowed.Length + " of " + takes.Length);
+            }
+
+            report.Append("\n  sets: ").Append(string.Join(", ", rows.ToArray()));
+
+            return failures;
+        }
+
+        static int TheBodiesCarryNone(StringBuilder report)
+        {
+            var bare = new List<string>();
+            var carrying = new List<string>();
+
+            foreach (var path in CharacterModels())
+            {
+                if (CharacterArtPostprocessor.Animated(path))
+                {
+                    continue;
+                }
+
+                var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+                if (importer == null)
+                {
+                    continue;
+                }
+
+                var clips = ClipsOn(path);
+                var named = System.IO.Path.GetFileNameWithoutExtension(path);
+
+                if (!importer.importAnimation && clips == 0)
+                {
+                    bare.Add(named);
+                }
+                else
+                {
+                    carrying.Add(named + " imports animation " + importer.importAnimation + " with " + clips
+                        + " clips");
+                }
+            }
+
+            return Assert(
+                report,
+                bare.Count > 0 && carrying.Count == 0,
+                "every character asset that is not an animation set imports with animation off and carries no "
+                + "clip of its own, so no body can shadow the sets with a stale take",
+                bare.Count + " import bare: " + string.Join(", ", bare.ToArray())
+                + (carrying.Count == 0 ? string.Empty : "; but " + string.Join("; ", carrying.ToArray())));
+        }
+
+        static int TheSkeletonsKeepTheirOwnTakes(StringBuilder report)
+        {
+            var kept = new List<string>();
+            var strayed = new List<string>();
+
+            foreach (PartModel model in Enum.GetValues(typeof(PartModel)))
+            {
+                if (model == PartModel.None || ArtPacks.Of(model) != ArtPack.Skeletons)
+                {
+                    continue;
+                }
+
+                var path = "Assets/Resources/" + WorldModels.AssetPathOf(model)
+                    + CharacterArtPostprocessor.ModelExtension;
+                var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+
+                if (importer == null)
+                {
+                    strayed.Add(path + " has no model importer");
+                    continue;
+                }
+
+                var narrowed = importer.clipAnimations ?? new ModelImporterClipAnimation[0];
+                var unwanted = new List<string>();
+
+                foreach (var clip in narrowed)
+                {
+                    if (!SkeletonClips.Wants(clip.name)
+                        || clip.loopTime != SkeletonClips.LoopsOf(clip.name))
+                    {
+                        unwanted.Add(clip.name);
+                    }
+                }
+
+                if (importer.importAnimation
+                    && narrowed.Length == SkeletonClips.Count
+                    && unwanted.Count == 0
+                    && ClipsOn(path) == SkeletonClips.Count)
+                {
+                    kept.Add(model + " " + narrowed.Length);
+                }
+                else
+                {
+                    strayed.Add(model + " imports animation " + importer.importAnimation + " narrowed to "
+                        + narrowed.Length + " of the " + SkeletonClips.Count + " its own takes name"
+                        + (unwanted.Count == 0
+                            ? string.Empty
+                            : ", straying on " + string.Join(", ", unwanted.ToArray())));
+                }
+            }
+
+            return Assert(
+                report,
+                kept.Count > 0 && strayed.Count == 0,
+                "the skeletons still import the takes baked into their own meshes under their own names, so "
+                + "moving the hero onto the animation sets leaves the enemies exactly where they were",
+                string.Join(", ", kept.ToArray())
+                + (strayed.Count == 0 ? string.Empty : "; but " + string.Join("; ", strayed.ToArray())));
+        }
+
+        static int BoundToTheHero(WorldModels models, StringBuilder report)
+        {
+            var worn = CharacterCast.MeshOf(PartStyle.Start);
+            var prefab = models.Of(worn);
+
+            if (prefab == null)
+            {
+                return Assert(
+                    report,
+                    false,
+                    "the hero's mesh loads out of the resources tree so its rig can be bound against",
+                    worn + " resolves to nothing loadable");
+            }
+
+            var figure = UnityEngine.Object.Instantiate(prefab);
+            var acts = 0;
+            var sourced = 0;
+            var bound = 0;
+            var looped = 0;
+            var curves = 0;
+            var skinning = 0;
+            var posed = 0;
+            var loose = new List<string>();
+            var strayed = new List<string>();
+            var mislooped = new List<string>();
+            var unkeyed = new List<string>();
+            var weightless = new List<string>();
+            var rows = new List<string>();
+
+            try
+            {
+                var skeleton = Skinning(figure, weightless);
+                skinning = skeleton.Count;
+
+                foreach (var act in FigureActs.All)
+                {
+                    acts++;
+
+                    var clip = models.ClipOf(worn, act);
+                    if (clip == null)
+                    {
+                        strayed.Add(act + " resolves to no clip at all");
+                        continue;
+                    }
+
+                    var wanted = CharacterArtPostprocessor.ModelFolder + AnimationSets.SetOf(act)
+                        + CharacterArtPostprocessor.ModelExtension;
+                    var from = AssetDatabase.GetAssetPath(clip);
+
+                    if (string.Equals(from, wanted, StringComparison.Ordinal))
+                    {
+                        sourced++;
+                    }
+                    else if (strayed.Count < 6)
+                    {
+                        strayed.Add(act + " on " + clip.name + " comes out of " + from + " rather than "
+                            + wanted);
+                    }
+
+                    if (clip.isLooping == FigureActs.Loops(act))
+                    {
+                        looped++;
+                    }
+                    else if (mislooped.Count < 6)
+                    {
+                        mislooped.Add(act + " is marked looping " + clip.isLooping);
+                    }
+
+                    var bindings = AnimationUtility.GetCurveBindings(clip);
+                    var references = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+                    var unresolved = new List<string>();
+                    var keyed = new HashSet<string>(StringComparer.Ordinal);
+
+                    foreach (var binding in bindings)
+                    {
+                        curves++;
+                        keyed.Add(binding.path);
+
+                        if (AnimationUtility.GetAnimatedObject(figure, binding) == null && unresolved.Count < 4)
+                        {
+                            unresolved.Add(binding.path + "." + binding.propertyName);
+                        }
+                    }
+
+                    var missed = new List<string>();
+
+                    foreach (var bone in skeleton)
+                    {
+                        if (!keyed.Contains(bone))
+                        {
+                            missed.Add(bone);
+                        }
+                    }
+
+                    if (missed.Count == 0)
+                    {
+                        posed++;
+                    }
+                    else if (unkeyed.Count < 6)
+                    {
+                        unkeyed.Add(clip.name + " keys none of " + string.Join(", ", missed.ToArray()));
+                    }
+
+                    foreach (var binding in references)
+                    {
+                        curves++;
+
+                        if (AnimationUtility.GetAnimatedObject(figure, binding) == null && unresolved.Count < 4)
+                        {
+                            unresolved.Add(binding.path + "." + binding.propertyName);
+                        }
+                    }
+
+                    if (unresolved.Count == 0)
+                    {
+                        bound++;
+                    }
+                    else if (loose.Count < 6)
+                    {
+                        loose.Add(clip.name + " binds nothing on " + worn + " at "
+                            + string.Join(", ", unresolved.ToArray()));
+                    }
+
+                    rows.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0} plays {1} out of {2}, {3:0.###}s over {4} curves, looping {5}",
+                        act,
+                        clip.name,
+                        AnimationSets.SetOf(act),
+                        clip.length,
+                        bindings.Length + references.Length,
+                        clip.isLooping));
+                }
+            }
+            finally
+            {
+                WorldObjects.Destroy(figure);
+            }
+
+            var failures = Assert(
+                report,
+                acts > 0 && sourced == acts,
+                "every act the hero can be cued into resolves to a clip out of the animation set that carries "
+                + "it, so not one frame the hero plays comes out of a character mesh any more",
+                sourced + " of " + acts + " do"
+                + (strayed.Count == 0 ? string.Empty : "; " + string.Join("; ", strayed.ToArray())));
+
+            failures += Assert(
+                report,
+                curves > 0 && bound == acts,
+                "and every curve in every one of those clips binds to a real node of the hero's own rig, which "
+                + "is the whole bet this ticket was written to settle",
+                bound + " of " + acts + " clips bind clean over " + curves + " curves"
+                + (loose.Count == 0 ? string.Empty : "; " + string.Join("; ", loose.ToArray())));
+
+            failures += Assert(
+                report,
+                acts > 0 && looped == acts,
+                "and the three acts the pure table loops are the three the imported clips loop, the pack "
+                + "itself having marked none of them",
+                looped + " of " + acts + " agree"
+                + (mislooped.Count == 0 ? string.Empty : "; " + string.Join("; ", mislooped.ToArray())));
+
+            failures += Assert(
+                report,
+                skinning > 0 && posed == acts,
+                "and every bone the hero's skinned meshes actually carry weight on is keyed by every one of "
+                + "those clips, so the nodes a set does not key deform nothing and the figure the player sees "
+                + "is posed entirely by the set",
+                posed + " of " + acts + " clips key all " + skinning + " weighted bones, the rig's other "
+                + weightless.Count + " carrying no vertex weight at all"
+                + (unkeyed.Count == 0 ? string.Empty : "; " + string.Join("; ", unkeyed.ToArray())));
+
+            report.Append("\n  weightless: ").Append(string.Join(", ", weightless.ToArray()));
+
+            report.Append("\n  library: ").Append(string.Join("; ", rows.ToArray()));
+
+            return failures;
+        }
+
+        static List<string> Skinning(GameObject figure, List<string> idle)
+        {
+            var bones = new List<string>();
+
+            foreach (var skin in figure.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                var mesh = skin.sharedMesh;
+                if (mesh == null)
+                {
+                    continue;
+                }
+
+                var weights = mesh.boneWeights;
+                var carrying = new bool[skin.bones.Length];
+
+                foreach (var weight in weights)
+                {
+                    Weigh(carrying, weight.boneIndex0, weight.weight0);
+                    Weigh(carrying, weight.boneIndex1, weight.weight1);
+                    Weigh(carrying, weight.boneIndex2, weight.weight2);
+                    Weigh(carrying, weight.boneIndex3, weight.weight3);
+                }
+
+                for (var slot = 0; slot < skin.bones.Length; slot++)
+                {
+                    var bone = skin.bones[slot];
+                    if (bone == null)
+                    {
+                        continue;
+                    }
+
+                    var trail = Trail(figure.transform, bone);
+                    var into = carrying[slot] ? bones : idle;
+
+                    if (!bones.Contains(trail) && !idle.Contains(trail))
+                    {
+                        into.Add(trail);
+                    }
+                    else if (carrying[slot] && idle.Remove(trail))
+                    {
+                        bones.Add(trail);
+                    }
+                }
+            }
+
+            bones.Sort(StringComparer.Ordinal);
+            idle.Sort(StringComparer.Ordinal);
+
+            return bones;
+        }
+
+        static void Weigh(bool[] carrying, int bone, float weight)
+        {
+            if (weight > 0f && bone >= 0 && bone < carrying.Length)
+            {
+                carrying[bone] = true;
+            }
+        }
+
+        static string Trail(Transform root, Transform node)
+        {
+            var trail = node.name;
+
+            for (var walk = node.parent; walk != null && walk != root; walk = walk.parent)
+            {
+                trail = walk.name + "/" + trail;
+            }
+
+            return trail;
+        }
+
+        static List<string> CharacterModels()
+        {
+            var assets = new List<string>();
+            var folder = CharacterArtPostprocessor.ModelFolder;
+
+            if (!System.IO.Directory.Exists(folder))
+            {
+                return assets;
+            }
+
+            foreach (var file in System.IO.Directory.GetFiles(
+                folder, "*" + CharacterArtPostprocessor.ModelExtension, System.IO.SearchOption.AllDirectories))
+            {
+                assets.Add(file.Replace('\\', '/'));
+            }
+
+            assets.Sort(StringComparer.Ordinal);
+
+            return assets;
+        }
+
+        static int ClipsOn(string asset)
+        {
+            var count = 0;
+
+            foreach (var loaded in AssetDatabase.LoadAllAssetsAtPath(asset))
+            {
+                var clip = loaded as AnimationClip;
+
+                if (clip != null && !clip.name.StartsWith("__preview__", StringComparison.Ordinal))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
         static int Cut(WorldModels models, StringBuilder report)
         {
             var worn = PartModels.Of(PartStyle.Start);
@@ -352,7 +729,7 @@ namespace Game.EditorTooling
             float beat,
             string leg)
         {
-            var clip = models.ClipOf(worn, cue.Clip);
+            var clip = models.ClipOf(worn, cue.Act);
             var seconds = clip == null ? 0f : clip.length;
 
             return Assert(
@@ -432,9 +809,10 @@ namespace Game.EditorTooling
 
             foreach (var mesh in meshes)
             {
+                var table = CastClips.TableFor(mesh);
                 var missing = new List<string>();
 
-                foreach (var name in AdventurerClips.Names)
+                foreach (var name in table.Names)
                 {
                     var clip = models.ClipOf(mesh, name);
 
@@ -444,7 +822,7 @@ namespace Game.EditorTooling
                     }
                 }
 
-                if (missing.Count == 0 && models.ClipCountOf(mesh) == AdventurerClips.Count)
+                if (missing.Count == 0 && models.ClipCountOf(mesh) == table.Count)
                 {
                     complete++;
                 }
@@ -459,9 +837,9 @@ namespace Game.EditorTooling
             return Assert(
                 report,
                 meshes.Count > 0 && complete == meshes.Count,
-                "every rigged mesh in the cast, the four skeletons as well as the player's knight, carries "
-                + "exactly the clips the pure table names, so an enemy animates off the same table the player "
-                + "does with no branch per pack",
+                "every rigged mesh in the cast, the four skeletons off their own takes and the player's knight "
+                + "off the animation sets, carries exactly the thirteen clips its pack's table names, so an "
+                + "enemy answers the same acts the player does",
                 complete + " of " + meshes.Count + " do (" + string.Join(", ", census.ToArray()) + ")"
                 + (complaint.Count == 0 ? string.Empty : "; " + string.Join("; ", complaint.ToArray())));
         }
@@ -632,10 +1010,10 @@ namespace Game.EditorTooling
 
                     if (fits == 0 && complaint.Count < 6)
                     {
-                        var clip = models.ClipOf(mesh, cue.Clip);
+                        var clip = models.ClipOf(mesh, cue.Act);
 
                         complaint.Add(
-                            mesh + " playing " + cue.Clip + " runs "
+                            mesh + " playing " + CastClips.NameOf(mesh, cue.Act) + " runs "
                             + (clip == null ? 0f : clip.length).ToString("0.###", CultureInfo.InvariantCulture)
                             + "s against a beat of "
                             + cue.Beat.ToString("0.###", CultureInfo.InvariantCulture) + "s");
@@ -914,7 +1292,7 @@ namespace Game.EditorTooling
 
         static int Cued(WorldModels models, PartModel mesh, FigureCue cue)
         {
-            var clip = models.ClipOf(mesh, cue.Clip);
+            var clip = models.ClipOf(mesh, cue.Act);
             var seconds = clip == null ? 0f : clip.length;
 
             return clip != null

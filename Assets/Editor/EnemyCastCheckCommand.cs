@@ -1343,7 +1343,7 @@ namespace Game.EditorTooling
 
                 if (member.Driven.Act == FigureAct.Idle
                     && member.Driven.Playing != null
-                    && member.Driven.Playing.name == AdventurerClips.Idle)
+                    && member.Driven.Playing.name == CastClips.NameOf(member.Driven.Worn, FigureAct.Idle))
                 {
                     idling++;
                 }
@@ -1366,7 +1366,9 @@ namespace Game.EditorTooling
                 cast.Count > 0 && idling == cast.Count,
                 "every one of them opens on the looping idle clip with nothing having cued it, because the "
                 + "still cue is the default cue",
-                idling + " of " + cast.Count + " stand on " + AdventurerClips.Idle);
+                idling + " of " + cast.Count + " stand on the clip their own pack names for "
+                + FigureAct.Idle + ", " + AdventurerClips.Idle + " for the hero and " + SkeletonClips.Idle
+                + " for a skeleton");
 
             if (cast.Count == 0)
             {

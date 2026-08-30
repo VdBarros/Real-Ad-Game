@@ -31,6 +31,11 @@ namespace Game.Presentation
             get { return motion.Cue.Act; }
         }
 
+        public PartModel Worn
+        {
+            get { return worn; }
+        }
+
         public AnimationClip Playing
         {
             get { return loaded; }
@@ -124,7 +129,7 @@ namespace Game.Presentation
                 return null;
             }
 
-            var clip = library.ClipOf(worn, motion.Cue.Clip);
+            var clip = library.ClipOf(worn, motion.Cue.Act);
             if (clip == null)
             {
                 return null;
