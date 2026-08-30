@@ -75,6 +75,9 @@ namespace Game.EditorTooling
             public readonly HashSet<string> StrayProps = new HashSet<string>(StringComparer.Ordinal);
             public PlayerWeapon Gripped;
             public bool WeaponFlew;
+            public bool DropSeen;
+            public string DropMesh = "nothing";
+            public PlayerWeapon DropRung;
             public bool EnemyFell;
             public bool Rebanded;
             public int Cleared;
@@ -347,6 +350,7 @@ namespace Game.EditorTooling
                     ? reel.EnemyPeak
                     : Further(reel.EnemyPeak, figure.Ground, enemyPost);
                 reel.WeaponFlew |= builder.Player.IsFlying;
+                Falling(reel, builder);
                 reel.EnemyFell |= figure != null && figure.HasFallen;
 
             }
@@ -364,6 +368,7 @@ namespace Game.EditorTooling
                 Step(rig, builder, walker, acting);
                 Reap(reel, builder, walker);
                 reel.WeaponFlew |= builder.Player.IsFlying;
+                Falling(reel, builder);
                 reel.EnemyFell |= figure != null && figure.HasFallen;
             }
 
@@ -939,6 +944,18 @@ namespace Game.EditorTooling
                 Debug.LogError("A win dropped no weapon.");
             }
 
+            if (!win.DropSeen)
+            {
+                Debug.LogError("A win never put the dropped weapon where it could be looked at.");
+            }
+            else if ((win.DropRung != PlayerWeapon.None) == IsAPrimitive(win.DropMesh))
+            {
+                Debug.LogError(
+                    "A win taking power to " + win.Settled.Power + " flew " + win.DropMesh
+                    + " while the rung it lands on grips " + win.DropRung
+                    + ", so the drop and the grip disagree about what is in the air.");
+            }
+
             if (win.Rebanded)
             {
                 Debug.LogError(
@@ -952,6 +969,40 @@ namespace Game.EditorTooling
                     "A win left the floor at " + win.Cleared + " cleared tiles, so the corridor the enemy "
                     + "was guarding never opened.");
             }
+        }
+
+        static void Falling(Tally reel, WorldBuilder builder)
+        {
+            if (reel.DropSeen || builder.Player == null || builder.PlayerBadge == null)
+            {
+                return;
+            }
+
+            var falling = builder.Player.Dropping;
+
+            if (falling == null)
+            {
+                return;
+            }
+
+            reel.DropSeen = true;
+            reel.DropRung = PlayerLook.Of(builder.PlayerBadge.Power).Weapon;
+
+            foreach (var renderer in falling.GetComponentsInChildren<Renderer>(true))
+            {
+                var mesh = PackMesh.On(renderer);
+
+                if (mesh != null)
+                {
+                    reel.DropMesh = mesh.name;
+                    return;
+                }
+            }
+        }
+
+        static bool IsAPrimitive(string mesh)
+        {
+            return string.Equals(mesh, "Cube", StringComparison.Ordinal);
         }
 
         static void ThePlayerStandsOnItsNode(WorldBuilder builder, RunState state, string leg)
@@ -1760,7 +1811,9 @@ namespace Game.EditorTooling
                 reel.ClearedBefore,
                 reel.Cleared,
                 reel.EnemyFell ? ", enemy dissolved" : string.Empty,
-                reel.WeaponFlew ? ", weapon dropped" : string.Empty,
+                reel.WeaponFlew
+                    ? ", dropped " + reel.DropMesh + " for a rung gripping " + reel.DropRung
+                    : string.Empty,
                 reel.HeldFrames * Frame,
                 reel.HeldFrames,
                 reel.WentGhost
