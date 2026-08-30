@@ -149,6 +149,8 @@ namespace Game.EditorTooling
             failures += TheStowedKitWalksThroughAGate(power, player, report);
             failures += EveryTierStandsInTheBodyItsGuiseNames(power, player, report);
             failures += ASwapKeepsWhatTheHeroWasDoingAndCarrying(power, player, report);
+            failures += TheDropCarriesTheWeaponTheHeroIsAboutToGrip(power, player, site, report);
+            failures += AWeaponArrivingWhileTheHeroIsStowedGoesDownHisSpine(power, player, site, report);
             failures += EveryGuiseSatForAPortrait(filmed, report);
 
             Application.logMessageReceived -= watcher;
@@ -2699,6 +2701,380 @@ namespace Game.EditorTooling
                 + "hanging off it are exactly the ones the tier calls for and no spares",
                 player.Carrying + " trophies in " + Planted(player) + " props against the "
                 + WantedProps(above) + " tier " + above + " wants");
+
+            return failures;
+        }
+
+        sealed class Drop
+        {
+            public string Name = "nothing";
+            public int Frames;
+            public int OwnMeshes;
+            public int Strangers;
+            public int OutgoingMeshes;
+            public float Scale;
+            public float Spin;
+            public float First;
+            public float Last;
+            public float Highest = float.MinValue;
+        }
+
+        static Drop Dropped(
+            PowerBadge power,
+            PlayerFigure player,
+            WorldPoint site,
+            int target,
+            ICollection<Mesh> arriving,
+            ICollection<Mesh> leaving)
+        {
+            var drop = new Drop();
+            var opening = 0f;
+
+            power.DropWeaponFrom(site);
+            power.Show(target);
+
+            for (var frame = 0; frame < PowerPump.Ceiling && (!power.IsSettled || player.IsFlying); frame++)
+            {
+                power.Advance(PowerPump.Frame);
+
+                var falling = player.Dropping;
+
+                if (falling == null)
+                {
+                    continue;
+                }
+
+                if (drop.Frames == 0)
+                {
+                    drop.Name = falling.name;
+                    drop.Scale = falling.lossyScale.x;
+                    drop.First = falling.position.y;
+                    opening = falling.localEulerAngles.y;
+
+                    foreach (var renderer in falling.GetComponentsInChildren<Renderer>(true))
+                    {
+                        var mesh = PackMesh.On(renderer);
+
+                        if (mesh != null && arriving.Contains(mesh))
+                        {
+                            drop.OwnMeshes++;
+                            continue;
+                        }
+
+                        drop.Strangers++;
+
+                        if (mesh != null && leaving.Contains(mesh))
+                        {
+                            drop.OutgoingMeshes++;
+                        }
+                    }
+                }
+
+                drop.Frames++;
+                drop.Last = falling.position.y;
+                drop.Highest = falling.position.y > drop.Highest ? falling.position.y : drop.Highest;
+                var turned = Math.Abs(Mathf.DeltaAngle(opening, falling.localEulerAngles.y));
+                drop.Spin = turned > drop.Spin ? turned : drop.Spin;
+            }
+
+            return drop;
+        }
+
+        static int StillHangingOffTheLevel(PlayerFigure player)
+        {
+            var parent = player.transform.parent;
+
+            if (parent == null)
+            {
+                return 0;
+            }
+
+            var left = 0;
+
+            foreach (var node in parent.GetComponentsInChildren<Transform>(true))
+            {
+                if (string.Equals(node.name, PartNames.Weapon, StringComparison.Ordinal))
+                {
+                    left++;
+                }
+            }
+
+            return left;
+        }
+
+        static ISet<Mesh> Bladed(PlayerWeapon weapon)
+        {
+            return weapon == PlayerWeapon.None
+                ? new HashSet<Mesh>()
+                : MeshesOf(PlayerKit.ModelOf(weapon));
+        }
+
+        static int TheDropCarriesTheWeaponTheHeroIsAboutToGrip(
+            PowerBadge power, PlayerFigure player, WorldPoint site, StringBuilder report)
+        {
+            if (power == null || player == null)
+            {
+                return Assert(
+                    report,
+                    false,
+                    "there is a hero for a dying enemy to throw a weapon at",
+                    "the world raised none");
+            }
+
+            var failures = 0;
+            var carried = 0;
+            var sized = 0;
+            var arced = 0;
+            var armed = 0;
+            var matched = 0;
+            var released = 0;
+            var strayed = new List<string>();
+            var hanging = new List<string>();
+
+            report.Append("\n  drops, each one thrown at the rung above or below the hero's own:");
+
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                var from = tier == 0 ? 1 : tier - 1;
+                PowerPump.Settle(power, PowerAt(from));
+
+                var leaving = PlayerKit.WeaponOf(from);
+                var arriving = PlayerLook.Of(PowerAt(tier));
+                var drop = Dropped(
+                    power, player, site, PowerAt(tier), Bladed(arriving.Weapon), Bladed(leaving));
+
+                report.AppendFormat(
+                    CultureInfo.InvariantCulture,
+                    "\n    tier {0} <- tier {1}: the {2} leaves a {3} for the {4}'s {5}, {6} pack meshes "
+                    + "and {7} strangers over {8} frames, uniform scale {9:0.#####} against the "
+                    + "{10:0.#####} the drop pins, rising {11:0.####} above its ends and turning "
+                    + "{12:0.#} degrees",
+                    tier,
+                    from,
+                    leaving,
+                    drop.Name,
+                    arriving.Guise,
+                    arriving.Weapon,
+                    drop.OwnMeshes,
+                    drop.Strangers,
+                    drop.Frames,
+                    drop.Scale,
+                    WeaponDrop.CarriesAMesh(arriving) ? WeaponDrop.ScaleOf(arriving) : 0f,
+                    drop.Highest - Math.Max(drop.First, drop.Last),
+                    drop.Spin);
+
+                var left = StillHangingOffTheLevel(player);
+
+                if (player.Dropping == null && left == 0)
+                {
+                    released++;
+                }
+                else
+                {
+                    hanging.Add(
+                        "tier " + tier + " left " + left + " of them hanging off the level");
+                }
+
+                if (drop.Frames > 1 && drop.Spin > 0f
+                    && drop.Highest > Math.Max(drop.First, drop.Last))
+                {
+                    arced++;
+                }
+                else
+                {
+                    strayed.Add("tier " + tier + " never arced or never spun");
+                }
+
+                if (!WeaponDrop.CarriesAMesh(arriving))
+                {
+                    if (drop.OwnMeshes == 0 && drop.Frames > 0)
+                    {
+                        carried++;
+                        sized++;
+                    }
+                    else
+                    {
+                        strayed.Add("tier " + tier + " flew a mesh at a rung that grips nothing");
+                    }
+
+                    continue;
+                }
+
+                armed++;
+
+                if (drop.OwnMeshes > 0 && drop.Strangers == 0 && drop.OutgoingMeshes == 0)
+                {
+                    carried++;
+                }
+                else
+                {
+                    strayed.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} flew {1} meshes of the {2} it is about to grip, {3} strangers and {4} "
+                        + "off the {5} it is leaving",
+                        tier,
+                        drop.OwnMeshes,
+                        arriving.Weapon,
+                        drop.Strangers,
+                        drop.OutgoingMeshes,
+                        leaving));
+                }
+
+                if (Math.Abs(drop.Scale - WeaponDrop.ScaleOf(arriving)) <= Epsilon)
+                {
+                    sized++;
+                }
+                else
+                {
+                    strayed.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} flew at {1:0.#####} against the {2:0.#####} the drop pins",
+                        tier,
+                        drop.Scale,
+                        WeaponDrop.ScaleOf(arriving)));
+                }
+
+                var gripped = player.Wielding;
+
+                if (gripped != null && Math.Abs(gripped.lossyScale.x - drop.Scale) <= Epsilon)
+                {
+                    matched++;
+                }
+                else
+                {
+                    strayed.Add(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "tier {0} landed at {1:0.#####} in a hand holding it at {2:0.#####}",
+                        tier,
+                        drop.Scale,
+                        gripped == null ? 0f : gripped.lossyScale.x));
+                }
+            }
+
+            failures += Assert(
+                report,
+                carried == PlayerTier.Count,
+                "every drop flew the mesh of the weapon the rung it lands on grips, and never the one "
+                + "the hero is leaving behind",
+                carried + " of " + PlayerTier.Count + " drops carried what they should"
+                + (strayed.Count == 0 ? "" : ": " + string.Join(", ", strayed.ToArray())));
+
+            failures += Assert(
+                report,
+                sized == PlayerTier.Count && matched == armed && armed > 0,
+                "a weapon is the same size in the air as it is in the hand it lands in",
+                sized + " drops flew at the pinned scale and " + matched + " of " + armed
+                + " armed rungs landed at the scale the hand holds them at");
+
+            failures += Assert(
+                report,
+                arced == PlayerTier.Count,
+                "carrying a real mesh leaves the arc and the spin alone",
+                arced + " of " + PlayerTier.Count + " drops rose above both ends of their flight while "
+                + "turning");
+
+            failures += Assert(
+                report,
+                released == PlayerTier.Count,
+                "a settling flight destroys the weapon it raised on the path the Editor actually runs, "
+                + "so no drop is left hanging off the level once the hero has it",
+                released + " of " + PlayerTier.Count + " drops cleared themselves away"
+                + (hanging.Count == 0 ? "" : ": " + string.Join(", ", hanging.ToArray())));
+
+            return failures;
+        }
+
+        static int AWeaponArrivingWhileTheHeroIsStowedGoesDownHisSpine(
+            PowerBadge power, PlayerFigure player, WorldPoint site, StringBuilder report)
+        {
+            if (power == null || player == null)
+            {
+                return Assert(report, false, "there is a hero to stow a weapon on", "the world raised none");
+            }
+
+            var spined = 0;
+            var drawn = 0;
+            var armed = 0;
+            var strayed = new List<string>();
+
+            report.Append("\n  drops landing on a hero walking a gate with his weapon down his spine:");
+
+            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            {
+                var arriving = PlayerLook.Of(PowerAt(tier));
+
+                if (!WeaponDrop.CarriesAMesh(arriving))
+                {
+                    continue;
+                }
+
+                armed++;
+                PowerPump.Settle(power, PowerAt(tier - 1));
+                player.Sling(true);
+
+                var away = player.IsStowed;
+                var drop = Dropped(
+                    power, player, site, PowerAt(tier), Bladed(arriving.Weapon), new HashSet<Mesh>());
+
+                var stayed = player.IsStowed;
+                var held = player.Wielding;
+                var spine = held != null && held.parent == player.transform;
+
+                player.Sling(false);
+
+                var back = player.Wielding;
+                var hand = !player.IsStowed
+                    && back != null
+                    && back.parent != null
+                    && back.parent.name.StartsWith(ArtPacks.CastSlotNode, StringComparison.Ordinal);
+
+                report.Append("\n    tier ")
+                    .Append(tier)
+                    .Append(": the ")
+                    .Append(arriving.Weapon)
+                    .Append(" flew ")
+                    .Append(drop.Frames)
+                    .Append(" frames onto a hero whose stow was ")
+                    .Append(away ? "on" : "off")
+                    .Append(" and stayed ")
+                    .Append(stayed ? "on" : "off")
+                    .Append(", came to rest on ")
+                    .Append(held == null ? "nothing" : spine ? "the spine" : held.parent.name)
+                    .Append(" and drew back to ")
+                    .Append(back == null || back.parent == null ? "nothing" : back.parent.name);
+
+                if (away && stayed && drop.Frames > 0 && spine)
+                {
+                    spined++;
+                }
+                else
+                {
+                    strayed.Add("tier " + tier + " lost the stow the drop arrived into");
+                }
+
+                if (hand)
+                {
+                    drawn++;
+                }
+                else
+                {
+                    strayed.Add("tier " + tier + " never drew the delivered weapon back into the hand");
+                }
+            }
+
+            var failures = Assert(
+                report,
+                armed > 0 && spined == armed,
+                "a weapon landing while the hero walks a gate stowed hangs down his spine instead of "
+                + "fighting the stow for his hand",
+                spined + " of " + armed + " drops landed into a stow and stayed in it"
+                + (strayed.Count == 0 ? "" : ": " + string.Join(", ", strayed.ToArray())));
+
+            failures += Assert(
+                report,
+                armed > 0 && drawn == armed,
+                "drawing again past the gate puts the weapon the drop delivered back in the hand",
+                drawn + " of " + armed + " drops ended up gripped once the gate was behind him");
 
             return failures;
         }

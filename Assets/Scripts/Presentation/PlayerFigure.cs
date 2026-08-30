@@ -92,6 +92,11 @@ namespace Game.Presentation
             get { return held == null ? null : held.transform; }
         }
 
+        public Transform Dropping
+        {
+            get { return weapon == null ? null : weapon.transform; }
+        }
+
         internal void Kit(WorldModels models, Material dressing, Material contour)
         {
             library = models;
@@ -382,8 +387,32 @@ namespace Game.Presentation
             WorldObjects.Destroy(weapon);
 
             flight = WeaponFlight.From(dropSite, MergePoint(look));
-            weapon = Forge(PartNames.Weapon, transform.parent);
-            weapon.transform.localScale = Vector(Trophy.Size) * look.Scale;
+            weapon = Hurl(look);
+        }
+
+        GameObject Hurl(PlayerLook look)
+        {
+            if (WeaponDrop.CarriesAMesh(look))
+            {
+                var falling = Mount(PartNames.Weapon, transform.parent, WeaponDrop.ModelOf(look));
+
+                if (falling != null)
+                {
+                    falling.transform.localScale = Vector3.one * WeaponDrop.ScaleOf(look);
+
+                    foreach (var renderer in falling.GetComponentsInChildren<Renderer>(true))
+                    {
+                        Tints.Wash(renderer, WeaponDrop.Iron);
+                    }
+
+                    return falling;
+                }
+            }
+
+            var token = Forge(PartNames.Weapon, transform.parent);
+            token.transform.localScale = Vector(Trophy.Size) * look.Scale;
+
+            return token;
         }
 
         void Fly(float deltaSeconds)
