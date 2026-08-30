@@ -7,7 +7,22 @@ namespace Game.Presentation.Pure
     {
         public const int CloakFrom = 1;
 
-        public const float GripHeight = 0.63728f;
+        public const float KnightGripHeight = 0.63728f;
+
+        public const float BarbarianGripHeight = 0.65008f;
+
+        readonly struct Rung
+        {
+            public Rung(PlayerGuise guise, PlayerWeapon weapon)
+            {
+                Guise = guise;
+                Weapon = weapon;
+            }
+
+            public PlayerGuise Guise { get; }
+
+            public PlayerWeapon Weapon { get; }
+        }
 
         readonly struct Wielded
         {
@@ -25,32 +40,79 @@ namespace Game.Presentation.Pure
             public float Breadth { get; }
         }
 
-        static readonly PlayerWeapon[] weaponByTier =
+        static readonly Rung[] rampByTier =
         {
-            PlayerWeapon.None,
-            PlayerWeapon.Shortsword,
-            PlayerWeapon.Axe,
-            PlayerWeapon.Spear,
-            PlayerWeapon.Greatsword
+            new Rung(PlayerGuise.Knight, PlayerWeapon.None),
+            new Rung(PlayerGuise.Knight, PlayerWeapon.Shortsword),
+            new Rung(PlayerGuise.Barbarian, PlayerWeapon.Axe),
+            new Rung(PlayerGuise.Barbarian, PlayerWeapon.Spear),
+            new Rung(PlayerGuise.Barbarian, PlayerWeapon.Greatsword)
         };
 
         public static PlayerWeapon WeaponOf(int tier)
         {
-            RequireTier(tier);
+            return Climbed(tier).Weapon;
+        }
 
-            return tier < weaponByTier.Length ? weaponByTier[tier] : weaponByTier[weaponByTier.Length - 1];
+        public static PlayerGuise GuiseOf(int tier)
+        {
+            return Climbed(tier).Guise;
+        }
+
+        public static PlayerGuise GuiseHolding(PlayerWeapon weapon)
+        {
+            for (var tier = 0; tier < rampByTier.Length; tier++)
+            {
+                if (rampByTier[tier].Weapon == weapon)
+                {
+                    return rampByTier[tier].Guise;
+                }
+            }
+
+            throw new ArgumentOutOfRangeException(
+                nameof(weapon), weapon, "No rung of the ramp hands out that weapon.");
         }
 
         public static bool CloakedAt(int tier)
         {
-            RequireTier(tier);
+            var rung = Climbed(tier);
 
-            return tier >= CloakFrom;
+            return tier >= CloakFrom && PlayerGuises.Drapes(rung.Guise);
+        }
+
+        public static string CapeOf(int tier)
+        {
+            return PlayerGuises.CapeOf(GuiseOf(tier));
         }
 
         public static IReadOnlyList<PlayerWeapon> Weapons
         {
-            get { return weaponByTier; }
+            get
+            {
+                var carried = new PlayerWeapon[rampByTier.Length];
+
+                for (var tier = 0; tier < rampByTier.Length; tier++)
+                {
+                    carried[tier] = rampByTier[tier].Weapon;
+                }
+
+                return carried;
+            }
+        }
+
+        public static IReadOnlyList<PlayerGuise> Guises
+        {
+            get
+            {
+                var worn = new PlayerGuise[rampByTier.Length];
+
+                for (var tier = 0; tier < rampByTier.Length; tier++)
+                {
+                    worn[tier] = rampByTier[tier].Guise;
+                }
+
+                return worn;
+            }
         }
 
         public static PartModel ModelOf(PlayerWeapon weapon)
@@ -58,19 +120,38 @@ namespace Game.Presentation.Pure
             return Held(weapon).Model;
         }
 
-        public static string CloakNode
-        {
-            get { return AdventurerPack.CloakNode; }
-        }
-
         public static PartModel Body
         {
-            get { return CharacterCast.MeshOf(PartStyle.Start); }
+            get { return BodyOf(GuiseOf(0)); }
+        }
+
+        public static PartModel BodyOf(PlayerGuise guise)
+        {
+            return PlayerGuises.MeshOf(guise);
         }
 
         public static float StandingPerImportUnit
         {
-            get { return FigureFit.ScaleOf(Body); }
+            get { return StandingPerImportUnitOf(GuiseOf(0)); }
+        }
+
+        public static float StandingPerImportUnitOf(PlayerGuise guise)
+        {
+            return FigureFit.ScaleOf(BodyOf(guise));
+        }
+
+        public static float GripHeightOf(PlayerGuise guise)
+        {
+            switch (guise)
+            {
+                case PlayerGuise.Knight:
+                    return KnightGripHeight;
+                case PlayerGuise.Barbarian:
+                    return BarbarianGripHeight;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(guise), guise, "No guise grips its weapon at that height.");
+            }
         }
 
         public static float TipOf(PlayerWeapon weapon)
@@ -85,6 +166,11 @@ namespace Game.Presentation.Pure
 
         public static float ReachOf(PlayerWeapon weapon)
         {
+            return weapon == PlayerWeapon.None ? 0f : ReachOf(GuiseHolding(weapon), weapon);
+        }
+
+        public static float ReachOf(PlayerGuise guise, PlayerWeapon weapon)
+        {
             if (weapon == PlayerWeapon.None)
             {
                 return 0f;
@@ -95,8 +181,15 @@ namespace Game.Presentation.Pure
             var height = ArtPacks.HeightOf(model);
             var depth = ArtPacks.DepthOf(model);
 
-            return StandingPerImportUnit
+            return StandingPerImportUnitOf(guise)
                 * (float)Math.Sqrt(width * width + height * height + depth * depth);
+        }
+
+        static Rung Climbed(int tier)
+        {
+            RequireTier(tier);
+
+            return tier < rampByTier.Length ? rampByTier[tier] : rampByTier[rampByTier.Length - 1];
         }
 
         static Wielded Held(PlayerWeapon weapon)
@@ -106,11 +199,11 @@ namespace Game.Presentation.Pure
                 case PlayerWeapon.Shortsword:
                     return new Wielded(PartModel.SwordA, 0.67635f, 1.02282f);
                 case PlayerWeapon.Axe:
-                    return new Wielded(PartModel.AxeB, 0.71331f, 1.20882f);
+                    return new Wielded(PartModel.AxeB, 0.72764f, 1.23311f);
                 case PlayerWeapon.Spear:
-                    return new Wielded(PartModel.StaffA, 0.67315f, 0.97671f);
+                    return new Wielded(PartModel.StaffA, 0.68668f, 0.99633f);
                 case PlayerWeapon.Greatsword:
-                    return new Wielded(PartModel.Sword2Handed, 0.7126f, 1.37637f);
+                    return new Wielded(PartModel.Sword2Handed, 0.72691f, 1.40402f);
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(weapon), weapon, "The kit hangs no mesh on an empty hand.");

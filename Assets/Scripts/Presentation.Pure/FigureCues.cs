@@ -1,4 +1,3 @@
-using System;
 using Game.Domain;
 
 namespace Game.Presentation.Pure
@@ -33,22 +32,14 @@ namespace Game.Presentation.Pure
 
         public static FigureAct FinisherOf(PlayerWeapon gripped)
         {
-            switch (gripped)
-            {
-                case PlayerWeapon.None:
-                    return FigureAct.Kick;
-                case PlayerWeapon.Shortsword:
-                    return FigureAct.Slice;
-                case PlayerWeapon.Axe:
-                    return FigureAct.Cleave;
-                case PlayerWeapon.Spear:
-                    return FigureAct.Thrust;
-                case PlayerWeapon.Greatsword:
-                    return FigureAct.Sweep;
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        nameof(gripped), gripped, "No finisher is swung with that weapon.");
-            }
+            return FinisherOf(PlayerKit.GuiseHolding(gripped), gripped);
+        }
+
+        public static FigureAct FinisherOf(PlayerGuise guise, PlayerWeapon gripped)
+        {
+            return gripped == PlayerWeapon.None
+                ? FigureAct.Kick
+                : PlayerGuises.FinisherOf(guise);
         }
 
         public static FigureCue Striking(Fight fight, PlayerWeapon gripped)

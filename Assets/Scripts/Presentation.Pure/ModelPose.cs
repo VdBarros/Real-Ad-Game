@@ -25,6 +25,7 @@ namespace Game.Presentation.Pure
                 case PartModel.Staircase:
                     return Crested(part);
                 case PartModel.Knight:
+                case PartModel.Barbarian:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:
@@ -57,6 +58,7 @@ namespace Game.Presentation.Pure
                 case PartModel.Chest:
                     return new WorldPoint(part.Rotation.X, part.Rotation.Y + ChestFacing, part.Rotation.Z);
                 case PartModel.Knight:
+                case PartModel.Barbarian:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:
@@ -115,6 +117,7 @@ namespace Game.Presentation.Pure
                 case PartModel.SwordShield:
                     return Boxed(part);
                 case PartModel.Knight:
+                case PartModel.Barbarian:
                 case PartModel.SkeletonMinion:
                 case PartModel.SkeletonRogue:
                 case PartModel.SkeletonWarrior:

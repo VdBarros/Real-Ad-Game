@@ -165,8 +165,8 @@ namespace Game.Presentation
                         playerNumber = badge;
                         playerFigure = prop.gameObject.AddComponent<PlayerFigure>();
                         playerFigure.Stand(badge.transform, worn);
-                        playerFigure.Kit(models, materials.Of(PartStyle.Start));
-                        FigureAnimator.Raise(playerFigure.gameObject, worn, models);
+                        playerFigure.Kit(
+                            models, materials.Of(PartStyle.Start), materials.Contour());
                     }
                     else if (part.Style == BadgeStyle.Enemy || part.Style == BadgeStyle.Boss)
                     {
@@ -291,13 +291,17 @@ namespace Game.Presentation
                 worn[part.Name] = raised ? part.Model : PartModel.None;
             }
 
-            var instance = raised
-                ? UnityEngine.Object.Instantiate(model)
-                : part.Shape == PartShape.Gate || part.Shape == PartShape.Landmark
-                    ? new GameObject()
-                    : GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
+            var framed = raised && part.Style == PartStyle.Start;
 
-            if (raised && ArtPacks.IsRiggedCharacter(part.Model))
+            var instance = framed
+                ? new GameObject()
+                : raised
+                    ? UnityEngine.Object.Instantiate(model)
+                    : part.Shape == PartShape.Gate || part.Shape == PartShape.Landmark
+                        ? new GameObject()
+                        : GameObject.CreatePrimitive(PrimitiveOf(part.Shape));
+
+            if (raised && !framed && ArtPacks.IsRiggedCharacter(part.Model))
             {
                 CharacterDress.Bare(instance);
             }

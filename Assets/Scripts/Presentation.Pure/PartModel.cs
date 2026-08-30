@@ -17,6 +17,7 @@ namespace Game.Presentation.Pure
         CratesStacked,
         SwordShield,
         Knight,
+        Barbarian,
         SkeletonMinion,
         SkeletonRogue,
         SkeletonWarrior,

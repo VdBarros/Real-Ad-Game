@@ -157,25 +157,36 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void EachWeaponTierSwingsAFinisherOfItsOwn()
+        public void EachGuiseSwingsAFinisherOfItsOwnAndAnEmptyHandStillKicks()
         {
-            var weapons = Enum.GetValues(typeof(PlayerWeapon)).Cast<PlayerWeapon>().ToList();
-            var acts = new List<FigureAct>();
-            var clips = new List<string>();
+            var acts = new List<FigureAct> { FigureAct.Kick };
+            var clips = new List<string> { AdventurerClips.NameOf(FigureAct.Kick) };
 
-            foreach (var weapon in weapons)
+            Assert.That(FigureCues.FinisherOf(PlayerWeapon.None), Is.EqualTo(FigureAct.Kick));
+
+            foreach (var guise in PlayerGuises.All)
             {
-                var act = FigureCues.FinisherOf(weapon);
+                var act = PlayerGuises.FinisherOf(guise);
 
-                Assert.That(acts, Has.No.Member(act), weapon.ToString());
-                Assert.That(AdventurerClips.Loops(act), Is.False, weapon.ToString());
+                Assert.That(acts, Has.No.Member(act), guise.ToString());
+                Assert.That(AdventurerClips.Loops(act), Is.False, guise.ToString());
+                Assert.That(
+                    FigureCues.FinisherOf(guise, PlayerWeapon.None),
+                    Is.EqualTo(FigureAct.Kick),
+                    guise.ToString());
 
                 acts.Add(act);
                 clips.Add(AdventurerClips.NameOf(act));
             }
 
-            Assert.That(acts.Count, Is.EqualTo(weapons.Count));
-            Assert.That(clips.Distinct().Count(), Is.EqualTo(weapons.Count));
+            Assert.That(acts.Count, Is.EqualTo(PlayerGuises.Count + 1));
+            Assert.That(clips.Distinct().Count(), Is.EqualTo(acts.Count));
+
+            foreach (PlayerWeapon weapon in Enum.GetValues(typeof(PlayerWeapon)))
+            {
+                Assert.That(acts, Has.Member(FigureCues.FinisherOf(weapon)), weapon.ToString());
+            }
+
             Assert.Throws<ArgumentOutOfRangeException>(() => FigureCues.FinisherOf((PlayerWeapon)99));
         }
 

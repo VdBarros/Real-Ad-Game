@@ -9,11 +9,12 @@ namespace Game.Presentation.Pure
 
         public const float BaseScale = LevelBlueprintBuilder.FigureScale;
 
-        PlayerLook(int tier, float scale, int trophies, PlayerWeapon weapon, bool cloak)
+        PlayerLook(int tier, float scale, int trophies, PlayerGuise guise, PlayerWeapon weapon, bool cloak)
         {
             Tier = tier;
             Scale = scale;
             Trophies = trophies;
+            Guise = guise;
             Weapon = weapon;
             Cloak = cloak;
         }
@@ -28,7 +29,12 @@ namespace Game.Presentation.Pure
             }
 
             return new PlayerLook(
-                tier, scale, TrophiesAt(tier), PlayerKit.WeaponOf(tier), PlayerKit.CloakedAt(tier));
+                tier,
+                scale,
+                TrophiesAt(tier),
+                PlayerKit.GuiseOf(tier),
+                PlayerKit.WeaponOf(tier),
+                PlayerKit.CloakedAt(tier));
         }
 
         static int TrophiesAt(int tier)
@@ -47,6 +53,8 @@ namespace Game.Presentation.Pure
 
         public int Trophies { get; }
 
+        public PlayerGuise Guise { get; }
+
         public PlayerWeapon Weapon { get; }
 
         public bool Cloak { get; }
@@ -56,6 +64,7 @@ namespace Game.Presentation.Pure
             return Tier == other.Tier
                 && Scale.Equals(other.Scale)
                 && Trophies == other.Trophies
+                && Guise == other.Guise
                 && Weapon == other.Weapon
                 && Cloak == other.Cloak;
         }
@@ -72,6 +81,7 @@ namespace Game.Presentation.Pure
                 var hash = Tier;
                 hash = (hash * 397) ^ Scale.GetHashCode();
                 hash = (hash * 397) ^ Trophies;
+                hash = (hash * 397) ^ (int)Guise;
                 hash = (hash * 397) ^ (int)Weapon;
                 hash = (hash * 397) ^ (Cloak ? 1 : 0);
                 return hash;
@@ -87,6 +97,8 @@ namespace Game.Presentation.Pure
                 Scale.ToString("0.###", CultureInfo.InvariantCulture),
                 " carrying ",
                 Trophies.ToString(),
+                " as the ",
+                Guise.ToString(),
                 ", wielding ",
                 Weapon.ToString(),
                 Cloak ? " under a cloak" : " bare shouldered");

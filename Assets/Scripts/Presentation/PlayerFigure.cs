@@ -12,6 +12,16 @@ namespace Game.Presentation
 
         Material skin;
 
+        Material outline;
+
+        GameObject body;
+
+        FigureAnimator acting;
+
+        PlayerGuise guise;
+
+        bool dressed;
+
         GameObject weapon;
 
         GameObject held;
@@ -47,6 +57,21 @@ namespace Game.Presentation
             get { return gripped; }
         }
 
+        public PlayerGuise Wearing
+        {
+            get { return guise; }
+        }
+
+        public GameObject Body
+        {
+            get { return body; }
+        }
+
+        public FigureAnimator Acting
+        {
+            get { return acting; }
+        }
+
         public bool IsStowed
         {
             get { return stowed; }
@@ -56,7 +81,7 @@ namespace Game.Presentation
         {
             get
             {
-                var cape = CharacterDress.Cloak(gameObject);
+                var cape = Cape();
 
                 return cape != null && cape.gameObject.activeSelf;
             }
@@ -67,10 +92,11 @@ namespace Game.Presentation
             get { return held == null ? null : held.transform; }
         }
 
-        internal void Kit(WorldModels models, Material dressing)
+        internal void Kit(WorldModels models, Material dressing, Material contour)
         {
             library = models;
             skin = dressing;
+            outline = contour;
         }
 
         public void AwaitWeaponFrom(WorldPoint deathSite)
@@ -122,8 +148,14 @@ namespace Game.Presentation
 
         void Arm(PlayerLook look)
         {
-            if (armed && gripped == look.Weapon && cloaked == look.Cloak)
+            if (dressed && armed && guise == look.Guise && gripped == look.Weapon && cloaked == look.Cloak)
             {
+                return;
+            }
+
+            if (!dressed || guise != look.Guise)
+            {
+                Become(look);
                 return;
             }
 
@@ -132,12 +164,7 @@ namespace Game.Presentation
                 WorldObjects.Destroy(held);
                 held = null;
                 gripped = look.Weapon;
-
-                if (gripped != PlayerWeapon.None)
-                {
-                    held = Mount(PartNames.Held(gripped), Grip(), PlayerKit.ModelOf(gripped));
-                    Hang();
-                }
+                Grasp();
             }
 
             if (!armed || cloaked != look.Cloak)
@@ -147,6 +174,111 @@ namespace Game.Presentation
             }
 
             armed = true;
+        }
+
+        public void Become(PlayerLook look)
+        {
+            var cue = acting == null ? FigureCue.Still : acting.Cued;
+            var phase = acting == null ? 0f : acting.Phase;
+            var mid = acting != null && acting.IsPosed;
+            var facing = transform.localEulerAngles;
+
+            Shed();
+
+            guise = look.Guise;
+            var mesh = PlayerKit.BodyOf(guise);
+            body = Dress(mesh);
+            Refit(mesh);
+            acting = FigureAnimator.Raise(gameObject, mesh, library);
+            Resume(cue, phase, mid);
+            transform.localEulerAngles = facing;
+            cloaked = look.Cloak;
+            Drape(cloaked);
+            gripped = look.Weapon;
+            Grasp();
+            Reseat();
+            dressed = true;
+            armed = true;
+        }
+
+        void Shed()
+        {
+            WorldObjects.Destroy(held);
+            held = null;
+            gripped = PlayerWeapon.None;
+            armed = false;
+
+            WorldObjects.Destroy(acting);
+            acting = null;
+
+            WorldObjects.Destroy(body);
+            body = null;
+            dressed = false;
+        }
+
+        GameObject Dress(PartModel mesh)
+        {
+            var prefab = library == null ? null : library.Of(mesh);
+
+            if (prefab == null)
+            {
+                return null;
+            }
+
+            var instance = Instantiate(prefab);
+            instance.name = PartNames.Guised(guise);
+            instance.transform.SetParent(transform, worldPositionStays: false);
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+            CharacterDress.Bare(instance);
+
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                renderer.sharedMaterial = skin;
+            }
+
+            if (FigureRim.Contours(PartStyle.Start))
+            {
+                FigureContour.Draw(instance, outline);
+            }
+
+            return instance;
+        }
+
+        void Resume(FigureCue cue, float phase, bool mid)
+        {
+            if (acting == null)
+            {
+                return;
+            }
+
+            acting.Cue(cue);
+
+            if (mid)
+            {
+                acting.Advance(phase);
+            }
+        }
+
+        void Grasp()
+        {
+            if (gripped == PlayerWeapon.None)
+            {
+                return;
+            }
+
+            held = Mount(PartNames.Held(gripped), Grip(), PlayerKit.ModelOf(gripped));
+            Hang();
+        }
+
+        void Reseat()
+        {
+            for (var slot = 0; slot < trophies.Count; slot++)
+            {
+                Seat(trophies[slot], slot);
+                trophies[slot].transform.localScale = Vector(Trophy.Size) * CapsuleUnit;
+            }
         }
 
         public void Sling(bool away)
@@ -183,7 +315,7 @@ namespace Game.Presentation
 
             held.transform.SetParent(transform, worldPositionStays: true);
             held.transform.localPosition =
-                Vector(WeaponStow.PoseOf(gripped, RestYaw)) * CapsuleUnit;
+                Vector(WeaponStow.PoseOf(guise, gripped, RestYaw)) * CapsuleUnit;
             held.transform.localEulerAngles = new Vector3(0f, WeaponStow.LocalYaw(RestYaw), 0f);
         }
 
@@ -192,6 +324,11 @@ namespace Game.Presentation
             var slot = CharacterDress.Hand(gameObject);
 
             return slot == null ? transform : slot;
+        }
+
+        Transform Cape()
+        {
+            return CharacterDress.Cloak(gameObject, guise);
         }
 
         GameObject Mount(string name, Transform anchor, PartModel model)
@@ -226,7 +363,7 @@ namespace Game.Presentation
 
         void Drape(bool worn)
         {
-            var cape = CharacterDress.Cloak(gameObject);
+            var cape = Cape();
 
             if (cape != null)
             {
@@ -275,11 +412,15 @@ namespace Game.Presentation
             WorldObjects.Destroy(weapon);
             weapon = null;
             held = null;
+            body = null;
+            acting = null;
             library = null;
             skin = null;
+            outline = null;
             gripped = PlayerWeapon.None;
             cloaked = false;
             armed = false;
+            dressed = false;
             stowed = false;
             trophies.Clear();
         }

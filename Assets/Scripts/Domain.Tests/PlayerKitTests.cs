@@ -45,25 +45,43 @@ namespace Game.Domain.Tests
         }
 
         [Test]
-        public void TheCloakGoesOnAtOneThresholdAndNeverComesOffAgain()
+        public void TheCloakGoesOnAtOneThresholdAndOnlyOnAGuiseThatOwnsACape()
         {
             Assert.That(PlayerKit.CloakedAt(0), Is.False);
+            Assert.That(PlayerKit.CloakedAt(PlayerKit.CloakFrom - 1), Is.False);
 
-            var thrown = 0;
-
-            for (var tier = 1; tier < PlayerTier.Count; tier++)
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
             {
-                Assert.That(PlayerKit.CloakedAt(tier), Is.True);
+                var guise = PlayerKit.GuiseOf(tier);
 
-                if (!PlayerKit.CloakedAt(tier) && PlayerKit.CloakedAt(tier - 1))
+                Assert.That(
+                    PlayerKit.CloakedAt(tier),
+                    Is.EqualTo(tier >= PlayerKit.CloakFrom && PlayerGuises.Drapes(guise)),
+                    "tier " + tier + " as the " + guise);
+            }
+        }
+
+        [Test]
+        public void AGuiseThatOwnsNoCapeNeverDrapesAndNeverReportsItselfCloaked()
+        {
+            Assert.That(PlayerGuises.WearsACape(null), Is.False);
+            Assert.That(PlayerGuises.WearsACape(string.Empty), Is.False);
+
+            var bare = 0;
+
+            for (var tier = PlayerKit.CloakFrom; tier < PlayerTier.Count; tier++)
+            {
+                if (PlayerGuises.Drapes(PlayerKit.GuiseOf(tier)))
                 {
-                    thrown++;
+                    continue;
                 }
+
+                bare++;
+                Assert.That(PlayerKit.CloakedAt(tier), Is.False);
+                Assert.That(PlayerGuises.WearsACape(PlayerKit.CapeOf(tier)), Is.False);
             }
 
-            Assert.That(thrown, Is.EqualTo(0));
-            Assert.That(PlayerKit.CloakedAt(PlayerKit.CloakFrom), Is.True);
-            Assert.That(PlayerKit.CloakedAt(PlayerKit.CloakFrom - 1), Is.False);
+            Assert.That(bare, Is.EqualTo(0), "every adventurer this pack ships wears a cape of its own");
         }
 
         [Test]
@@ -105,15 +123,23 @@ namespace Game.Domain.Tests
         [Test]
         public void NoWeaponHangsTheMeshTheBodyItselfIsCutFrom()
         {
-            var body = CharacterCast.MeshOf(PartStyle.Start);
-
             for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
-                Assert.That(PlayerKit.ModelOf(PlayerKit.WeaponOf(tier)), Is.Not.EqualTo(body));
+                foreach (var guise in PlayerGuises.All)
+                {
+                    Assert.That(
+                        PlayerKit.ModelOf(PlayerKit.WeaponOf(tier)),
+                        Is.Not.EqualTo(PlayerKit.BodyOf(guise)));
+                }
             }
 
-            Assert.That(ArtPacks.IsRiggedCharacter(body), Is.True);
-            Assert.That(AdventurerPack.Carries(body), Is.True);
+            foreach (var guise in PlayerGuises.All)
+            {
+                var body = PlayerKit.BodyOf(guise);
+
+                Assert.That(ArtPacks.IsRiggedCharacter(body), Is.True, guise.ToString());
+                Assert.That(AdventurerPack.Carries(body), Is.True, guise.ToString());
+            }
         }
 
         [Test]
@@ -149,7 +175,7 @@ namespace Game.Domain.Tests
 
                 Assert.That(
                     PlayerKit.ReachOf(weapon),
-                    Is.EqualTo(PlayerKit.StandingPerImportUnit
+                    Is.EqualTo(PlayerKit.StandingPerImportUnitOf(PlayerKit.GuiseOf(tier))
                         * (float)Math.Sqrt(width * width + height * height + depth * depth))
                         .Within(1e-5f),
                     weapon.ToString());
@@ -169,17 +195,18 @@ namespace Game.Domain.Tests
             for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
                 Assert.That(
-                    PlayerKit.TipOf(PlayerKit.WeaponOf(tier)), Is.GreaterThan(PlayerKit.GripHeight));
+                    PlayerKit.TipOf(PlayerKit.WeaponOf(tier)),
+                    Is.GreaterThan(PlayerKit.GripHeightOf(PlayerKit.GuiseOf(tier))));
             }
         }
 
         [Test]
         public void NoWeaponTipsHigherThanTheHeadThePackHangsItBeside()
         {
-            var standing = FigureFit.StandingScalesOf(PartModel.Knight);
-
             for (var tier = 1; tier < PlayerTier.Count; tier++)
             {
+                var standing = FigureFit.StandingScalesOf(PlayerKit.BodyOf(PlayerKit.GuiseOf(tier)));
+
                 Assert.That(PlayerKit.TipOf(PlayerKit.WeaponOf(tier)), Is.LessThan(standing));
             }
         }
@@ -187,19 +214,51 @@ namespace Game.Domain.Tests
         [Test]
         public void TheHandTheWeaponsHangFromSitsInsideTheBodyThatSwingsThem()
         {
-            var standing = FigureFit.StandingScalesOf(PartModel.Knight);
+            foreach (var guise in PlayerGuises.All)
+            {
+                var standing = FigureFit.StandingScalesOf(PlayerKit.BodyOf(guise));
 
-            Assert.That(PlayerKit.GripHeight, Is.GreaterThan(standing / 3f));
-            Assert.That(PlayerKit.GripHeight, Is.LessThan(standing * 0.5f));
+                Assert.That(PlayerKit.GripHeightOf(guise), Is.GreaterThan(standing / 3f), guise.ToString());
+                Assert.That(PlayerKit.GripHeightOf(guise), Is.LessThan(standing * 0.5f), guise.ToString());
+            }
         }
 
         [Test]
-        public void TheCloakIsTheClothThePackAlreadyBoltsToTheBodyItDressses()
+        public void EveryGuiseGripsItsWeaponWhereItsOwnBodyCarriesTheHandSlot()
         {
-            Assert.That(PlayerKit.CloakNode, Is.EqualTo(AdventurerPack.CloakNode));
-            Assert.That(PlayerKit.CloakNode, Is.Not.Empty);
-            Assert.That(PlayerKit.CloakNode, Does.StartWith(PartModel.Knight.ToString()));
-            Assert.That(PlayerKit.CloakNode, Is.Not.EqualTo(AdventurerPack.SlotNode));
+            var rigged = PlayerKit.GripHeightOf(PlayerGuise.Knight)
+                * ArtPacks.HeightOf(PlayerKit.BodyOf(PlayerGuise.Knight));
+
+            foreach (var guise in PlayerGuises.All)
+            {
+                Assert.That(
+                    PlayerKit.GripHeightOf(guise) * ArtPacks.HeightOf(PlayerKit.BodyOf(guise)),
+                    Is.EqualTo(rigged).Within(1e-4f),
+                    guise.ToString());
+            }
+
+            Assert.That(
+                () => PlayerKit.GripHeightOf((PlayerGuise)99),
+                Throws.InstanceOf<ArgumentOutOfRangeException>());
+        }
+
+        [Test]
+        public void TheCloakIsTheClothTheGuisesOwnPackAlreadyBoltsToTheBodyItDressses()
+        {
+            Assert.That(PlayerKit.CapeOf(0), Is.EqualTo(AdventurerPack.KnightCloakNode));
+
+            for (var tier = 0; tier < PlayerTier.Count; tier++)
+            {
+                var cape = PlayerKit.CapeOf(tier);
+
+                Assert.That(cape, Is.EqualTo(PlayerGuises.CapeOf(PlayerKit.GuiseOf(tier))));
+                Assert.That(cape, Is.Not.EqualTo(AdventurerPack.SlotNode));
+
+                if (PlayerGuises.WearsACape(cape))
+                {
+                    Assert.That(cape, Does.StartWith(PlayerKit.BodyOf(PlayerKit.GuiseOf(tier)).ToString()));
+                }
+            }
         }
 
         [Test]
@@ -250,7 +309,7 @@ namespace Game.Domain.Tests
                     mounted.ToString());
             }
 
-            Assert.That(PlayerKit.CloakNode, Does.StartWith(PartModel.Knight.ToString()));
+            Assert.That(PlayerKit.CapeOf(PlayerKit.CloakFrom), Is.Not.Empty);
         }
     }
 }

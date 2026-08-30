@@ -26,9 +26,21 @@ namespace Game.Presentation
 
         bool grafted;
 
+        bool posed;
+
         public FigureAct Act
         {
             get { return motion.Cue.Act; }
+        }
+
+        public FigureCue Cued
+        {
+            get { return motion.Cue; }
+        }
+
+        public float Phase
+        {
+            get { return motion.Elapsed; }
         }
 
         public PartModel Worn
@@ -59,6 +71,11 @@ namespace Game.Presentation
         public bool HasClipsToPlay
         {
             get { return grafted; }
+        }
+
+        public bool IsPosed
+        {
+            get { return posed; }
         }
 
         public static FigureAnimator Raise(GameObject figure, PartModel mesh, WorldModels models)
@@ -120,6 +137,7 @@ namespace Game.Presentation
 
             playing.SetTime(motion.TimeIn(clip.length));
             graph.Evaluate(0f);
+            posed = true;
         }
 
         AnimationClip Load()
@@ -179,6 +197,7 @@ namespace Game.Presentation
             loaded = null;
             library = null;
             grafted = false;
+            posed = false;
         }
     }
 }

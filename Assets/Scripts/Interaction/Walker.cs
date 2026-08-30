@@ -14,8 +14,6 @@ namespace Game.Interaction
 
         PlayerFigure figure;
 
-        FigureAnimator acting;
-
         PowerBadge power;
 
         FloorState floor;
@@ -35,6 +33,11 @@ namespace Game.Interaction
         bool holding;
 
         bool afoot;
+
+        FigureAnimator Acting
+        {
+            get { return figure == null ? null : figure.Acting; }
+        }
 
         public event Action<ActionResult> Arrived;
 
@@ -116,7 +119,6 @@ namespace Game.Interaction
             rig = framing;
             input = taps;
             figure = world.Player;
-            acting = figure == null ? null : figure.GetComponent<FigureAnimator>();
             power = world.PlayerBadge;
             floor = world.Floor;
             trail = world.Trail;
@@ -340,9 +342,9 @@ namespace Game.Interaction
 
         void Act()
         {
-            if (acting != null)
+            if (Acting != null)
             {
-                acting.Cue(FigureCues.Of(journey, Gripped));
+                Acting.Cue(FigureCues.Of(journey, Gripped));
             }
         }
 
@@ -419,9 +421,9 @@ namespace Game.Interaction
             enabled = IsTheCastStillTurning();
             rig.Jolt(0f);
 
-            if (acting != null)
+            if (Acting != null)
             {
-                acting.Cue(FigureCue.Still);
+                Acting.Cue(FigureCue.Still);
             }
 
             if (!afoot)

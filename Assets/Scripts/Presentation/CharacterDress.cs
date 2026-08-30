@@ -43,9 +43,14 @@ namespace Game.Presentation
             return carried.Count;
         }
 
-        public static Transform Cloak(GameObject instance)
+        public static Transform Cloak(GameObject instance, PlayerGuise guise)
         {
-            return Under(instance, AdventurerPack.CloakNode);
+            return Cloak(instance, PlayerGuises.CapeOf(guise));
+        }
+
+        public static Transform Cloak(GameObject instance, string cape)
+        {
+            return PlayerGuises.WearsACape(cape) ? Under(instance, cape) : null;
         }
 
         public static Transform Hand(GameObject instance)

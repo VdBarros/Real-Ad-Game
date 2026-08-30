@@ -72,10 +72,15 @@ namespace Game.Presentation.Pure
 
         public static WorldPoint PoseOf(PlayerWeapon weapon, float restYaw)
         {
+            return PoseOf(PlayerKit.GuiseHolding(weapon), weapon, restYaw);
+        }
+
+        public static WorldPoint PoseOf(PlayerGuise guise, PlayerWeapon weapon, float restYaw)
+        {
             var behind = FigureFacing.HeadingOf(
                 FigureFacing.Normalised(LocalYaw(restYaw) + FigureFacing.HalfTurn));
 
-            return new WorldPoint(behind.X * Back, LiftOf(weapon), behind.Z * Back);
+            return new WorldPoint(behind.X * Back, LiftOf(guise, weapon), behind.Z * Back);
         }
 
         public static WorldPoint TrophyOf(int slot)
@@ -88,6 +93,11 @@ namespace Game.Presentation.Pure
 
         public static float LiftOf(PlayerWeapon weapon)
         {
+            return LiftOf(PlayerKit.GuiseHolding(weapon), weapon);
+        }
+
+        public static float LiftOf(PlayerGuise guise, PlayerWeapon weapon)
+        {
             if (weapon == PlayerWeapon.None)
             {
                 return Ride;
@@ -96,10 +106,15 @@ namespace Game.Presentation.Pure
             var model = PlayerKit.ModelOf(weapon);
             var middle = ArtPacks.BaseOf(model) + ArtPacks.HeightOf(model) * 0.5f;
 
-            return Ride - Standing(middle);
+            return Ride - Standing(guise, middle);
         }
 
         public static float CrestOf(PlayerWeapon weapon)
+        {
+            return CrestOf(PlayerKit.GuiseHolding(weapon), weapon);
+        }
+
+        public static float CrestOf(PlayerGuise guise, PlayerWeapon weapon)
         {
             if (weapon == PlayerWeapon.None)
             {
@@ -108,38 +123,54 @@ namespace Game.Presentation.Pure
 
             var model = PlayerKit.ModelOf(weapon);
 
-            return LiftOf(weapon)
-                + Standing(ArtPacks.BaseOf(model) + ArtPacks.HeightOf(model));
+            return LiftOf(guise, weapon)
+                + Standing(guise, ArtPacks.BaseOf(model) + ArtPacks.HeightOf(model));
         }
 
         public static float FootOf(PlayerWeapon weapon)
         {
+            return FootOf(PlayerKit.GuiseHolding(weapon), weapon);
+        }
+
+        public static float FootOf(PlayerGuise guise, PlayerWeapon weapon)
+        {
             if (weapon == PlayerWeapon.None)
             {
                 return 0f;
             }
 
-            return LiftOf(weapon) + Standing(ArtPacks.BaseOf(PlayerKit.ModelOf(weapon)));
+            return LiftOf(guise, weapon)
+                + Standing(guise, ArtPacks.BaseOf(PlayerKit.ModelOf(weapon)));
         }
 
         public static float AcrossOf(PlayerWeapon weapon)
         {
-            if (weapon == PlayerWeapon.None)
-            {
-                return 0f;
-            }
-
-            return Standing(ArtPacks.WidthOf(PlayerKit.ModelOf(weapon)));
+            return AcrossOf(PlayerKit.GuiseHolding(weapon), weapon);
         }
 
-        public static float BehindOf(PlayerWeapon weapon)
+        public static float AcrossOf(PlayerGuise guise, PlayerWeapon weapon)
         {
             if (weapon == PlayerWeapon.None)
             {
                 return 0f;
             }
 
-            return Back + Standing(ArtPacks.DepthOf(PlayerKit.ModelOf(weapon))) * 0.5f;
+            return Standing(guise, ArtPacks.WidthOf(PlayerKit.ModelOf(weapon)));
+        }
+
+        public static float BehindOf(PlayerWeapon weapon)
+        {
+            return BehindOf(PlayerKit.GuiseHolding(weapon), weapon);
+        }
+
+        public static float BehindOf(PlayerGuise guise, PlayerWeapon weapon)
+        {
+            if (weapon == PlayerWeapon.None)
+            {
+                return 0f;
+            }
+
+            return Back + Standing(guise, ArtPacks.DepthOf(PlayerKit.ModelOf(weapon))) * 0.5f;
         }
 
         public static float Lintel
@@ -154,6 +185,11 @@ namespace Game.Presentation.Pure
 
         public static bool ClearsTheArch(PlayerWeapon weapon)
         {
+            return ClearsTheArch(PlayerKit.GuiseHolding(weapon), weapon);
+        }
+
+        public static bool ClearsTheArch(PlayerGuise guise, PlayerWeapon weapon)
+        {
             if (!TuckedIn())
             {
                 return false;
@@ -164,10 +200,10 @@ namespace Game.Presentation.Pure
                 return true;
             }
 
-            return FootOf(weapon) > 0f
-                && CrestOf(weapon) < Lintel
-                && AcrossOf(weapon) < Shoulders
-                && 2f * BehindOf(weapon) < FigureFit.DepthOf(GateArch.Passer, 1f);
+            return FootOf(guise, weapon) > 0f
+                && CrestOf(guise, weapon) < Lintel
+                && AcrossOf(guise, weapon) < Shoulders
+                && 2f * BehindOf(guise, weapon) < FigureFit.DepthOf(GateArch.Passer, 1f);
         }
 
         static bool TuckedIn()
@@ -175,9 +211,9 @@ namespace Game.Presentation.Pure
             return Tuck < Trophy.Reach && 2f * (Tuck + Trophy.Thickness * 0.5f) < Shoulders;
         }
 
-        static float Standing(float importUnits)
+        static float Standing(PlayerGuise guise, float importUnits)
         {
-            return importUnits * PlayerKit.StandingPerImportUnit;
+            return importUnits * PlayerKit.StandingPerImportUnitOf(guise);
         }
     }
 }

@@ -93,7 +93,7 @@ namespace Game.Domain.Tests
                 Assert.That(WeaponStow.Away(level, walk, fight), Is.False, outcome + " kept it stowed.");
                 Assert.That(
                     FigureCues.FinisherOf(PlayerKit.WeaponOf(PlayerTier.Count - 1)),
-                    Is.EqualTo(FigureAct.Sweep));
+                    Is.EqualTo(PlayerGuises.FinisherOf(PlayerKit.GuiseOf(PlayerTier.Count - 1))));
             }
         }
 

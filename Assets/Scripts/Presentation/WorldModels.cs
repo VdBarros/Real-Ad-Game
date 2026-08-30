@@ -313,6 +313,8 @@ namespace Game.Presentation
                     return "sword_shield";
                 case PartModel.Knight:
                     return "Knight";
+                case PartModel.Barbarian:
+                    return "Barbarian";
                 case PartModel.SkeletonMinion:
                     return "Skeleton_Minion";
                 case PartModel.SkeletonRogue:
